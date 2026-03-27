@@ -338,10 +338,10 @@ async function handlePeer(ws: string, peerId: string): Promise<string> {
 
   return layout(`${peerId} — ${ws}`, navLinks(ws, "peers"), `
     <h1>${esc(peerId)}</h1>
-    ${agentContext?.content ? `<div class="card" style="background:#f0f9ff;border-left:4px solid #3b82f6">
-      <h3>🤖 Agent Context Injection</h3>
-      <div class="meta" style="margin-bottom:12px">This is what gets injected into the AI agent's system prompt</div>
-      <div class="content-full" style="white-space:pre-wrap">${esc(agentContext.content)}</div>
+    ${agentContext?.content ? `<div class="card" style="background:#e0f2fe;border-left:4px solid #0284c7">
+      <h3 style="color:#0c4a6e">🤖 Agent Context Injection</h3>
+      <div class="meta" style="margin-bottom:12px;color:#0c4a6e">This is what gets injected into the AI agent's system prompt</div>
+      <div class="content-full" style="white-space:pre-wrap;color:#0c4a6e">${esc(agentContext.content)}</div>
     </div>` : ""}
     ${card?.peer_card ? `<div class="card"><h3>Peer Card</h3><div class="content-full">${esc(card.peer_card)}</div></div>` : ""}
     ${context?.representation ? `<div class="card"><h3>Raw Context (timestamped observations)</h3><div class="content-full">${esc(context.representation)}</div></div>` : ""}
