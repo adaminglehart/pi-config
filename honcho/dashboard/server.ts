@@ -260,42 +260,58 @@ async function handlePeers(ws: string): Promise<string> {
 }
 
 async function handlePeer(ws: string, peerId: string): Promise<string> {
-  const allPeers = await listPeers(ws);
-  const card = await getPeerCard(ws, peerId);
-  const sessions = await getPeerSessions(ws, peerId);
-  const context = await getPeerContext(ws, peerId);
-  
-  // Get the synthesized context that gets injected into agents
-  const agentContext = await getPeerChat(ws, peerId, "Summarize everything you know about this user - their preferences, coding style, workflow, and patterns.");
+  // Fetch all data in parallel where possible
+  // Skip agentContext by default (it's slow ~6s due to LLM synthesis)
+  const [allPeers, card, sessions, context, allConclusions] = await Promise.all([
+    listPeers(ws),
+    getPeerCard(ws, peerId),
+    getPeerSessions(ws, peerId),
+    getPeerContext(ws, peerId),
+    listConclusions(ws, 1, 200),
+  ]);
 
   // Representations: what this peer knows about others, and what others know about this peer
+  // Fetch all representations in parallel
   let repHtml = "";
+  const repPromises: Promise<void>[] = [];
+  const repResults: string[] = [];
+  
   for (const other of allPeers.items) {
     if (other.id === peerId) continue;
+    
     // This peer's view of others
-    try {
-      const { representation } = await getRepresentation(ws, peerId, other.id);
-      if (representation) {
-        repHtml += `<div class="card">
-          <h3>${esc(peerId)}'s view of <a href="/w/${esc(ws)}/peers/${esc(other.id)}"><span class="badge badge-green">${esc(other.id)}</span></a></h3>
-          <div class="content-full">${esc(representation)}</div>
-        </div>`;
-      }
-    } catch { /* none */ }
+    repPromises.push(
+      getRepresentation(ws, peerId, other.id)
+        .then(({ representation }) => {
+          if (representation) {
+            repResults.push(`<div class="card">
+              <h3>${esc(peerId)}'s view of <a href="/w/${esc(ws)}/peers/${esc(other.id)}"><span class="badge badge-green">${esc(other.id)}</span></a></h3>
+              <div class="content-full">${esc(representation)}</div>
+            </div>`);
+          }
+        })
+        .catch(() => {})
+    );
+    
     // Others' view of this peer
-    try {
-      const { representation } = await getRepresentation(ws, other.id, peerId);
-      if (representation) {
-        repHtml += `<div class="card">
-          <h3><a href="/w/${esc(ws)}/peers/${esc(other.id)}"><span class="badge badge-blue">${esc(other.id)}</span></a>'s view of ${esc(peerId)}</h3>
-          <div class="content-full">${esc(representation)}</div>
-        </div>`;
-      }
-    } catch { /* none */ }
+    repPromises.push(
+      getRepresentation(ws, other.id, peerId)
+        .then(({ representation }) => {
+          if (representation) {
+            repResults.push(`<div class="card">
+              <h3><a href="/w/${esc(ws)}/peers/${esc(other.id)}"><span class="badge badge-blue">${esc(other.id)}</span></a>'s view of ${esc(peerId)}</h3>
+              <div class="content-full">${esc(representation)}</div>
+            </div>`);
+          }
+        })
+        .catch(() => {})
+    );
   }
+  
+  await Promise.all(repPromises);
+  repHtml = repResults.join("");
 
-  // Conclusions about this peer
-  const allConclusions = await listConclusions(ws, 1, 200);
+  // Conclusions about this peer (filter client-side from cached fetch)
   const aboutPeer = allConclusions.items.filter(c => c.observed_id === peerId);
   const byPeer = allConclusions.items.filter(c => c.observer_id === peerId);
 
@@ -338,11 +354,28 @@ async function handlePeer(ws: string, peerId: string): Promise<string> {
 
   return layout(`${peerId} — ${ws}`, navLinks(ws, "peers"), `
     <h1>${esc(peerId)}</h1>
-    ${agentContext?.content ? `<div class="card" style="background:#e0f2fe;border-left:4px solid #0284c7">
+    <div class="card" style="background:#e0f2fe;border-left:4px solid #0284c7">
       <h3 style="color:#0c4a6e">🤖 Agent Context Injection</h3>
       <div class="meta" style="margin-bottom:12px;color:#0c4a6e">This is what gets injected into the AI agent's system prompt</div>
-      <div class="content-full" style="white-space:pre-wrap">${esc(agentContext.content)}</div>
-    </div>` : ""}
+      <div id="agent-context" class="content-full" style="white-space:pre-wrap">
+        <button onclick="loadAgentContext()" style="padding:8px 16px;background:#0284c7;color:white;border:none;border-radius:4px;cursor:pointer">Load Agent Context (may take 5-10s)</button>
+      </div>
+    </div>
+    <script>
+      async function loadAgentContext() {
+        const btn = document.querySelector('#agent-context button');
+        btn.textContent = 'Loading...';
+        btn.disabled = true;
+        try {
+          const res = await fetch('/w/${esc(ws)}/peers/${esc(peerId)}/agent-context');
+          if (!res.ok) throw new Error('Failed to fetch');
+          const data = await res.json();
+          document.getElementById('agent-context').textContent = data.content;
+        } catch (err) {
+          document.getElementById('agent-context').innerHTML = '<span style="color:#dc2626">Failed to load agent context</span>';
+        }
+      }
+    </script>
     ${card?.peer_card ? `<div class="card"><h3>Peer Card</h3><div class="content-full">${esc(card.peer_card)}</div></div>` : ""}
     ${context?.representation ? `<div class="card"><h3>Raw Context (timestamped observations)</h3><div class="content-full">${esc(context.representation)}</div></div>` : ""}
     ${repHtml ? `<h2>Representations</h2>${repHtml}` : ""}
@@ -483,6 +516,15 @@ const server = Bun.serve({
       const wsMatch = path.match(/^\/w\/([^/]+)$/);
       if (wsMatch) {
         return new Response(await handleWorkspace(decodeURIComponent(wsMatch[1])), { headers: { "Content-Type": "text/html" } });
+      }
+
+      // /w/:ws/peers/:peerId/agent-context (API endpoint)
+      const agentContextMatch = path.match(/^\/w\/([^/]+)\/peers\/([^/]+)\/agent-context$/);
+      if (agentContextMatch) {
+        const ws = decodeURIComponent(agentContextMatch[1]);
+        const peerId = decodeURIComponent(agentContextMatch[2]);
+        const agentContext = await getPeerChat(ws, peerId, "Summarize everything you know about this user - their preferences, coding style, workflow, and patterns.");
+        return new Response(JSON.stringify(agentContext || { content: "No context available" }), { headers: { "Content-Type": "application/json" } });
       }
 
       // /w/:ws/peers/:peerId
