@@ -193,50 +193,15 @@ export default function (pi: ExtensionAPI) {
   // Custom Tools
   // ===========================
 
-  // honcho_search — Semantic search across sessions
-  pi.registerTool({
-    name: "honcho_search",
-    label: "Honcho Search",
-    description:
-      "Semantic search across all Honcho sessions and messages for the current user",
-    parameters: Type.Object({
-      query: Type.String({ description: "Search query" }),
-    }),
-    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
-      if (!enabled) {
-        return {
-          content: [{ type: "text", text: "Honcho is not connected" }],
-          details: {},
-        };
-      }
-      try {
-        const userPeer = await client.peer(userPeerId);
-        const result = await userPeer.chat(params.query, {
-          session: sessionId,
-        });
-        return {
-          content: [{ type: "text", text: result || "No response" }],
-          details: {},
-        };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return {
-          content: [{ type: "text", text: `Honcho search failed: ${msg}` }],
-          details: {},
-        };
-      }
-    },
-  });
-
   // honcho_chat — Natural language query about the user
   pi.registerTool({
     name: "honcho_chat",
     label: "Honcho Chat",
     description:
-      "Ask Honcho about the user — their preferences, patterns, past decisions",
+      "Query long-term memory about this user. Use this before making assumptions about the user's preferences, workflow, or past decisions — especially at the start of a task, when choosing between approaches, or when you're unsure how the user likes things done. Returns synthesized knowledge from all past sessions.",
     parameters: Type.Object({
       question: Type.String({
-        description: "Natural language question about the user",
+        description: "Natural language question about the user, e.g. 'What is the user\'s preferred git workflow?' or 'How does the user like code to be structured?'",
       }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
@@ -268,9 +233,9 @@ export default function (pi: ExtensionAPI) {
     name: "honcho_save_insight",
     label: "Honcho Save Insight",
     description:
-      "Save a conclusion/insight about the user to Honcho's long-term memory",
+      "Persist a new insight or conclusion about the user to long-term memory. Use this whenever you learn something durable about the user's preferences, habits, opinions, or decisions — things that would be useful to know in future sessions. Don't wait to be asked; save proactively when you notice a pattern.",
     parameters: Type.Object({
-      content: Type.String({ description: "The insight to save" }),
+      content: Type.String({ description: "The insight to save, written as a concrete, reusable fact. E.g. 'User prefers flat module structures over nested folders' or 'User uses Graphite for git branching, not raw git'." }),
       category: Type.Optional(
         Type.String({
           description: "Category (e.g., preferences, workflow, code-style)",
