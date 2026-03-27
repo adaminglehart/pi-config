@@ -1,0 +1,16 @@
+{
+  "name": "pi-honcho",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@honcho-ai/sdk": "^2.0.1"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}
