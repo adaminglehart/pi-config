@@ -401,6 +401,44 @@ async function handlePeer(ws: string, peerId: string): Promise<string> {
     <h1>${esc(peerId)}</h1>
     ${card?.peer_card ? `<div class="card"><h3>Peer Card</h3><div class="content-full">${esc(card.peer_card)}</div></div>` : ""}
     ${context?.representation ? `<div class="card" style="background:#e0f2fe;border-left:4px solid #0284c7"><h3 style="color:#0c4a6e">🤖 Agent Context</h3><div class="meta" style="margin-bottom:12px;color:#0c4a6e">What gets injected into the AI agent's system prompt</div><div class="content-full" style="white-space:pre-wrap">${esc(context.representation)}</div></div>` : ""}
+    <h2>Chat</h2>
+    <div class="card">
+      <div class="meta" style="margin-bottom:12px">Ask Honcho anything about this peer using natural language</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="chat-input" type="text" placeholder="e.g. What are this user's coding preferences?" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:14px">
+        <button id="chat-btn" onclick="sendChat()" style="padding:8px 16px;background:#0284c7;color:white;border:none;border-radius:4px;cursor:pointer;white-space:nowrap">Ask</button>
+      </div>
+      <div id="chat-response" style="white-space:pre-wrap;display:none"></div>
+    </div>
+    <script>
+      document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+      async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const btn = document.getElementById('chat-btn');
+        const response = document.getElementById('chat-response');
+        const query = input.value.trim();
+        if (!query) return;
+        btn.textContent = '...';
+        btn.disabled = true;
+        response.style.display = 'none';
+        try {
+          const res = await fetch('/w/${esc(ws)}/peers/${esc(peerId)}/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+          });
+          const data = await res.json();
+          response.textContent = data.content;
+          response.style.display = 'block';
+        } catch (err) {
+          response.textContent = 'Error: ' + err;
+          response.style.display = 'block';
+        } finally {
+          btn.textContent = 'Ask';
+          btn.disabled = false;
+        }
+      }
+    </script>
     ${repHtml ? `<h2>Representations</h2>${repHtml}` : ""}
     ${conclusionHtml}
     ${sessions.items.length > 0 ? `<h2>Sessions (${sessions.total})</h2><table><tr><th>Session</th><th>Name</th><th>Created</th></tr>${sessionHtml}</table>` : ""}
@@ -539,6 +577,18 @@ const server = Bun.serve({
       const wsMatch = path.match(/^\/w\/([^/]+)$/);
       if (wsMatch) {
         return new Response(await handleWorkspace(decodeURIComponent(wsMatch[1])), { headers: { "Content-Type": "text/html" } });
+      }
+
+      // /w/:ws/peers/:peerId/chat (API endpoint)
+      const peerChatMatch = path.match(/^\/w\/([^/]+)\/peers\/([^/]+)\/chat$/);
+      if (peerChatMatch && req.method === "POST") {
+        const ws = decodeURIComponent(peerChatMatch[1]);
+        const peerId = decodeURIComponent(peerChatMatch[2]);
+        const body = await req.json() as { query: string };
+        const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+        const peer = await honcho.peer(peerId);
+        const content = await peer.chat(body.query);
+        return new Response(JSON.stringify({ content }), { headers: { "Content-Type": "application/json" } });
       }
 
       // /w/:ws/peers/:peerId
