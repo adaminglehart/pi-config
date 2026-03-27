@@ -20,8 +20,8 @@ export default function contextPilot(pi: ExtensionAPI) {
   registerContextDashboard(pi);
 
   // Handle status requests from other extensions (e.g. footer)
-  pi.events.on("context-pilot:status_request", () => {
-    if (getCommandCtx()) {
+  pi.events.on("context-pilot:status_request", (sm?: any) => {
+    if (getCommandCtx(sm)) {
       pi.events.emit("context-pilot:enabled", true);
     }
   });
@@ -31,7 +31,7 @@ export default function contextPilot(pi: ExtensionAPI) {
   pi.registerCommand("acm", {
     description: "Enable agentic context management for the current session",
     handler: async (args, ctx) => {
-      setCommandCtx(ctx);
+      setCommandCtx(ctx, ctx.sessionManager as any);
       pi.events.emit("context-pilot:enabled", true);
       ctx.ui.notify("Agentic Context Management enabled.", "info");
       pi.sendMessage(
@@ -53,19 +53,19 @@ export default function contextPilot(pi: ExtensionAPI) {
   // 2. turn_end aborts the agent (can't navigate mid-turn)
   // 3. agent_end navigates to the new branch via saved CommandCtx
   pi.on("turn_end", async (_event, ctx) => {
-    if (!getPendingCheckout()) return;
+    if (!getPendingCheckout(ctx.sessionManager as any)) return;
     ctx.abort();
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    const checkout = getPendingCheckout();
+    const sm = ctx.sessionManager as any;
+    const checkout = getPendingCheckout(sm);
     if (!checkout) return;
 
-    // Import getCommandCtx statically at module level — use the already-imported ref
-    const cmdCtx = getCommandCtx();
+    const cmdCtx = getCommandCtx(sm);
     if (!cmdCtx) return;
 
-    setPendingCheckout(null);
+    setPendingCheckout(null, sm);
 
     try {
       await cmdCtx.navigateTree(checkout.branchId, {

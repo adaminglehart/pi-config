@@ -1,3 +1,4 @@
 sourceDir: {{ .chezmoi.homeDir }}/dev/pi-config
+destDir: {{ .chezmoi.homeDir }}/.pi/agent
 data:
   environment: {{ if eq .chezmoi.hostname "Adams-MacBook-Pro.local" }}home{{ else }}work{{ end }}

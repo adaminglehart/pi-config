@@ -8,3 +8,9 @@ extensions/package-lock.json
 # Chezmoi state
 .chezmoi.yaml
 .chezmoi.toml
+
+# Honcho local environment
+honcho/.env
+agent/extensions/honcho/node_modules
+**/node_modules
+**/dist

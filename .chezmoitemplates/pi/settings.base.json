@@ -10,9 +10,7 @@
     "~/.config/pi/bake/pi-extension/status-writer.ts",
     "~/.pi/agent/extensions/custom-compaction/index.ts"
   ],
-  "skills": [
-    "~/.agents/skills"
-  ],
+  "skills": ["~/.agents/skills"],
   "selfLearning": {
     "enabled": false,
     "autoAfterTask": true,

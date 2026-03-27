@@ -38,10 +38,14 @@ function sanitizePath(cwd: string): string {
 /**
  * Extract text content from message content (string or array)
  */
-function extractTextContent(content: string | Array<{ type: string; text?: string }>): string | null {
+function extractTextContent(
+  content: string | Array<{ type: string; text?: string }>,
+): string | null {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
-    const texts = content.filter((c) => c.type === "text" && c.text).map((c) => c.text!);
+    const texts = content
+      .filter((c) => c.type === "text" && c.text)
+      .map((c) => c.text!);
     return texts.length > 0 ? texts.join("\n") : null;
   }
   return null;
@@ -56,7 +60,11 @@ export default function (pi: ExtensionAPI) {
   // ===========================
   pi.on("session_start", async (_event, ctx) => {
     try {
-      client = new Honcho({ baseURL: config.baseUrl, apiKey: "none", workspaceId: config.workspace });
+      client = new Honcho({
+        baseURL: config.baseUrl,
+        apiKey: "none",
+        workspaceId: config.workspace,
+      });
 
       // Get or create peers
       const userPeer = await client.peer(config.userName);
@@ -72,10 +80,15 @@ export default function (pi: ExtensionAPI) {
       });
       sessionId = session.id;
 
-      // Fetch initial context via chat (representation may not be computed yet)
+      // Fetch initial context using session.context() with peer representation
       try {
-        const chatResponse = await userPeer.chat("Summarize everything you know about this user - their preferences, coding style, workflow, and patterns.");
-        cachedContext = chatResponse || null;
+        const session = await client.session(sessionId);
+        const sessionContext = await session.context({
+          tokens: config.contextTokens,
+          peerTarget: userPeerId,
+        });
+        // Get the peer representation from the context
+        cachedContext = sessionContext.peerRepresentation || null;
       } catch {
         cachedContext = null;
       }
@@ -86,7 +99,10 @@ export default function (pi: ExtensionAPI) {
     } catch (err) {
       enabled = false;
       const msg = err instanceof Error ? err.message : String(err);
-      ctx.ui.notify(`Honcho: unreachable (${msg}), memory disabled for this session`, "warning");
+      ctx.ui.notify(
+        `Honcho: unreachable (${msg}), memory disabled for this session`,
+        "warning",
+      );
       ctx.ui.setStatus("honcho", "🧠 Honcho: disconnected");
     }
   });
@@ -98,13 +114,17 @@ export default function (pi: ExtensionAPI) {
     if (!enabled) return;
 
     turnCounter++;
-    const shouldRefresh = turnCounter === 1 || turnCounter % config.refreshInterval === 0;
+    const shouldRefresh =
+      turnCounter === 1 || turnCounter % config.refreshInterval === 0;
 
     if (shouldRefresh) {
       try {
-        const userPeer = await client.peer(userPeerId);
-        const chatResponse = await userPeer.chat("Summarize everything you know about this user - their preferences, coding style, workflow, and patterns.");
-        cachedContext = chatResponse || null;
+        const session = await client.session(sessionId);
+        const sessionContext = await session.context({
+          tokens: config.contextTokens,
+          peerTarget: userPeerId,
+        });
+        cachedContext = sessionContext.peerRepresentation || null;
       } catch {
         // Use cached on failure
       }
@@ -153,7 +173,9 @@ export default function (pi: ExtensionAPI) {
 
     // Create messages in a single batch
     if (messagesToCreate.length > 0) {
-      const p = session.addMessages(messagesToCreate).catch(() => {}) as Promise<void>;
+      const p = session
+        .addMessages(messagesToCreate)
+        .catch(() => {}) as Promise<void>;
       pendingWrites.push(p);
     }
   });
@@ -175,21 +197,33 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "honcho_search",
     label: "Honcho Search",
-    description: "Semantic search across all Honcho sessions and messages for the current user",
+    description:
+      "Semantic search across all Honcho sessions and messages for the current user",
     parameters: Type.Object({
       query: Type.String({ description: "Search query" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       if (!enabled) {
-        return { content: [{ type: "text", text: "Honcho is not connected" }], details: {} };
+        return {
+          content: [{ type: "text", text: "Honcho is not connected" }],
+          details: {},
+        };
       }
       try {
         const userPeer = await client.peer(userPeerId);
-        const result = await userPeer.chat(params.query, { session: sessionId });
-        return { content: [{ type: "text", text: result || "No response" }], details: {} };
+        const result = await userPeer.chat(params.query, {
+          session: sessionId,
+        });
+        return {
+          content: [{ type: "text", text: result || "No response" }],
+          details: {},
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: `Honcho search failed: ${msg}` }], details: {} };
+        return {
+          content: [{ type: "text", text: `Honcho search failed: ${msg}` }],
+          details: {},
+        };
       }
     },
   });
@@ -198,21 +232,33 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "honcho_chat",
     label: "Honcho Chat",
-    description: "Ask Honcho about the user — their preferences, patterns, past decisions",
+    description:
+      "Ask Honcho about the user — their preferences, patterns, past decisions",
     parameters: Type.Object({
-      question: Type.String({ description: "Natural language question about the user" }),
+      question: Type.String({
+        description: "Natural language question about the user",
+      }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       if (!enabled) {
-        return { content: [{ type: "text", text: "Honcho is not connected" }], details: {} };
+        return {
+          content: [{ type: "text", text: "Honcho is not connected" }],
+          details: {},
+        };
       }
       try {
         const userPeer = await client.peer(userPeerId);
         const result = await userPeer.chat(params.question);
-        return { content: [{ type: "text", text: result || "No response" }], details: {} };
+        return {
+          content: [{ type: "text", text: result || "No response" }],
+          details: {},
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: `Honcho chat failed: ${msg}` }], details: {} };
+        return {
+          content: [{ type: "text", text: `Honcho chat failed: ${msg}` }],
+          details: {},
+        };
       }
     },
   });
@@ -221,14 +267,22 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "honcho_save_insight",
     label: "Honcho Save Insight",
-    description: "Save a conclusion/insight about the user to Honcho's long-term memory",
+    description:
+      "Save a conclusion/insight about the user to Honcho's long-term memory",
     parameters: Type.Object({
       content: Type.String({ description: "The insight to save" }),
-      category: Type.Optional(Type.String({ description: "Category (e.g., preferences, workflow, code-style)" })),
+      category: Type.Optional(
+        Type.String({
+          description: "Category (e.g., preferences, workflow, code-style)",
+        }),
+      ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       if (!enabled) {
-        return { content: [{ type: "text", text: "Honcho is not connected" }], details: {} };
+        return {
+          content: [{ type: "text", text: "Honcho is not connected" }],
+          details: {},
+        };
       }
       try {
         const aiPeer = await client.peer(aiPeerId);
@@ -236,10 +290,18 @@ export default function (pi: ExtensionAPI) {
           content: params.content,
           sessionId: sessionId,
         });
-        return { content: [{ type: "text", text: `Saved insight: "${params.content}"` }], details: {} };
+        return {
+          content: [
+            { type: "text", text: `Saved insight: "${params.content}"` },
+          ],
+          details: {},
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { content: [{ type: "text", text: `Failed to save insight: ${msg}` }], details: {} };
+        return {
+          content: [{ type: "text", text: `Failed to save insight: ${msg}` }],
+          details: {},
+        };
       }
     },
   });
@@ -250,7 +312,8 @@ export default function (pi: ExtensionAPI) {
 
   // /honcho:status — Show connection info
   pi.registerCommand("honcho:status", {
-    description: "Show Honcho connection status, workspace, session, and peer info",
+    description:
+      "Show Honcho connection status, workspace, session, and peer info",
     handler: async (_args, ctx) => {
       if (!enabled) {
         ctx.ui.notify("🧠 Honcho: disconnected", "warning");
@@ -272,7 +335,8 @@ export default function (pi: ExtensionAPI) {
 
   // /honcho:interview — Structured Q&A to seed preferences
   pi.registerCommand("honcho:interview", {
-    description: "Structured interview to seed user preferences into Honcho memory",
+    description:
+      "Structured interview to seed user preferences into Honcho memory",
     handler: async (_args, ctx) => {
       if (!enabled) {
         ctx.ui.notify("Honcho is not connected", "error");
@@ -313,7 +377,8 @@ export default function (pi: ExtensionAPI) {
 
   // /honcho:inspect — Show raw observations with optional search filter
   pi.registerCommand("honcho:inspect", {
-    description: "Show raw Honcho observations/facts about the user (optional: search query)",
+    description:
+      "Show raw Honcho observations/facts about the user (optional: search query)",
     handler: async (args, ctx) => {
       if (!enabled) {
         ctx.ui.notify("Honcho is not connected", "error");
@@ -323,14 +388,19 @@ export default function (pi: ExtensionAPI) {
       try {
         const userPeer = await client.peer(userPeerId);
         const query = args?.trim() || "";
-        const representation = await userPeer.representation(query ? { searchQuery: query } : {});
-        
+        const representation = await userPeer.representation(
+          query ? { searchQuery: query } : {},
+        );
+
         if (!representation) {
           ctx.ui.notify("No observations found", "info");
           return;
         }
 
-        ctx.ui.notify(`🔍 Honcho Observations${query ? ` (filtered: "${query}")` : ""}\n\n${representation}`, "info");
+        ctx.ui.notify(
+          `🔍 Honcho Observations${query ? ` (filtered: "${query}")` : ""}\n\n${representation}`,
+          "info",
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         ctx.ui.notify(`Failed to fetch observations: ${msg}`, "error");
@@ -349,7 +419,10 @@ export default function (pi: ExtensionAPI) {
 
       const content = args?.trim();
       if (!content) {
-        ctx.ui.notify("Usage: /honcho:save <content>\n\nExample: /honcho:save User prefers concise responses", "info");
+        ctx.ui.notify(
+          "Usage: /honcho:save <content>\n\nExample: /honcho:save User prefers concise responses",
+          "info",
+        );
         return;
       }
 
@@ -370,9 +443,13 @@ export default function (pi: ExtensionAPI) {
 
   // /honcho:forget — Info about clearing memory
   pi.registerCommand("honcho:forget", {
-    description: "Show info about clearing Honcho memory (manual via API for now)",
+    description:
+      "Show info about clearing Honcho memory (manual via API for now)",
     handler: async (_args, ctx) => {
-      ctx.ui.notify("To clear Honcho memory, use the Honcho API directly at http://localhost:8100/docs", "info");
+      ctx.ui.notify(
+        "To clear Honcho memory, use the Honcho API directly at http://localhost:8100/docs",
+        "info",
+      );
     },
   });
 }

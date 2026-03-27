@@ -44,7 +44,8 @@ export function registerContextCheckout(pi: ExtensionAPI) {
       _onUpdate,
       ctx
     ) {
-      const cmdCtx = getCommandCtx();
+      const sm = ctx.sessionManager as any;
+      const cmdCtx = getCommandCtx(sm);
       if (!cmdCtx) {
         ctx.ui.setEditorText(
           `/acm ${ctx.ui.getEditorText() || "continue"}`
@@ -61,7 +62,6 @@ export function registerContextCheckout(pi: ExtensionAPI) {
       }
 
       // Cast to full SessionManager for branchWithSummary
-      const sm = ctx.sessionManager as unknown as SessionManager;
       const targetId = resolveTargetId(sm, params.target);
 
       // Validate target exists
@@ -130,7 +130,7 @@ export function registerContextCheckout(pi: ExtensionAPI) {
         target: params.target,
         enrichedMessage,
         backupTag: params.backupTag,
-      });
+      }, sm);
 
       return {
         content: [

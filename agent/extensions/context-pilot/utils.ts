@@ -10,11 +10,16 @@ export interface SessionTreeNode {
 }
 import type { TextContent, ImageContent, ToolCall } from "@mariozechner/pi-ai";
 
-// --- Shared mutable state for checkout flow ---
+// --- Session-scoped state for checkout flow ---
 // CommandCtx captures ExtensionCommandContext from /acm (only source of navigateTree).
 // pendingCheckout holds params between tool execution → turn_end → agent_end.
+//
+// Use WeakMaps keyed by sessionManager to ensure each session has isolated state.
+// This prevents state pollution across forked sessions running in the same process.
 
-let commandCtx: ExtensionCommandContext | null = null;
+import type { SessionManager } from "@mariozechner/pi-coding-agent";
+
+const commandCtxMap = new WeakMap<SessionManager, ExtensionCommandContext>();
 
 export interface PendingCheckout {
   branchId: string;
@@ -23,19 +28,26 @@ export interface PendingCheckout {
   enrichedMessage: string;
   backupTag?: string;
 }
-let pendingCheckout: PendingCheckout | null = null;
+const pendingCheckoutMap = new WeakMap<SessionManager, PendingCheckout>();
 
-export function getCommandCtx(): ExtensionCommandContext | null {
-  return commandCtx;
+export function getCommandCtx(sm?: SessionManager): ExtensionCommandContext | null {
+  return sm ? commandCtxMap.get(sm) || null : null;
 }
-export function setCommandCtx(ctx: ExtensionCommandContext): void {
-  commandCtx = ctx;
+
+export function setCommandCtx(ctx: ExtensionCommandContext, sm: SessionManager): void {
+  commandCtxMap.set(sm, ctx);
 }
-export function getPendingCheckout(): PendingCheckout | null {
-  return pendingCheckout;
+
+export function getPendingCheckout(sm?: SessionManager): PendingCheckout | null {
+  return sm ? pendingCheckoutMap.get(sm) || null : null;
 }
-export function setPendingCheckout(checkout: PendingCheckout | null): void {
-  pendingCheckout = checkout;
+
+export function setPendingCheckout(checkout: PendingCheckout | null, sm: SessionManager): void {
+  if (checkout === null) {
+    pendingCheckoutMap.delete(sm);
+  } else {
+    pendingCheckoutMap.set(sm, checkout);
+  }
 }
 
 // --- Constants and helpers ---

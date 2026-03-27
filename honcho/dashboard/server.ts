@@ -1,79 +1,125 @@
+import { Honcho } from "@honcho-ai/sdk";
+
 const API = "http://api:8000";
 
-// --- Honcho API helpers ---
-
-async function api(path: string, method = "POST", body?: unknown): Promise<unknown> {
-  const opts: RequestInit = { method, headers: { "Content-Type": "application/json" } };
-  if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API}/v3${path}`, opts);
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
-}
+// --- Honcho SDK helpers ---
 
 async function listWorkspaces() {
-  return api("/workspaces/list") as Promise<Page<Workspace>>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: "pi" });
+  const workspaces = await honcho.workspaces();
+  return { 
+    items: workspaces.items.map(ws => ({ id: ws, metadata: {}, configuration: {}, created_at: "" })), 
+    total: workspaces.items.length, 
+    page: 1, 
+    size: workspaces.items.length, 
+    pages: 1 
+  };
 }
 
 async function listPeers(ws: string) {
-  return api(`/workspaces/${ws}/peers/list`) as Promise<Page<Peer>>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  return honcho.peers();
 }
 
 async function listSessions(ws: string) {
-  return api(`/workspaces/${ws}/sessions/list`) as Promise<Page<Session>>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  return honcho.sessions();
 }
 
 async function listConclusions(ws: string, page = 1, size = 50) {
-  return api(`/workspaces/${ws}/conclusions/list`, "POST", { page, size }) as Promise<Page<Conclusion>>;
+  // For workspace-wide conclusions, use raw API since SDK requires peer scope
+  const res = await fetch(`${API}/v3/workspaces/${ws}/conclusions/list`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page, size })
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json() as Promise<Page<Conclusion>>;
 }
 
 async function listMessages(ws: string, sid: string, page = 1, size = 50) {
-  return api(`/workspaces/${ws}/sessions/${sid}/messages/list`, "POST", { page, size }) as Promise<Page<Message>>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  const session = await honcho.session(sid);
+  return session.messages({ page, pageSize: size });
 }
 
 async function getRepresentation(ws: string, observer: string, target: string) {
-  return api(`/workspaces/${ws}/peers/${observer}/representation`, "POST", { target }) as Promise<{ representation: string }>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  const peer = await honcho.peer(observer);
+  const rep = await peer.representation({ target });
+  return { representation: rep };
 }
 
 async function getSummaries(ws: string, sid: string) {
-  const res = await fetch(`${API}/v3/workspaces/${ws}/sessions/${sid}/summaries`);
-  if (!res.ok) return null;
-  return res.json() as Promise<Summaries>;
+  try {
+    const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+    const session = await honcho.session(sid);
+    return await session.summaries();
+  } catch {
+    return null;
+  }
 }
 
 async function getQueueStatus(ws: string) {
-  const res = await fetch(`${API}/v3/workspaces/${ws}/queue/status`);
-  if (!res.ok) return null;
-  return res.json() as Promise<QueueStatus>;
+  try {
+    const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+    return await honcho.queueStatus();
+  } catch {
+    return null;
+  }
 }
 
 async function getPeerCard(ws: string, peerId: string) {
-  const res = await fetch(`${API}/v3/workspaces/${ws}/peers/${peerId}/card`);
-  if (!res.ok) return null;
-  return res.json() as Promise<{ peer_card: string | null }>;
+  try {
+    const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+    const peer = await honcho.peer(peerId);
+    const card = await peer.card();
+    return { peer_card: card ? card.join("\n") : null };
+  } catch {
+    return null;
+  }
 }
 
 async function getPeerSessions(ws: string, peerId: string) {
-  return api(`/workspaces/${ws}/peers/${peerId}/sessions`) as Promise<Page<Session>>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  const peer = await honcho.peer(peerId);
+  return peer.sessions();
 }
 
 async function getPeerContext(ws: string, peerId: string) {
-  const res = await fetch(`${API}/v3/workspaces/${ws}/peers/${peerId}/context`);
-  if (!res.ok) return null;
-  return res.json() as Promise<{ peer_id: string; target_id: string; representation: string; peer_card: string | null }>;
+  try {
+    const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+    const peer = await honcho.peer(peerId);
+    const context = await peer.context();
+    return {
+      peer_id: context.peerId,
+      target_id: context.targetId,
+      representation: context.representation,
+      peer_card: context.peerCard ? context.peerCard.join("\n") : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function queryConclusions(ws: string, query: string) {
-  return api(`/workspaces/${ws}/conclusions/query`, "POST", { query, top_k: 10 }) as Promise<Conclusion[]>;
+  const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+  const results = await honcho.search(query, { pageSize: 10 });
+  return results.items;
 }
 
-async function getPeerChat(ws: string, peerId: string, query: string) {
-  const res = await fetch(`${API}/v3/workspaces/${ws}/peers/${peerId}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
-  });
-  if (!res.ok) return null;
-  return res.json() as Promise<{ content: string }>;
+async function getPeerAgentContext(ws: string, peerId: string, sessionId: string) {
+  try {
+    const honcho = new Honcho({ baseURL: API, apiKey: "none", workspaceId: ws });
+    const session = await honcho.session(sessionId);
+    const context = await session.context({
+      tokens: 2000,
+      peerTarget: peerId,
+    });
+    return context.peerRepresentation;
+  } catch {
+    return null;
+  }
 }
 
 // --- Types ---
