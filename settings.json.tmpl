@@ -1,0 +1,4 @@
+{{- $baseConfig := include ( printf "%s/.chezmoitemplates/pi/settings.base.json" .chezmoi.workingTree ) | fromJson -}}
+{{- $environmentConfigFile := ternary "settings.work.json" "settings.home.json" (eq .environment "work") -}}
+{{- $environmentConfig := include ( printf "%s/.chezmoitemplates/pi/%s" .chezmoi.workingTree $environmentConfigFile ) | fromJson -}}
+{{- mergeOverwrite $baseConfig $environmentConfig | toPrettyJson -}}

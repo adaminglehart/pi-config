@@ -1,0 +1,10 @@
+# Generated/installed files
+.DS_Store
+
+# Node modules for extensions
+extensions/node_modules/
+extensions/package-lock.json
+
+# Chezmoi state
+.chezmoi.yaml
+.chezmoi.toml

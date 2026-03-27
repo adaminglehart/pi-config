@@ -1,0 +1,47 @@
+{
+  "lastChangelogVersion": "0.63.1",
+  "packages": [
+    "npm:@plannotator/pi-extension",
+    "npm:pi-self-learning",
+    "npm:glimpseui",
+    "git:github.com/HazAT/pi-interactive-subagents"
+  ],
+  "extensions": [
+    "~/.config/pi/bake/pi-extension/status-writer.ts",
+    "~/.pi/agent/extensions/custom-compaction/index.ts"
+  ],
+  "skills": [
+    "~/.agents/skills"
+  ],
+  "selfLearning": {
+    "enabled": false,
+    "autoAfterTask": true,
+    "injectLastN": 0,
+    "maxCoreItems": 20,
+    "git": {
+      "enabled": false
+    },
+    "context": {
+      "enabled": true,
+      "includeCore": true,
+      "includeLastNDaily": 2,
+      "maxChars": 12000,
+      "instructionMode": "strict"
+    },
+    "storage": {
+      "mode": "global",
+      "globalPath": "~/.obsidian/vaults/agents/learnings"
+    },
+    "model": {
+      "provider": "stripe-google",
+      "id": "gemini-3-flash"
+    }
+  },
+  "hideThinkingBlock": true,
+  "librarian": {
+    "maxTurns": 10,
+    "maxSearchResults": 30,
+    "models": "stripe-google/gemini-3-flash:medium,stripe-anthropic/claude-sonnet-4.5:high"
+  },
+  "quietStartup": true
+}

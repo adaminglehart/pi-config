@@ -1,0 +1,16 @@
+{
+  "defaultProvider": "stripe-anthropic",
+  "defaultModel": "claude-sonnet-4.5",
+  "enabledModels": [
+    "stripe-anthropic/claude-opus-4.6",
+    "stripe-anthropic/claude-opus-4.6-1m",
+    "stripe-anthropic/claude-sonnet-4.5",
+    "stripe-anthropic/claude-sonnet-4-6-1m",
+    "stripe-anthropic/claude-4.5-haiku",
+    "stripe-openai/gpt-5.4",
+    "stripe-openai/gpt-5.4-pro",
+    "stripe-openai/gpt-5.3-codex",
+    "stripe-google/gemini-3.1-pro",
+    "stripe-google/gemini-3-flash"
+  ]
+}
