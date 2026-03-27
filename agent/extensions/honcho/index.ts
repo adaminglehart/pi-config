@@ -338,6 +338,36 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  // /honcho:save — Manually save a conclusion/fact
+  pi.registerCommand("honcho:save", {
+    description: "Manually save a conclusion or fact to Honcho memory",
+    handler: async (args, ctx) => {
+      if (!enabled) {
+        ctx.ui.notify("Honcho is not connected", "error");
+        return;
+      }
+
+      const content = args?.trim();
+      if (!content) {
+        ctx.ui.notify("Usage: /honcho:save <content>\n\nExample: /honcho:save User prefers concise responses", "info");
+        return;
+      }
+
+      try {
+        const aiPeer = await client.peer(aiPeerId);
+        const conclusionsScope = aiPeer.conclusionsOf(userPeerId);
+        await conclusionsScope.create({
+          content: content,
+          sessionId: sessionId,
+        });
+        ctx.ui.notify(`✓ Saved to Honcho: "${content}"`, "info");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        ctx.ui.notify(`Failed to save: ${msg}`, "error");
+      }
+    },
+  });
+
   // /honcho:forget — Info about clearing memory
   pi.registerCommand("honcho:forget", {
     description: "Show info about clearing Honcho memory (manual via API for now)",
