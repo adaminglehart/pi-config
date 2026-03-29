@@ -21,37 +21,51 @@ Honcho is a self-hosted memory service that gives Pi persistent, cross-session m
 ## Prerequisites
 
 - Docker and Docker Compose
+- API keys for your chosen providers (see configuration below)
 
 ## Setup
 
-1. **Generate the environment file:**
+1. **Ensure required API keys are in your environment:**
+   
+   For **home** environment (OpenRouter + Fireworks):
+   ```bash
+   export OPENROUTER_API_KEY="sk-or-v1-..."
+   export FIREWORKS_API_KEY="fw-..."
+   # Optional fallbacks:
+   export ANTHROPIC_API_KEY="sk-ant-..."
+   export OPENAI_API_KEY="sk-..."
+   export GEMINI_API_KEY="..."
+   ```
+   
+   For **work** environment (Stripe LiteLLM proxy):
+   ```bash
+   # No keys needed - uses Stripe's proxy
+   ```
+
+2. **Generate the environment file:**
    ```bash
    just honcho-env
    ```
    This creates `honcho/.env` configured for your current environment (work or home).
-   
-   The configuration automatically selects:
-   - **Work:** Stripe LiteLLM proxy with Gemini/Claude models
-   - **Home:** Direct API keys (requires `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` in your environment)
    
    To verify which environment will be used:
    ```bash
    chezmoi data | grep environment
    ```
 
-2. **Start the services:**
+3. **Start the services:**
    ```bash
    cd honcho
    docker compose up -d
    ```
 
-3. **Initialize the database (first time only):**
+4. **Initialize the database (first time only):**
    ```bash
    docker compose exec api python -m scripts.provision_db
    ```
    This creates all necessary database tables and indexes.
 
-4. **Verify it's running:**
+5. **Verify it's running:**
    ```bash
    curl http://localhost:8100/docs
    ```
@@ -74,18 +88,25 @@ LLM_OPENAI_COMPATIBLE_BASE_URL=http://litellm.qa.corp.stripe.com.certproxy.local
 LLM_OPENAI_COMPATIBLE_API_KEY=use_case=development&team=privy-eng-access-team
 ```
 
-### Home Environment
+### Home Environment (OpenRouter + Fireworks)
 
-Uses direct API keys from your environment variables:
-```env
-LLM_ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
-LLM_OPENAI_API_KEY=$OPENAI_API_KEY
-LLM_GEMINI_API_KEY=$GEMINI_API_KEY
-```
+Uses OpenRouter as the primary provider (unified access to Anthropic, Google, etc.) and Fireworks for fast, cheap models.
 
-Honcho's default dialectic levels:
-- **minimal/low:** `google/gemini-2.5-flash-lite`
-- **medium/high/max:** `anthropic/claude-haiku-4-5`
+**Required environment variables:**
+- `OPENROUTER_API_KEY` — Primary API key for OpenRouter
+- `FIREWORKS_API_KEY` — Secondary key for Fireworks-hosted models
+
+**Model tier configuration:**
+- **minimal:** `accounts/fireworks/models/llama4-scout-basic` (Fireworks — fastest, cheapest)
+- **low:** `google/gemini-2.5-flash-lite` (OpenRouter)
+- **medium:** `anthropic/claude-haiku-4-5` (OpenRouter)
+- **high/max:** `anthropic/claude-sonnet-4-5` (OpenRouter)
+
+**Why OpenRouter + Fireworks?**
+- **Cost efficiency** — OpenRouter routes to the cheapest provider for each model
+- **Single API key** — Access Anthropic, Google, and others through one integration
+- **Fallback options** — Direct API keys available as fallback
+- **Fireworks speed** — Llama 4 Scout on Fireworks is extremely fast and cheap for simple tasks
 
 ### Customizing Configuration
 
@@ -138,6 +159,8 @@ docker compose logs deriver
 ```
 
 Ensure your LLM provider is configured correctly in `.env` — the deriver needs working LLM access to reason about conversations.
+
+**Common issue:** If you see "401 Unauthorized" errors, check that your API keys are properly set in the template files and that you've regenerated `.env` with `just honcho-env`.
 
 ### Fresh start
 

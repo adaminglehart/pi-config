@@ -16,16 +16,15 @@ Plans live in the `plans/` directory in the project root, named by feature:
 - `plans/auth-refactor.md`
 - `plans/api-pagination.md`
 
-don't auto-commit changes to git, let me take care of that
+**important** don't automatically commit changes to git, ask first or letm e take care of it
   
 ## Extensions
 
-- if asked to create or edit an extension, do it in the dotfiles repo in the correct pi configuration location under home/private_dot_pi (which corresponds to ~/.pi). For example, since an extension needs to end up in ~/.pi/agent/extensions, it should go in dotfiles/private_dot_pi/private_agent/extensions
+- if asked to create or edit an extension, do it in the dotfiles repo in the correct pi configuration location under the pi-config repo (which corresponds to ~/.pi). For example, since an extension needs to end up in ~/.pi/agent/extensions, it should go in ~/dev/pi-config/agent/extensions
 
 ## Context Management
 
 Always use the context-pilot skill for proactive context management. Read the skill file at the start of every session and follow its guidelines throughout.
-
 
 ## Tool usage
 

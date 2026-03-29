@@ -1,9 +1,17 @@
 {
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-4",
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/routers/kimi-k2p5-turbo",
   "enabledModels": [
-    "anthropic/claude-sonnet-4",
-    "anthropic/claude-opus-4",
-    "anthropic/claude-haiku-4"
-  ]
+    "accounts/fireworks/routers/kimi-k2p5-turbo",
+    "openai-codex/gpt-5.4",
+    "minimax/minimax-m2.7",
+    "google/gemini-3-flash-preview",
+    "google/gemini-3.1-flash-lite-preview"
+  ],
+  "librarian": {
+    "maxSearchResults": 30,
+    "maxTurns": 15,
+    "models": "openrouter/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p5-turbo:high"
+  },
+  "defaultThinkingLevel": "high"
 }
