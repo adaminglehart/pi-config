@@ -19,6 +19,7 @@ import {
 import type {
   ExtensionAPI,
   ExtensionContext,
+  ModelRegistry,
 } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import {
@@ -88,14 +89,12 @@ const model = "google/gemini-3-flash-preview";
  */
 async function selectExtractionModel(
   currentModel: Model<Api>,
-  modelRegistry: {
-    find: (provider: string, modelId: string) => Model<Api> | undefined;
-    getApiKey: (model: Model<Api>) => Promise<string | undefined>;
-  },
+  modelRegistry: ModelRegistry,
 ): Promise<Model<Api>> {
   const haikuModel = modelRegistry.find(provider, model);
   if (haikuModel) {
-    const apiKey = await modelRegistry.getApiKey(haikuModel);
+    // Use getApiKeyForProvider instead of getApiKey to avoid potential binding issues
+    const apiKey = await modelRegistry.getApiKeyForProvider(haikuModel.provider);
     if (apiKey) {
       return haikuModel;
     }
@@ -521,15 +520,42 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
+    // Validate modelRegistry is available
+    if (!ctx.modelRegistry) {
+      ctx.ui.notify("Model registry not available", "error");
+      return;
+    }
+
+    // Validate modelRegistry methods exist
+    if (typeof ctx.modelRegistry.find !== "function") {
+      ctx.ui.notify("Model registry find method not available", "error");
+      return;
+    }
+    if (typeof ctx.modelRegistry.getApiKeyForProvider !== "function") {
+      ctx.ui.notify("Model registry getApiKeyForProvider method not available", "error");
+      return;
+    }
+
     // Find the last assistant message on the current branch
     const branch = ctx.sessionManager.getBranch();
     let lastAssistantText: string | undefined;
 
+    // Find the last assistant message, skipping over tool calls/results
+    // that may have been added by execute_command or other tools
+    let assistantMessagesChecked = 0;
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
+      
+      // Skip tool calls and tool results - they're not assistant messages
+      if (entry.type === "tool_call" || entry.type === "tool_result") {
+        continue;
+      }
+      
       if (entry.type === "message") {
         const msg = entry.message;
         if ("role" in msg && msg.role === "assistant") {
+          assistantMessagesChecked++;
+          
           // Accept "stop" and "toolUse" (for self-invoked /answer via execute_command)
           if (msg.stopReason !== "stop" && msg.stopReason !== "toolUse") {
             ctx.ui.notify(
@@ -552,7 +578,11 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (!lastAssistantText) {
-      ctx.ui.notify("No assistant messages found", "error");
+      if (assistantMessagesChecked === 0) {
+        ctx.ui.notify("No assistant messages found", "error");
+      } else {
+        ctx.ui.notify("No questions found in the last message", "info");
+      }
       return;
     }
 
@@ -573,7 +603,8 @@ export default function (pi: ExtensionAPI) {
         loader.onAbort = () => done(null);
 
         const doExtract = async () => {
-          const apiKey = await ctx.modelRegistry.getApiKey(extractionModel);
+          // Use getApiKeyForProvider to avoid potential binding issues
+          const apiKey = await ctx.modelRegistry.getApiKeyForProvider(extractionModel.provider);
           const userMessage: UserMessage = {
             role: "user",
             content: [{ type: "text", text: lastAssistantText! }],
@@ -654,7 +685,17 @@ export default function (pi: ExtensionAPI) {
   });
 
   // Listen for trigger from other extensions (e.g., execute_command tool)
-  pi.events.on("trigger:answer", (ctx: ExtensionContext) => {
-    answerHandler(ctx);
+  pi.events.on("trigger:answer", async (ctx: ExtensionContext) => {
+    try {
+      await answerHandler(ctx);
+    } catch (err) {
+      console.error("[answer] Error in trigger:answer handler:", err);
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          `Answer extension error: ${err instanceof Error ? err.message : String(err)}`,
+          "error",
+        );
+      }
+    }
   });
 }
