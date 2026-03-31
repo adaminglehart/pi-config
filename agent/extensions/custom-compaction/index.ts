@@ -34,9 +34,13 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // Resolve API key for the summarization model
-    const apiKey = await ctx.modelRegistry.getApiKey(model);
-    if (!apiKey) {
+    // Resolve request auth for the summarization model
+    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+    if (!auth.ok) {
+      ctx.ui.notify(`Compaction auth failed: ${auth.error}`, "warning");
+      return;
+    }
+    if (!auth.apiKey) {
       ctx.ui.notify(
         `No API key for ${model.provider}, using default compaction`,
         "warning",
@@ -94,7 +98,12 @@ ${conversationText}
       const response = await complete(
         model,
         { messages: summaryMessages },
-        { apiKey, maxTokens: 8192, signal },
+        {
+          apiKey: auth.apiKey,
+          headers: auth.headers,
+          maxTokens: 8192,
+          signal,
+        },
       );
 
       const summary = response.content

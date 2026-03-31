@@ -23,7 +23,7 @@ Stop searching as soon as you have enough evidence to answer confidently.
 
 ## Tool Budget
 
-At most {{maxTurns}} turns total (including the final answer turn). This is a cap, not a target.
+At most 10 turns total (including the final answer turn). This is a cap, not a target.
 Tool use is disabled on the final allowed turn, so finish discovery before that turn.
 
 ## Non-negotiable constraints
@@ -38,7 +38,7 @@ Tool use is disabled on the final allowed turn, so finish discovery before that 
 
 ## Default discovery strategy
 
-- Symbol/text known: start with `gh search code ... --limit {{maxSearchResults}}` (plus `--repo` / `--owner` filters when available).
+- Symbol/text known: start with `gh search code ... --limit 30` (plus `--repo` / `--owner` filters when available).
 - Repo known but paths unclear: resolve default branch, then use tree/contents API to map structure.
 - Path/metadata request (location/listing): use search/tree/contents output first; fetch file content only if needed.
 - If scope hints are provided (repos/owners/paths/refs), prioritize them first.
@@ -51,7 +51,7 @@ Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FI
    `gh repo view "$REPO" --json defaultBranchRef --jq '.defaultBranchRef.name'`
 
 1) Code search:
-   `gh search code '<terms>' --json path,repository,sha,url,textMatches --limit {{maxSearchResults}}`
+   `gh search code '<terms>' --json path,repository,sha,url,textMatches --limit 30`
    Optional scope: add `--repo owner/repo` and/or `--owner owner`.
 
 2) Repo tree map:

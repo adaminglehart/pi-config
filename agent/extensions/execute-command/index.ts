@@ -11,19 +11,17 @@ export default function (pi: ExtensionAPI) {
     label: "Execute Command",
     description: `Execute a slash command or send a message as if the user typed it. The message is added to the session history and triggers a new turn. Use this to:
 - Self-invoke /answer after asking multiple questions
-- Run /reload after creating skills
-- Execute any slash command programmatically
 - Send follow-up prompts to yourself
+- Execute other slash commands programmatically after making changes
 
-The command/message appears in the conversation as a user message.`,
+IMPORTANT: This tool does NOT work with /reload. Never use execute_command for /reload - it will fail or cause unexpected behavior. /reload must be typed by the user directly. Also, do NOT use this tool when the user has already typed a command - that creates a loop. Only use it to programmatically trigger commands after YOUR actions.`,
     promptSnippet:
-      "Execute a slash command or send a message as if the user typed it. " +
-      "Use to self-invoke /answer after asking questions, run /reload after creating skills, or send follow-up prompts.",
-
-    parameters: Type.Object({
+      "Execute a slash command or send a message programmatically after making changes. " +
+      "Use for /answer after questions or follow-up prompts. " +
+      "IMPORTANT: Does NOT work with /reload. Never use for user-typed commands.", Type.Object({
       command: Type.String({
         description:
-          "The command or message to execute (e.g., '/answer', '/reload', or any text)",
+          "The command or message to execute (e.g., '/answer', '/compact', or any text). NOTE: /reload does NOT work with this tool.",
       }),
       reason: Type.Optional(
         Type.String({
@@ -35,6 +33,29 @@ The command/message appears in the conversation as a user message.`,
 
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const { command, reason } = params;
+
+      // Explicitly block /reload - it does not work with this tool
+      if (command === "/reload") {
+        throw new Error(
+          "execute_command does NOT work with /reload. /reload must be typed by the user directly, not executed programmatically."
+        );
+      }
+
+      // Safety check: Don't queue if we're responding to a user-typed command
+      const entries = ctx.sessionManager.getBranch();
+      const lastEntry = entries[entries.length - 1];
+      if (
+        lastEntry?.type === "message" &&
+        lastEntry.message.role === "user" &&
+        lastEntry.message.content?.[0]?.type === "text" &&
+        lastEntry.message.content[0].text === command
+      ) {
+        throw new Error(
+          `Cannot execute "${command}" - user just typed this command. ` +
+          `This tool should only be used to programmatically trigger commands, ` +
+          `not to echo user commands.`
+        );
+      }
 
       // Store command to be executed after agent turn ends
       pendingCommand = { command, reason };
