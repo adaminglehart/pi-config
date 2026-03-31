@@ -18,7 +18,9 @@ IMPORTANT: This tool does NOT work with /reload. Never use execute_command for /
     promptSnippet:
       "Execute a slash command or send a message programmatically after making changes. " +
       "Use for /answer after questions or follow-up prompts. " +
-      "IMPORTANT: Does NOT work with /reload. Never use for user-typed commands.", Type.Object({
+      "IMPORTANT: Does NOT work with /reload. Never use for user-typed commands.",
+
+    parameters: Type.Object({
       command: Type.String({
         description:
           "The command or message to execute (e.g., '/answer', '/compact', or any text). NOTE: /reload does NOT work with this tool.",
