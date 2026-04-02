@@ -20,7 +20,7 @@ Plans live in the `plans/` directory in the project root, named by feature:
   
 ## Extensions
 
-- if asked to create or edit an extension, do it in the dotfiles repo in the correct pi configuration location under the pi-config repo (which corresponds to ~/.pi). For example, since an extension needs to end up in ~/.pi/agent/extensions, it should go in ~/dev/pi-config/agent/extensions
+- if asked to create, edit, or in any way modify a pi extension, do it in the correct pi configuration location under the pi-config repo (which corresponds to ~/.pi). For example, since an extension needs to end up in ~/.pi/agent/extensions, it should go in ~/dev/pi-config/agent/extensions
 
 ## Context Management
 
@@ -28,4 +28,4 @@ Always use the context-pilot skill for proactive context management. Read the sk
 
 ## Tool usage
 
-- NEVER run a terraform apply or other possibly destructive command without checking with me first
+- NEVER run a terraform apply or other possibly destructive command without asking for confirmation first

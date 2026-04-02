@@ -46,17 +46,26 @@ IMPORTANT: This tool does NOT work with /reload. Never use execute_command for /
       // Safety check: Don't queue if we're responding to a user-typed command
       const entries = ctx.sessionManager.getBranch();
       const lastEntry = entries[entries.length - 1];
-      if (
-        lastEntry?.type === "message" &&
-        lastEntry.message.role === "user" &&
-        lastEntry.message.content?.[0]?.type === "text" &&
-        lastEntry.message.content[0].text === command
-      ) {
-        throw new Error(
-          `Cannot execute "${command}" - user just typed this command. ` +
-          `This tool should only be used to programmatically trigger commands, ` +
-          `not to echo user commands.`
-        );
+      if (lastEntry?.type === "message" && lastEntry.message.role === "user") {
+        const content = lastEntry.message.content;
+        let userText: string | undefined;
+        
+        if (typeof content === "string") {
+          userText = content;
+        } else if (Array.isArray(content) && content.length > 0) {
+          const first = content[0];
+          if (typeof first === "object" && first !== null && "type" in first && first.type === "text" && "text" in first) {
+            userText = first.text as string;
+          }
+        }
+        
+        if (userText === command) {
+          throw new Error(
+            `Cannot execute "${command}" - user just typed this command. ` +
+            `This tool should only be used to programmatically trigger commands, ` +
+            `not to echo user commands.`
+          );
+        }
       }
 
       // Store command to be executed after agent turn ends

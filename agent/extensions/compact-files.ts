@@ -1,9 +1,9 @@
 /**
- * Compact Read Extension - Shows compact summaries for all file reads
+ * Compact Files Extension - Shows compact summaries for read and write
  *
- * This extension overrides the built-in `read` tool to provide compact rendering
- * for all file reads. Instead of showing full file content in the chat,
- * it shows just a summary (filename + line count + preview), while still
+ * This extension overrides the built-in `read` and `write` tools to provide compact rendering
+ * for all file operations. Instead of showing full file content in the chat,
+ * it shows just a summary (filename + line count/size + preview), while still
  * providing the full content to the LLM for processing.
  *
  * The content is collapsed by default but can be expanded with Ctrl+E
@@ -13,13 +13,14 @@
  */
 
 import type { ExtensionAPI, ReadToolDetails } from "@mariozechner/pi-coding-agent";
-import { createReadTool } from "@mariozechner/pi-coding-agent";
+import { createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { basename } from "node:path";
 
 export default function (pi: ExtensionAPI) {
 	const cwd = process.cwd();
 	const originalRead = createReadTool(cwd);
+	const originalWrite = createWriteTool(cwd);
 
 	// Helper to check if a path is a SKILL.md file
 	function isSkillFile(path: string): boolean {
@@ -42,19 +43,19 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	// Extract preview from content (first line or description)
-	function getPreview(path: string, content: string): string {
+	function getPreview(path: string | undefined, content: string): string {
 		// For skills, extract from frontmatter
-		if (isSkillFile(path)) {
+		if (path && isSkillFile(path)) {
 			const descMatch = content.match(/description:\s*(.+)/);
 			if (descMatch) return descMatch[1].slice(0, 80);
 		}
 
 		const lines = content.split("\n");
-		
+
 		// Look for first markdown header
 		const headerMatch = lines.find(l => l.startsWith("# "));
 		if (headerMatch) return headerMatch.replace("# ", "").slice(0, 80);
-		
+
 		// Fall back to first non-empty line
 		const firstLine = lines.find(l => l.trim());
 		return firstLine ? firstLine.slice(0, 80) : "";
@@ -68,6 +69,7 @@ export default function (pi: ExtensionAPI) {
 		return basename(path);
 	}
 
+	// Register compact read tool
 	pi.registerTool({
 		name: "read",
 		label: "read",
@@ -75,7 +77,6 @@ export default function (pi: ExtensionAPI) {
 		parameters: originalRead.parameters,
 
 		async execute(toolCallId, params, signal, onUpdate) {
-			// Delegate to original implementation
 			return originalRead.execute(toolCallId, params, signal, onUpdate);
 		},
 
@@ -114,24 +115,79 @@ export default function (pi: ExtensionAPI) {
 			const lineCount = content.text.split("\n").length;
 			const preview = getPreview(path, content.text);
 
-			// Compact display
 			let text = theme.fg("success", "✓ ");
 			text += theme.fg("accent", displayName);
 			text += theme.fg("dim", ` (${lineCount} lines)`);
-			
+
 			if (details?.truncation?.truncated) {
 				text += theme.fg("warning", " [truncated]");
 			}
-			
+
 			if (preview) {
 				text += "\n" + theme.fg("muted", preview);
 			}
 
-			// If expanded, show first 15 lines
 			if (expanded) {
 				const lines = content.text.split("\n");
 				const displayLines = lines.slice(0, 15);
-				
+				text += "\n" + theme.fg("dim", "─".repeat(40));
+				for (const line of displayLines) {
+					text += "\n" + theme.fg("dim", line);
+				}
+				if (lines.length > 15) {
+					text += "\n" + theme.fg("muted", `... ${lines.length - 15} more lines`);
+				}
+			} else {
+				text += "\n" + theme.fg("dim", "(Ctrl+E to expand)");
+			}
+
+			return new Text(text, 0, 0);
+		},
+	});
+
+	// Register compact write tool
+	pi.registerTool({
+		name: "write",
+		label: "write",
+		description: originalWrite.description,
+		parameters: originalWrite.parameters,
+
+		async execute(toolCallId, params, signal, onUpdate) {
+			return originalWrite.execute(toolCallId, params, signal, onUpdate);
+		},
+
+		renderCall(args, theme, _context) {
+			const displayName = args?.path ? basename(args.path) : "...";
+			let text = theme.fg("toolTitle", theme.bold("write "));
+			text += theme.fg("accent", displayName);
+			return new Text(text, 0, 0);
+		},
+
+		renderResult(result, { expanded, isPartial }, theme, context) {
+			if (isPartial) {
+				return new Text(theme.fg("warning", "Writing..."), 0, 0);
+			}
+
+			const args = context.args as { path?: string; content?: string };
+			const path = args?.path || "";
+			const displayName = path ? basename(path) : "unknown";
+			const content = args?.content || "";
+
+			const lineCount = content.split("\n").length;
+			const byteCount = new Blob([content]).size;
+			const preview = getPreview(undefined, content);
+
+			let text = theme.fg("success", "✓ ");
+			text += theme.fg("accent", displayName);
+			text += theme.fg("dim", ` (${lineCount} lines, ${byteCount} bytes)`);
+
+			if (preview) {
+				text += "\n" + theme.fg("muted", preview);
+			}
+
+			if (expanded) {
+				const lines = content.split("\n");
+				const displayLines = lines.slice(0, 15);
 				text += "\n" + theme.fg("dim", "─".repeat(40));
 				for (const line of displayLines) {
 					text += "\n" + theme.fg("dim", line);

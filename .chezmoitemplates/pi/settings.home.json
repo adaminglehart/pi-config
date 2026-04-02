@@ -13,5 +13,9 @@
     "maxTurns": 15,
     "models": "openrouter/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p5-turbo:high"
   },
-  "defaultThinkingLevel": "high"
+  "defaultThinkingLevel": "high",
+  "compaction": {
+    "provider": "openrouter",
+    "model": "google/gemini-3.1-flash-lite-preview"
+  }
 }

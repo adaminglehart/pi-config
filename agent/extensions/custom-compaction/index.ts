@@ -1,29 +1,62 @@
-import { complete } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import {
-  convertToLlm,
-  serializeConversation,
-} from "@mariozechner/pi-coding-agent";
+import { compact } from "@mariozechner/pi-coding-agent";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+interface CompactionModelConfig {
+  provider?: string;
+  model?: string;
+}
+
+interface PiSettings {
+  compaction?: {
+    provider?: string;
+    model?: string;
+  };
+}
+
+function readCompactionSettings(): CompactionModelConfig | undefined {
+  try {
+    const globalSettingsPath = path.join(
+      os.homedir(),
+      ".pi",
+      "agent",
+      "settings.json",
+    );
+    if (fs.existsSync(globalSettingsPath)) {
+      const content = fs.readFileSync(globalSettingsPath, "utf-8");
+      const settings: PiSettings = JSON.parse(content);
+      if (settings.compaction?.provider || settings.compaction?.model) {
+        return {
+          provider: settings.compaction.provider,
+          model: settings.compaction.model,
+        };
+      }
+    }
+  } catch {
+    // Ignore errors and return undefined to use defaults
+  }
+  return undefined;
+}
 
 /**
  * Custom Compaction Extension
  *
- * Uses a cheaper/faster model for summarization to preserve context and budget.
+ * Uses a cheaper/faster model for summarization while reusing all of pi's
+ * built-in compaction logic (prompts, file tracking, split-turn handling, etc.)
  */
 export default function (pi: ExtensionAPI) {
   pi.on("session_before_compact", async (event, ctx) => {
-    const { preparation, signal } = event;
-    const {
-      messagesToSummarize,
-      turnPrefixMessages,
-      tokensBefore,
-      firstKeptEntryId,
-      previousSummary,
-    } = preparation;
+    const { preparation, customInstructions, signal } = event;
 
-    // Configure the compaction model here
-    const provider = "openrouter";
-    const modelId = "google/gemini-3-flash-preview";
+    // Read compaction model settings from pi settings file
+    const compactionSettings = readCompactionSettings();
+
+    // Use settings or fall back to defaults
+    const provider = compactionSettings?.provider ?? "openrouter";
+    const modelId =
+      compactionSettings?.model ?? "google/gemini-3-flash-preview";
 
     const model = ctx.modelRegistry.find(provider, modelId);
     if (!model) {
@@ -36,102 +69,44 @@ export default function (pi: ExtensionAPI) {
 
     // Resolve request auth for the summarization model
     const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok) {
-      ctx.ui.notify(`Compaction auth failed: ${auth.error}`, "warning");
-      return;
-    }
-    if (!auth.apiKey) {
+    if (!auth.ok || !auth.apiKey) {
       ctx.ui.notify(
-        `No API key for ${model.provider}, using default compaction`,
+        `Compaction auth unavailable for ${model.id}, using default compaction`,
         "warning",
       );
       return;
     }
 
-    // Combine all messages for full summary
-    const allMessages = [...messagesToSummarize, ...turnPrefixMessages];
-
     ctx.ui.notify(
-      `Custom compaction: summarizing ${allMessages.length} messages (${tokensBefore.toLocaleString()} tokens) with ${model.id}...`,
+      `Custom compaction: using ${model.id} for summarization (${preparation.tokensBefore.toLocaleString()} tokens)...`,
       "info",
     );
 
-    // Convert messages to readable text format
-    const conversationText = serializeConversation(convertToLlm(allMessages));
-
-    // Include previous summary context if available
-    const previousContext = previousSummary
-      ? `\n\nPrevious session summary for context:\n${previousSummary}`
-      : "";
-
-    // Build messages that ask for a comprehensive summary
-    const summaryMessages = [
-      {
-        role: "user" as const,
-        content: [
-          {
-            type: "text" as const,
-            text: `You are a conversation summarizer. Create a comprehensive summary of this conversation that captures:${previousContext}
-
-1. The main goals and objectives discussed
-2. Key decisions made and their rationale
-3. Important code changes, file modifications, or technical details
-4. Current state of any ongoing work
-5. Any blockers, issues, or open questions
-6. Next steps that were planned or suggested
-
-Be thorough but concise. The summary will replace the ENTIRE conversation history, so include all information needed to continue the work effectively.
-
-Format the summary as structured markdown with clear sections.
-
-<conversation>
-${conversationText}
-</conversation>`,
-          },
-        ],
-        timestamp: Date.now(),
-      },
-    ];
-
     try {
-      // Pass signal to honor abort requests (e.g., user cancels compaction)
-      const response = await complete(
+      // Use pi's built-in compact() function with our custom model
+      // This reuses ALL of pi's built-in logic:
+      // - SUMMARIZATION_SYSTEM_PROMPT
+      // - SUMMARIZATION_PROMPT / UPDATE_SUMMARIZATION_PROMPT
+      // - TURN_PREFIX_SUMMARIZATION_PROMPT for split turns
+      // - File operations tracking
+      // - Proper message serialization
+      // - All edge case handling
+      const result = await compact(
+        preparation,
         model,
-        { messages: summaryMessages },
-        {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
-          maxTokens: 8192,
-          signal,
-        },
+        auth.apiKey,
+        auth.headers,
+        customInstructions,
+        signal,
       );
 
-      const summary = response.content
-        .filter((c): c is { type: "text"; text: string } => c.type === "text")
-        .map((c) => c.text)
-        .join("\n");
-
-      if (!summary.trim()) {
-        if (!signal.aborted)
-          ctx.ui.notify(
-            "Compaction summary was empty, using default compaction",
-            "warning",
-          );
-        return;
-      }
-
-      // Return compaction content - SessionManager adds id/parentId
-      // Use firstKeptEntryId from preparation to keep recent messages
+      // Return the compaction result
       return {
-        compaction: {
-          summary,
-          firstKeptEntryId,
-          tokensBefore,
-        },
+        compaction: result,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      ctx.ui.notify(`Compaction failed: ${message}`, "error");
+      ctx.ui.notify(`Custom compaction failed: ${message}`, "error");
       // Fall back to default compaction on error
       return;
     }
