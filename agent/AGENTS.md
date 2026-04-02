@@ -26,6 +26,33 @@ Plans live in the `plans/` directory in the project root, named by feature:
 
 Always use the context-pilot skill for proactive context management. Read the skill file at the start of every session and follow its guidelines throughout.
 
+## Honcho (Long-Term Memory)
+
+Honcho provides persistent memory across sessions. Use it **proactively** — don't wait to be asked.
+
+### `honcho_save_insight` — Save early, save often
+
+Call this whenever you learn something durable about the user. Key moments:
+- **User corrects you** — save the correction as a preference/fact so future sessions don't repeat the mistake
+- **User expresses a preference** — tool choices, code style, communication style, workflow habits
+- **User makes a decision** — architectural choices, technology picks, naming conventions
+- **User pushes back** — their objection reveals what they care about
+- **You discover a pattern** — after 2+ similar requests, save the pattern
+
+Write insights as concrete, reusable facts:
+- ✅ "User prefers flat module structures over nested folders"
+- ✅ "User uses Graphite for git branching, not raw git — always use gt create/gt submit"
+- ❌ "User has opinions about code organization" (too vague)
+
+### `honcho_chat` — Query before assuming
+
+Call this when you're about to make a choice the user might have an opinion on:
+- Choosing between implementation approaches
+- Picking defaults, frameworks, or libraries
+- Deciding how to structure code or organize files
+- Setting up a new project or feature
+- Any moment you think "the user might prefer this differently"
+
 ## Tool usage
 
 - NEVER run a terraform apply or other possibly destructive command without asking for confirmation first

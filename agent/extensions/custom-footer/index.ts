@@ -3,7 +3,6 @@
  *
  * Displays:
  * - Model info (Line 1 & 2)
- * - Dynamic height Status Box (right)
  * - Dynamic Scene (Bottom rows)
  *
  * Usage: pi -e ./custom-footer/index.ts
@@ -19,14 +18,11 @@ import type {
 import type { Api, Model } from "@mariozechner/pi-ai";
 import { truncateToWidth, visibleWidth, type TUI } from "@mariozechner/pi-tui";
 import {
-  renderAnimationBlock,
   startAnimation,
   stopAnimation,
-  cycleAnimation,
   cycleScene,
   getActiveScene,
   setAgentState,
-  CONFIG,
 } from "./animation.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -219,12 +215,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
 
   const scene = getActiveScene();
 
-  // Total height = 2 info lines + scene top border + scene rows + scene bottom border
-  const totalHeight = 2 + 1 + scene.height + 1;
-  const animLines = renderAnimationBlock(totalHeight);
-
-  const animWidth = CONFIG.BOX_WIDTH;
-  const mainWidth = width - animWidth - 2;
+  const mainWidth = width;
 
   // Scene box inner width (subtract 2 for left/right borders)
   const sceneInnerWidth = mainWidth - 2;
@@ -264,12 +255,11 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
 
   // Build the final array of lines
   const resultLines: string[] = [];
-  let animIdx = 0;
 
   // Info Line 1
   resultLines.push(
     truncateToWidth(
-      line1Content + " ".repeat(line1Pad) + "  " + animLines[animIdx++],
+      line1Content + " ".repeat(line1Pad),
       width,
     ),
   );
@@ -277,7 +267,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Info Line 2
   resultLines.push(
     truncateToWidth(
-      line2Content + " ".repeat(line2Pad) + "  " + animLines[animIdx++],
+      line2Content + " ".repeat(line2Pad),
       width,
     ),
   );
@@ -285,10 +275,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Scene top border
   const sceneTopBorder = `${sepColor}┌${"─".repeat(sceneInnerWidth)}┐${reset}`;
   resultLines.push(
-    truncateToWidth(
-      sceneTopBorder + "  " + animLines[animIdx++],
-      width,
-    ),
+    truncateToWidth(sceneTopBorder, width),
   );
 
   // Scene content rows with side borders
@@ -297,20 +284,14 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
     const contentPad = Math.max(0, sceneInnerWidth - visibleWidth(content));
     const borderedRow = `${sepColor}│${reset}${content}${" ".repeat(contentPad)}${sepColor}│${reset}`;
     resultLines.push(
-      truncateToWidth(
-        borderedRow + "  " + (animLines[animIdx++] || ""),
-        width,
-      ),
+      truncateToWidth(borderedRow, width),
     );
   }
 
   // Scene bottom border
   const sceneBottomBorder = `${sepColor}└${"─".repeat(sceneInnerWidth)}┘${reset}`;
   resultLines.push(
-    truncateToWidth(
-      sceneBottomBorder + "  " + (animLines[animIdx] || ""),
-      width,
-    ),
+    truncateToWidth(sceneBottomBorder, width),
   );
 
   return resultLines;
@@ -358,15 +339,6 @@ export default function customFooter(pi: ExtensionAPI) {
     acmEnabled = false;
     pi.events.emit("context-pilot:status_request", {});
     tuiRef?.requestRender();
-  });
-
-  pi.registerCommand("footer-cycle", {
-    description: "Cycle footer animation style",
-    handler: async (_args, ctx) => {
-      const style = cycleAnimation();
-      ctx.ui.notify(`Style: ${style}`, "info");
-      tuiRef?.requestRender();
-    },
   });
 
   pi.registerCommand("footer-scene", {
@@ -425,7 +397,7 @@ export default function customFooter(pi: ExtensionAPI) {
     if (!ctx.hasUI) return;
     ctxRef = ctx;
     ctx.ui.setFooter(
-      (tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
+      (tui: TUI, _theme: Theme, footerData: ReadonlyFooterDataProvider) => {
         tuiRef = tui;
         return {
           render: (width: number): string[] => {

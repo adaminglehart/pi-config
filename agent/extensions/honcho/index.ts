@@ -41,14 +41,18 @@ function sanitizePath(cwd: string): string {
 function extractTextContent(
   content: string | Array<{ type: string; text?: string }>,
 ): string | null {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
+  let text: string | null = null;
+  if (typeof content === "string") {
+    text = content;
+  } else if (Array.isArray(content)) {
     const texts = content
       .filter((c) => c.type === "text" && c.text)
       .map((c) => c.text!);
-    return texts.length > 0 ? texts.join("\n") : null;
+    text = texts.length > 0 ? texts.join("\n") : null;
   }
-  return null;
+  // Reject whitespace-only content (Honcho API rejects it)
+  if (text !== null && text.trim().length === 0) return null;
+  return text;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -234,7 +238,7 @@ export default function (pi: ExtensionAPI) {
     name: "honcho_save_insight",
     label: "Honcho Save Insight",
     description:
-      "Persist a new insight or conclusion about the user to long-term memory. Use this whenever you learn something durable about the user's preferences, habits, opinions, or decisions — things that would be useful to know in future sessions. Don't wait to be asked; save proactively when you notice a pattern.",
+      "Persist a new insight or conclusion about the user to long-term memory. Call this PROACTIVELY whenever you learn something durable: when the user corrects you, expresses a preference, makes a decision, pushes back on an approach, or reveals a workflow habit. Save concrete facts, not vague summaries. Don't wait to be asked.",
     parameters: Type.Object({
       content: Type.String({
         description:

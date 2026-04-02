@@ -14,7 +14,7 @@
     "stripe-google/gemini-3-flash"
   ],
   "compaction": {
-    "provider": "stripe-anthropic",
-    "model": "claude-4.5-haiku"
+    "provider": "stripe-google",
+    "model": "gemini-3-flash"
   }
 }
