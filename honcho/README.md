@@ -85,7 +85,7 @@ Uses the LiteLLM proxy with these models:
 Configuration:
 ```env
 LLM_OPENAI_COMPATIBLE_BASE_URL=http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1
-LLM_OPENAI_COMPATIBLE_API_KEY=use_case=development&team=privy-eng-access-team
+LLM_OPENAI_COMPATIBLE_API_KEY=use_case=development&team=privy-infra-data
 ```
 
 ### Home Environment (OpenRouter + Fireworks)

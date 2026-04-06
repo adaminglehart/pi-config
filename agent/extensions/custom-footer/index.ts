@@ -22,7 +22,9 @@ import {
   stopAnimation,
   cycleScene,
   getActiveScene,
+  getSceneCache,
   setAgentState,
+  getCurrentTick,
 } from "./animation.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -213,8 +215,6 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const sepColor = ansi.fg(colors.sep);
   const reset = ansi.reset;
 
-  const scene = getActiveScene();
-
   const mainWidth = width;
 
   // Scene box inner width (subtract 2 for left/right borders)
@@ -246,8 +246,9 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (extStatusSeg) line2Segments.push(extStatusSeg);
   const line2Content = line2Segments.join(separator);
 
-  // Scene content (rendered into the inner width)
-  const sceneLines = scene.render(sceneInnerWidth, ctx.contextPercent || 0);
+  // Scene content — use cached render to avoid recomputing on every TUI
+  // render pass (the cache only refreshes on our own animation tick)
+  const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
 
   // Padding
   const line1Pad = Math.max(0, mainWidth - visibleWidth(line1Content));
@@ -307,36 +308,70 @@ export default function customFooter(pi: ExtensionAPI) {
   let ctxRef: ExtensionContext | null = null;
   let acmEnabled = false;
 
+  /**
+   * Footer render cache.
+   *
+   * The TUI calls render() on every requestRender() — not just our animation
+   * ticks but also the built-in Loader (80ms), the animations extension (60ms),
+   * input events, agent streaming, etc.  If render() returns different strings
+   * each time, the TUI diff detects changes and clears+rewrites those lines
+   * (\x1b[2K), causing visible flicker.
+   *
+   * We cache the full footer output and only recompute when:
+   *   - Our animation tick advances (scene changes)
+   *   - An event bumps dataVersion (model change, cost update, etc.)
+   *   - Terminal width changes
+   *
+   * Renders triggered by other sources reuse the cache → identical strings →
+   * TUI diff skips those lines → no flicker.
+   */
+  let cachedFooterLines: string[] = [];
+  let cachedFooterTick = -1;
+  let cachedFooterDataVersion = -1;
+  let cachedFooterWidth = -1;
+  let dataVersion = 0;
+
+  function bumpDataVersion(): void {
+    dataVersion++;
+  }
+
   pi.events.on("context-pilot:enabled", () => {
     acmEnabled = true;
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
 
   pi.on("agent_end", async () => {
     setAgentState("paused");
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
   pi.on("model_select", async () => {
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
   pi.on("agent_start", async () => {
     setAgentState("thinking");
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
 
   // Track when agent is actively working (tools being called)
   pi.on("tool_execution_start", async () => {
     setAgentState("active");
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
   pi.on("tool_execution_end", async () => {
     setAgentState("thinking");
+    bumpDataVersion();
     tuiRef?.requestRender();
   });
 
   pi.on("session_switch", async () => {
     setAgentState("paused");
     acmEnabled = false;
+    bumpDataVersion();
     pi.events.emit("context-pilot:status_request", {});
     tuiRef?.requestRender();
   });
@@ -401,6 +436,15 @@ export default function customFooter(pi: ExtensionAPI) {
         tuiRef = tui;
         return {
           render: (width: number): string[] => {
+            const tick = getCurrentTick();
+            if (
+              tick === cachedFooterTick &&
+              dataVersion === cachedFooterDataVersion &&
+              width === cachedFooterWidth &&
+              cachedFooterLines.length > 0
+            ) {
+              return cachedFooterLines;
+            }
             const contextUsage = ctxRef?.getContextUsage?.();
             const footerContext: FooterContext = {
               model: ctxRef?.model ?? null,
@@ -415,7 +459,11 @@ export default function customFooter(pi: ExtensionAPI) {
               extensionStatuses:
                 footerData?.getExtensionStatuses?.() ?? new Map(),
             };
-            return buildFooter(footerContext, width);
+            cachedFooterLines = buildFooter(footerContext, width);
+            cachedFooterTick = tick;
+            cachedFooterDataVersion = dataVersion;
+            cachedFooterWidth = width;
+            return cachedFooterLines;
           },
           invalidate: () => {},
           dispose: () => {

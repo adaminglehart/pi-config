@@ -53,6 +53,6 @@ Call this when you're about to make a choice the user might have an opinion on:
 - Setting up a new project or feature
 - Any moment you think "the user might prefer this differently"
 
-## Tool usage
+## Tool Usage
 
-- NEVER run a terraform apply or other possibly destructive command without asking for confirmation first
+- Destructive operations (`terraform apply`, `kubectl delete`, etc.) require explicit user approval — see `~/AGENTS.md`

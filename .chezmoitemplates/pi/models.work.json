@@ -3,7 +3,7 @@
     "stripe-anthropic": {
       "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-completions",
-      "apiKey": "use_case=development&team=privy-eng-access-team",
+      "apiKey": "use_case=development&team=privy-infra-data",
       "compat": {
         "supportsStore": false
       },
@@ -47,7 +47,7 @@
     "stripe-openai": {
       "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-responses",
-      "apiKey": "use_case=development&team=privy-eng-access-team",
+      "apiKey": "use_case=development&team=privy-infra-data",
       "models": [
         {
           "id": "gpt-5.4",
@@ -81,7 +81,7 @@
     "stripe-google": {
       "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-completions",
-      "apiKey": "use_case=development&team=privy-eng-access-team",
+      "apiKey": "use_case=development&team=privy-infra-data",
       "compat": {
         "supportsStore": false
       },
