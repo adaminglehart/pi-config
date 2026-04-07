@@ -90,23 +90,23 @@ LLM_OPENAI_COMPATIBLE_API_KEY=use_case=development&team=privy-infra-data
 
 ### Home Environment (OpenRouter + Fireworks)
 
-Uses OpenRouter as the primary provider (unified access to Anthropic, Google, etc.) and Fireworks for fast, cheap models.
+Uses OpenRouter as the primary provider for Gemini models and Fireworks for the Kimi router.
 
 **Required environment variables:**
 - `OPENROUTER_API_KEY` — Primary API key for OpenRouter
 - `FIREWORKS_API_KEY` — Secondary key for Fireworks-hosted models
 
 **Model tier configuration:**
-- **minimal:** `accounts/fireworks/models/llama4-scout-basic` (Fireworks — fastest, cheapest)
-- **low:** `google/gemini-2.5-flash-lite` (OpenRouter)
-- **medium:** `anthropic/claude-haiku-4-5` (OpenRouter)
-- **high/max:** `anthropic/claude-sonnet-4-5` (OpenRouter)
+- **summary / minimal / low:** `google/gemini-3.1-flash-lite-preview` (OpenRouter)
+- **medium:** `google/gemini-3-flash-preview` (OpenRouter)
+- **high/max / deriver:** `accounts/fireworks/routers/kimi-k2p5-turbo` (Fireworks)
+
+These model IDs were verified against the live OpenRouter and Fireworks APIs. The older IDs `google/gemini-3-flash-lite-preview`, `google/gemini-3-flash`, and `accounts/fireworks/models/kimi-2.5-turbo` return provider errors and break Honcho chat/derivation.
 
 **Why OpenRouter + Fireworks?**
-- **Cost efficiency** — OpenRouter routes to the cheapest provider for each model
-- **Single API key** — Access Anthropic, Google, and others through one integration
-- **Fallback options** — Direct API keys available as fallback
-- **Fireworks speed** — Llama 4 Scout on Fireworks is extremely fast and cheap for simple tasks
+- **Cost efficiency** — OpenRouter routes Gemini requests through one integration
+- **Single API key** — Access Gemini models without wiring separate Google credentials
+- **Fireworks speed** — The Kimi router is fast and works for higher-effort derivation
 
 ### Customizing Configuration
 
