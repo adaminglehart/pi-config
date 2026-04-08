@@ -123,6 +123,7 @@ interface FooterContext {
   gitBranch: string | null;
   acmEnabled: boolean;
   extensionStatuses: ReadonlyMap<string, string>;
+  sessionId: string | null;
 }
 
 function renderAcmSegment(ctx: FooterContext): string {
@@ -206,6 +207,13 @@ function renderExtensionStatuses(ctx: FooterContext): string {
   return parts.join(` ${ansi.fg(colors.sep)}│${ansi.reset} `);
 }
 
+function renderSessionIdSegment(ctx: FooterContext): string {
+  if (!ctx.sessionId) return "";
+  // Show just the first 8 characters of the session ID
+  const shortId = ctx.sessionId.slice(0, 8);
+  return `${ansi.fg(colors.sep)}[${ansi.reset}${ansi.fg(colors.text)}${shortId}${ansi.reset}${ansi.fg(colors.sep)}]${ansi.reset}`;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Main footer builder
 // ═══════════════════════════════════════════════════════════════════════════
@@ -220,13 +228,22 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Scene box inner width (subtract 2 for left/right borders)
   const sceneInnerWidth = mainWidth - 2;
 
-  // Line 1 Content: directory and branch
-  const line1Segments: string[] = [];
+  // Line 1 Content: directory and branch (left), session ID (right)
+  const line1LeftSegments: string[] = [];
   const dirSeg = renderDirectorySegment(ctx);
   const branchSeg = renderBranchSegment(ctx);
-  if (dirSeg) line1Segments.push(dirSeg);
-  if (branchSeg) line1Segments.push(branchSeg);
-  const line1Content = line1Segments.join(separator);
+  if (dirSeg) line1LeftSegments.push(dirSeg);
+  if (branchSeg) line1LeftSegments.push(branchSeg);
+  const line1Left = line1LeftSegments.join(separator);
+  
+  const sessionIdSeg = renderSessionIdSegment(ctx);
+  
+  // Calculate padding to push session ID to the right
+  const line1LeftWidth = visibleWidth(line1Left);
+  const sessionIdWidth = visibleWidth(sessionIdSeg);
+  const line1Pad = Math.max(1, mainWidth - line1LeftWidth - sessionIdWidth);
+  
+  const line1Content = line1Left + " ".repeat(line1Pad) + sessionIdSeg;
 
   // Line 2 Content: model, thinking, ACM, tokens, cost, extension statuses
   const line2Segments: string[] = [];
@@ -251,7 +268,6 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
 
   // Padding
-  const line1Pad = Math.max(0, mainWidth - visibleWidth(line1Content));
   const line2Pad = Math.max(0, mainWidth - visibleWidth(line2Content));
 
   // Build the final array of lines
@@ -259,10 +275,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
 
   // Info Line 1
   resultLines.push(
-    truncateToWidth(
-      line1Content + " ".repeat(line1Pad),
-      width,
-    ),
+    truncateToWidth(line1Content, width),
   );
 
   // Info Line 2
@@ -458,6 +471,7 @@ export default function customFooter(pi: ExtensionAPI) {
               acmEnabled: acmEnabled,
               extensionStatuses:
                 footerData?.getExtensionStatuses?.() ?? new Map(),
+              sessionId: ctxRef?.sessionManager?.getSessionId?.() ?? null,
             };
             cachedFooterLines = buildFooter(footerContext, width);
             cachedFooterTick = tick;
