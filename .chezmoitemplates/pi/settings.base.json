@@ -6,10 +6,7 @@
     "npm:glimpseui",
     "git:github.com/HazAT/pi-interactive-subagents"
   ],
-  "extensions": [
-    "~/.config/pi/bake/pi-extension/status-writer.ts",
-    "~/.pi/agent/extensions/custom-compaction/index.ts"
-  ],
+  "extensions": ["~/.config/pi/bake/pi-extension/status-writer.ts"],
   "skills": ["~/.agents/skills"],
   "selfLearning": {
     "enabled": false,

@@ -15,10 +15,29 @@
             "output": 3,
             "cacheRead": 0.1,
             "cacheWrite": 0
+          }
+        }
+      ]
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKey": "OPENROUTER_API_KEY",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "z-ai/glm-5.1",
+          "name": "GLM-5.1",
+          "reasoning": true,
+          "contextWindow": 204800,
+          "cost": {
+            "input": 1.4,
+            "output": 4.4,
+            "cacheRead": 0.26,
+            "cacheWrite": 0
           },
           "compat": {
             "openRouterRouting": {
-              "order": ["fireworks"]
+              "order": ["friendli"]
             }
           }
         }
