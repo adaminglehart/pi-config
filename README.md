@@ -1,76 +1,135 @@
 # Pi Agent Configuration
 
-Standalone Pi configuration repo managed by Chezmoi, separate from main dotfiles.
+Profile-based Pi configuration with shared libraries and per-profile customization.
 
 ## Structure
 
 ```
-~/dev/pi-config/           # Source directory
-  ├── agents/              # Agent definitions (scout, worker, planner, etc.)
-  ├── extensions/          # Custom Pi extensions
-  ├── skills/              # Task-specific instruction packages
-  ├── AGENTS.md            # Workflow rules and guidelines
-  ├── APPEND_SYSTEM.md     # Additional system prompt content
-  ├── settings.json.tmpl   # Settings template (merges base + environment)
-  ├── models.json.tmpl     # Models template (merges base + environment)
-  └── .chezmoitemplates/pi/
-      ├── settings.base.json       # Shared settings
-      ├── settings.work.json       # Work-specific overrides (Stripe LiteLLM)
-      ├── settings.home.json       # Home-specific overrides (Anthropic API)
-      ├── models.base.json         # Shared models
-      ├── models.work.json         # Work models (Stripe providers)
-      └── models.home.json         # Home models (Anthropic direct)
+~/dev/pi-config/
+  ├── profiles/            # Agent profiles (coding, personal, etc.)
+  │   ├── coding/
+  │   │   ├── package.json        # Profile manifest (extensions, skills, vars)
+  │   │   ├── config/             # Profile-specific config overrides
+  │   │   │   ├── mcp.json        # MCP servers for this profile
+  │   │   │   ├── settings.json   # Settings overrides
+  │   │   │   └── models.json     # Model overrides
+  │   │   ├── AGENTS.md           # Profile-specific rules
+  │   │   ├── APPEND_SYSTEM.md    # Profile-specific system prompt
+  │   │   └── agents/             # Profile-specific agent definitions
+  │   └── personal/
+  │       └── ...
+  ├── extensions/          # Shared Pi extensions
+  ├── skills/              # Shared task-specific instruction packages
+  ├── shared/lib/          # Shared library code (_lib/)
+  ├── config/              # Base and environment-specific config
+  │   ├── settings.base.json      # Base settings for all profiles
+  │   ├── models.base.json        # Base models for all profiles
+  │   ├── mcp.base.json           # Base MCP configuration
+  │   ├── home/
+  │   │   ├── settings.json       # Home environment overrides
+  │   │   ├── models.json         # Home models (Anthropic API)
+  │   │   └── honcho.env          # Home Honcho config
+  │   └── work/
+  │       ├── settings.json       # Work environment overrides
+  │       ├── models.json         # Work models (Stripe LiteLLM)
+  │       └── honcho.env          # Work Honcho config
+  └── build/               # Build output (gitignored)
+      └── coding/agent/    # Ready to deploy → ~/.pi/agent/
 ```
 
-Installed to: `~/.pi/agent/`
+## Config Merge Order
+
+Configs are merged in this order (later overrides earlier):
+
+1. **Base** (`config/*.base.json`) — shared across all profiles and environments
+2. **Environment** (`config/{home,work}/*.json`) — environment-specific overrides
+3. **Profile** (`profiles/{name}/config/*.json`) — profile-specific overrides
+
+Example: `mcp.json` for coding profile on work machine:
+```
+config/mcp.base.json          # Base MCP servers
+→ config/work/mcp.json        # Add work-specific servers
+→ profiles/coding/config/mcp.json  # Add coding-specific servers
+```
+
+This allows you to:
+- Share common config across all profiles (base)
+- Adjust for home vs work environments (environment layer)
+- Customize per agent profile (profile layer)
 
 ## Environment Detection
 
-Chezmoi automatically detects environment based on hostname:
+Automatically detects environment based on hostname:
 - `Adams-MacBook-Pro.local` → `home`
 - All other hostnames → `work`
 
-Edit `.chezmoi.yaml.tmpl` to customize detection logic.
+Override with: `PI_BUILD_ENV=home just build coding`
 
 ## Commands
 
 ```bash
-# Preview what would change
-cd ~/dev/pi-config && chezmoi diff
+# Build a single profile
+just build coding
 
-# Apply changes to ~/.pi/agent/
-cd ~/dev/pi-config && chezmoi apply
+# Build all profiles
+just build-all
 
-# Or use the helper script
-~/dev/pi-config/apply.sh
+# Deploy a built profile to ~/.pi/agent/
+just apply-profile coding
 
-# Check status
-cd ~/dev/pi-config && chezmoi status
+# Build and deploy all profiles
+just apply
+
+# Build and deploy a single profile
+just deploy coding
+
+# Show diff between build output and deployed files
+just diff coding
+
+# Clean build output and deployed files
+just clean coding
+
+# Generate honcho/.env for current environment
+just honcho-env
 ```
 
 ## Editing Files
 
 **Always edit in `~/dev/pi-config/` (the source), not `~/.pi/agent/` (the target).**
 
-After editing, run:
+After editing, build and deploy:
 ```bash
-cd ~/dev/pi-config && chezmoi apply
-# Or
-~/dev/pi-config/apply.sh
+just deploy coding
+# Or deploy all profiles:
+just apply
 ```
 
-## Environment-Specific Config
+## Adding Profile-Specific Config
 
-### Settings
-- Edit `.chezmoitemplates/pi/settings.base.json` for shared settings
-- Edit `.chezmoitemplates/pi/settings.work.json` for work-only overrides
-- Edit `.chezmoitemplates/pi/settings.home.json` for home-only overrides
+To customize config for a specific profile (e.g., different MCP servers for coding vs personal):
 
-### Models
-- Edit `.chezmoitemplates/pi/models.work.json` for Stripe LiteLLM providers
-- Edit `.chezmoitemplates/pi/models.home.json` for direct Anthropic API
+1. Create `profiles/<profile>/config/<config-name>.json`
+2. Add overrides (will be deep-merged with base + environment)
+3. Rebuild: `just build <profile>`
 
-The templates automatically merge base + environment configs.
+Example — custom MCP servers for coding profile:
+
+```bash
+# profiles/coding/config/mcp.json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    }
+  }
+}
+```
+
+Supported config files:
+- `settings.json` — Pi agent settings
+- `models.json` — Model definitions
+- `mcp.json` — MCP server configuration
 
 ## Setup on New Machine
 
@@ -78,8 +137,7 @@ The templates automatically merge base + environment configs.
 # Clone this repo
 git clone <repo-url> ~/dev/pi-config
 
-# Apply configuration
+# Build and deploy all profiles
 cd ~/dev/pi-config
-chezmoi init
-chezmoi apply
+just apply
 ```

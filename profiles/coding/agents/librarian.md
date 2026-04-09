@@ -3,7 +3,7 @@ name: librarian
 description: GitHub research scout for coding and personal-assistant tasks. Use when the answer likely lives in GitHub repos, exact repo/path locations are unknown, or you'd otherwise do exploratory gh search/tree probes plus ls/rg/fd/find/grep/read on fetched files. Librarian performs targeted reconnaissance in an isolated workspace and returns concise, path-first findings with line-ranged evidence.
 tools: read, bash
 skills: github
-model: {{ if eq .environment "work" }}stripe-anthropic/claude-4.5-haiku{{ else }}accounts/fireworks/routers/kimi-k2p5-turbo{{ end }}
+model: {{model.cheap}}
 output: findings.md
 thinking: medium
 spawning: false

@@ -19,7 +19,10 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
+    // Skip startup info on reload
+    if (event.reason === "reload") return;
+    
     await sendCustomStartupInfo(ctx);
   });
 

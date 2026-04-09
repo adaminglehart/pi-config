@@ -26,6 +26,7 @@ import {
   setAgentState,
   getCurrentTick,
 } from "./animation.js";
+import { isSubagent } from "../_lib/env.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Color helpers
@@ -49,8 +50,6 @@ export const colors = {
   text: "250", // Light gray
   accent: "213", // Pink
 };
-
-const isSubagent = !!process.env.PI_SUBAGENT_NAME;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Formatting helpers
@@ -216,6 +215,19 @@ function renderSessionIdSegment(ctx: FooterContext): string {
   return `${ansi.fg(colors.sep)}[${ansi.reset}${ansi.fg(colors.text)}${shortId}${ansi.reset}${ansi.fg(colors.sep)}]${ansi.reset}`;
 }
 
+function renderProfileSegment(): string {
+  const agentDir = process.env.PI_CODING_AGENT_DIR || "~/.pi/agent";
+  let profile = "coding"; // default
+  let color = colors.accent; // Pink for coding
+  
+  if (agentDir.includes("pi-personal")) {
+    profile = "personal";
+    color = colors.output; // Green for personal
+  }
+  
+  return `${ansi.fg(color)}${profile}${ansi.reset}`;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Main footer builder
 // ═══════════════════════════════════════════════════════════════════════════
@@ -230,7 +242,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Scene box inner width (subtract 2 for left/right borders)
   const sceneInnerWidth = mainWidth - 2;
 
-  // Line 1 Content: directory and branch (left), session ID (right)
+  // Line 1 Content: directory and branch (left), session ID and profile (right)
   const line1LeftSegments: string[] = [];
   const dirSeg = renderDirectorySegment(ctx);
   const branchSeg = renderBranchSegment(ctx);
@@ -238,14 +250,16 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (branchSeg) line1LeftSegments.push(branchSeg);
   const line1Left = line1LeftSegments.join(separator);
 
+  const profileSeg = renderProfileSegment();
   const sessionIdSeg = renderSessionIdSegment(ctx);
+  const line1Right = [profileSeg, sessionIdSeg].filter(Boolean).join(separator);
 
-  // Calculate padding to push session ID to the right
+  // Calculate padding to push right segments to the right
   const line1LeftWidth = visibleWidth(line1Left);
-  const sessionIdWidth = visibleWidth(sessionIdSeg);
-  const line1Pad = Math.max(1, mainWidth - line1LeftWidth - sessionIdWidth);
+  const line1RightWidth = visibleWidth(line1Right);
+  const line1Pad = Math.max(1, mainWidth - line1LeftWidth - line1RightWidth);
 
-  const line1Content = line1Left + " ".repeat(line1Pad) + sessionIdSeg;
+  const line1Content = line1Left + " ".repeat(line1Pad) + line1Right;
 
   // Line 2 Content: model, thinking, ACM, tokens, cost, extension statuses
   const line2Segments: string[] = [];
@@ -278,7 +292,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   resultLines.push(truncateToWidth(line2Content + " ".repeat(line2Pad), width));
 
   // Scene content — skip animation in subagent processes
-  if (!isSubagent) {
+  if (!isSubagent()) {
     // Use cached render to avoid recomputing on every TUI
     // render pass (the cache only refreshes on our own animation tick)
     const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
@@ -373,13 +387,8 @@ export default function customFooter(pi: ExtensionAPI) {
     tuiRef?.requestRender();
   });
 
-  pi.on("session_switch", async () => {
-    setAgentState("paused");
-    acmEnabled = false;
-    bumpDataVersion();
-    pi.events.emit("context-pilot:status_request", {});
-    tuiRef?.requestRender();
-  });
+  // Note: session_switch event doesn't exist in pi's event system
+  // Keeping ACM status request in session_start instead
 
   pi.registerCommand("footer-scene", {
     description: "Cycle footer scene",
@@ -478,7 +487,7 @@ export default function customFooter(pi: ExtensionAPI) {
         };
       },
     );
-    if (!isSubagent) startAnimation(tuiRef);
+    if (!isSubagent()) startAnimation(tuiRef);
   }
 
   pi.on("session_start", async (_event, ctx) => {

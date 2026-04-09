@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "toolshed": {
+      "command": "/Users/adaminglehart/stripe/pay-server/.cursor/toolshed_stdio_shim.sh",
+      "args": [
+        "slack.asana.internal_search.org_info.sourcegraph.trailhead.code.figma.gmail.google_drive.home.internal_search.interpretation.pre_reads.zoom"
+      ]
+    }
+  }
+}

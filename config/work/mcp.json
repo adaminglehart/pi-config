@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "toolshed-slack": {
+      "command": "/Users/adaminglehart/stripe/pay-server/.cursor/toolshed_stdio_shim.sh",
+      "args": ["code"]
+    }
+  }
+}

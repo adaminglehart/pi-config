@@ -1,5 +1,6 @@
 # Generated/installed files
 .DS_Store
+build/
 
 # Node modules for extensions
 extensions/node_modules/

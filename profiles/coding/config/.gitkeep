@@ -1,0 +1,10 @@
+# Profile-specific config overrides for coding profile
+# 
+# Files here override config/base and config/{env}/ for this profile only.
+# 
+# Supported files:
+# - settings.json   (pi agent settings)
+# - models.json     (model definitions)
+# - mcp.json        (MCP server configuration)
+#
+# Example: Different MCP servers for coding vs personal agent

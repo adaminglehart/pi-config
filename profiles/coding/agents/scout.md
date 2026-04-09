@@ -2,7 +2,7 @@
 name: scout
 description: Fast codebase reconnaissance - gathers context without making changes
 tools: read, bash
-model: {{ if eq .environment "work" }}stripe-google/gemini-3-flash{{ else }}accounts/fireworks/routers/kimi-k2p5-turbo{{ end }}
+model: {{model.fast}}
 output: context.md
 thinking: medium
 spawning: false

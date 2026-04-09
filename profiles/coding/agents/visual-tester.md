@@ -2,7 +2,7 @@
 name: visual-tester
 description: Visual QA tester — navigates web UIs via Chrome CDP, spots visual issues, tests interactions, produces structured reports
 tools: bash, read, write
-model: {{ if eq .environment "work" }}stripe-anthropic/claude-opus-4.6{{ else }}openai-codex/gpt-5.4{{ end }}
+model: {{model.strong}}
 skill: chrome-cdp
 spawning: false
 auto-exit: true
