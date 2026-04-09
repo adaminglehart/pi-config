@@ -1,5 +1,4 @@
 import { aquariumScene } from "./scenes/aquarium.js";
-import { lifeScene } from "./scenes/life.js";
 import { nebulaScene } from "./scenes/nebula.js";
 import type { Scene } from "./scenes/types.js";
 
@@ -32,7 +31,7 @@ export function getAgentState(): AgentState {
 /**
  * SCENE MANAGEMENT
  */
-const scenes: Scene[] = [nebulaScene, lifeScene, aquariumScene];
+const scenes: Scene[] = [nebulaScene, aquariumScene];
 let currentSceneIdx = 0;
 
 export function getActiveScene(): Scene {
@@ -80,7 +79,9 @@ export function getSceneCache(width: number, contextPercent: number): string[] {
   return sceneCacheLines;
 }
 
-export function startAnimation(tuiRef: { requestRender: () => void } | null): void {
+export function startAnimation(
+  tuiRef: { requestRender: () => void } | null,
+): void {
   tuiReference = tuiRef;
   if (animationInterval) clearInterval(animationInterval);
   animationInterval = setInterval(() => {

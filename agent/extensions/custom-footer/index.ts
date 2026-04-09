@@ -50,6 +50,8 @@ export const colors = {
   accent: "213", // Pink
 };
 
+const isSubagent = !!process.env.PI_SUBAGENT_NAME;
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Formatting helpers
 // ═══════════════════════════════════════════════════════════════════════════
@@ -235,14 +237,14 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (dirSeg) line1LeftSegments.push(dirSeg);
   if (branchSeg) line1LeftSegments.push(branchSeg);
   const line1Left = line1LeftSegments.join(separator);
-  
+
   const sessionIdSeg = renderSessionIdSegment(ctx);
-  
+
   // Calculate padding to push session ID to the right
   const line1LeftWidth = visibleWidth(line1Left);
   const sessionIdWidth = visibleWidth(sessionIdSeg);
   const line1Pad = Math.max(1, mainWidth - line1LeftWidth - sessionIdWidth);
-  
+
   const line1Content = line1Left + " ".repeat(line1Pad) + sessionIdSeg;
 
   // Line 2 Content: model, thinking, ACM, tokens, cost, extension statuses
@@ -263,10 +265,6 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (extStatusSeg) line2Segments.push(extStatusSeg);
   const line2Content = line2Segments.join(separator);
 
-  // Scene content — use cached render to avoid recomputing on every TUI
-  // render pass (the cache only refreshes on our own animation tick)
-  const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
-
   // Padding
   const line2Pad = Math.max(0, mainWidth - visibleWidth(line2Content));
 
@@ -274,39 +272,33 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const resultLines: string[] = [];
 
   // Info Line 1
-  resultLines.push(
-    truncateToWidth(line1Content, width),
-  );
+  resultLines.push(truncateToWidth(line1Content, width));
 
   // Info Line 2
-  resultLines.push(
-    truncateToWidth(
-      line2Content + " ".repeat(line2Pad),
-      width,
-    ),
-  );
+  resultLines.push(truncateToWidth(line2Content + " ".repeat(line2Pad), width));
 
-  // Scene top border
-  const sceneTopBorder = `${sepColor}┌${"─".repeat(sceneInnerWidth)}┐${reset}`;
-  resultLines.push(
-    truncateToWidth(sceneTopBorder, width),
-  );
+  // Scene content — skip animation in subagent processes
+  if (!isSubagent) {
+    // Use cached render to avoid recomputing on every TUI
+    // render pass (the cache only refreshes on our own animation tick)
+    const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
 
-  // Scene content rows with side borders
-  for (let i = 0; i < sceneLines.length; i++) {
-    const content = sceneLines[i] || " ".repeat(sceneInnerWidth);
-    const contentPad = Math.max(0, sceneInnerWidth - visibleWidth(content));
-    const borderedRow = `${sepColor}│${reset}${content}${" ".repeat(contentPad)}${sepColor}│${reset}`;
-    resultLines.push(
-      truncateToWidth(borderedRow, width),
-    );
+    // Scene top border
+    const sceneTopBorder = `${sepColor}┌${"─".repeat(sceneInnerWidth)}┐${reset}`;
+    resultLines.push(truncateToWidth(sceneTopBorder, width));
+
+    // Scene content rows with side borders
+    for (let i = 0; i < sceneLines.length; i++) {
+      const content = sceneLines[i] || " ".repeat(sceneInnerWidth);
+      const contentPad = Math.max(0, sceneInnerWidth - visibleWidth(content));
+      const borderedRow = `${sepColor}│${reset}${content}${" ".repeat(contentPad)}${sepColor}│${reset}`;
+      resultLines.push(truncateToWidth(borderedRow, width));
+    }
+
+    // Scene bottom border
+    const sceneBottomBorder = `${sepColor}└${"─".repeat(sceneInnerWidth)}┘${reset}`;
+    resultLines.push(truncateToWidth(sceneBottomBorder, width));
   }
-
-  // Scene bottom border
-  const sceneBottomBorder = `${sepColor}└${"─".repeat(sceneInnerWidth)}┘${reset}`;
-  resultLines.push(
-    truncateToWidth(sceneBottomBorder, width),
-  );
 
   return resultLines;
 }
@@ -486,7 +478,7 @@ export default function customFooter(pi: ExtensionAPI) {
         };
       },
     );
-    startAnimation(tuiRef);
+    if (!isSubagent) startAnimation(tuiRef);
   }
 
   pi.on("session_start", async (_event, ctx) => {
