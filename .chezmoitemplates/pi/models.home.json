@@ -16,6 +16,18 @@
             "cacheRead": 0.1,
             "cacheWrite": 0
           }
+        },
+        {
+          "id": "accounts/fireworks/models/glm-5p1",
+          "name": "GLM 5.1 (fireworks)",
+          "reasoning": true,
+          "contextWindow": 204800,
+          "cost": {
+            "input": 1.4,
+            "output": 4.4,
+            "cacheRead": 0.26,
+            "cacheWrite": 0
+          }
         }
       ]
     },
@@ -37,7 +49,7 @@
           },
           "compat": {
             "openRouterRouting": {
-              "order": ["friendli"]
+              "order": ["together", "friendli"]
             }
           }
         }
