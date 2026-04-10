@@ -9,10 +9,5 @@
   "extensions": ["~/.config/pi/bake/pi-extension/status-writer.ts"],
   "skills": ["~/.agents/skills"],
   "hideThinkingBlock": true,
-  "librarian": {
-    "maxTurns": 10,
-    "maxSearchResults": 30,
-    "models": "stripe-google/gemini-3-flash:medium,stripe-anthropic/claude-sonnet-4.5:high"
-  },
   "quietStartup": true
 }

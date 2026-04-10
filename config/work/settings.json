@@ -13,6 +13,11 @@
     "stripe-google/gemini-3.1-pro",
     "stripe-google/gemini-3-flash"
   ],
+  "librarian": {
+    "maxTurns": 10,
+    "maxSearchResults": 30,
+    "models": "stripe-google/gemini-3-flash:medium,stripe-anthropic/claude-sonnet-4.5:high"
+  },
   "compaction": {
     "provider": "stripe-google",
     "model": "gemini-3-flash"

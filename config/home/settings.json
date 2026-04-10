@@ -14,5 +14,10 @@
   "compaction": {
     "provider": "openrouter",
     "model": "google/gemini-3.1-flash-lite-preview"
+  },
+  "librarian": {
+    "maxTurns": 10,
+    "maxSearchResults": 30,
+    "models": "google/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p5-turbo:high"
   }
 }
