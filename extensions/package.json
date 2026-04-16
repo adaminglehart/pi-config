@@ -7,7 +7,7 @@
     "@mariozechner/pi-ai": "^0.66.1",
     "@mariozechner/pi-coding-agent": "^0.66.1",
     "@mariozechner/pi-tui": "^0.66.1",
-    "@sinclair/typebox": "0.34.48",
+    "@sinclair/typebox": "0.34.49",
     "typescript": "5.8.2",
     "vscode-languageserver-protocol": "3.17.5"
   },
