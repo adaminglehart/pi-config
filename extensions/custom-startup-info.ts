@@ -20,8 +20,8 @@ import type {
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
-    // Skip startup info on reload
-    if (event.reason === "reload") return;
+    // Skip startup info on reload and resume
+    if (event.reason === "reload" || event.reason === "resume") return;
     
     await sendCustomStartupInfo(ctx);
   });
@@ -72,13 +72,8 @@ export default function (pi: ExtensionAPI) {
     lines.push();
     lines.push(box.line(`remember to start /acm`, "center"));
     lines.push(box.bottom());
-    lines.push("");
 
-    pi.sendMessage({
-      customType: "startup-info",
-      content: lines.join("\n"),
-      display: true,
-      details: { type: "startup" },
-    });
+    // Print directly to console - not persisted in session
+    console.log("\n" + lines.join("\n") + "\n");
   }
 }

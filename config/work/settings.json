@@ -1,6 +1,7 @@
 {
   "defaultProvider": "stripe-anthropic",
   "defaultModel": "claude-sonnet-4.5",
+  "defaultThinkingLevel": "high",
   "enabledModels": [
     "stripe-anthropic/claude-opus-4.6",
     "stripe-anthropic/claude-opus-4.6-1m",
