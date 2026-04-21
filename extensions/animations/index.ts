@@ -327,6 +327,11 @@ export default function (pi: ExtensionAPI) {
     lastAnimLines = 0;
     const animName = state.randomMode ? pickRandom() : state.anim;
     state.timer = setInterval(() => {
+      // Guard against firing after stopAnimation() — avoids leaving a
+      // stale frame in pendingWorkingMessage when the interval sneaks in
+      // between pi-core's agent_end (which destroys the loader) and the
+      // extension's async agent_end handler (which clears the interval).
+      if (!state.timer) return;
       state.frame++;
       const w = resolveWidth();
       const lines = renderFrame(animName, state.frame, w);
