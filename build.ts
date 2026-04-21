@@ -36,7 +36,7 @@ const BUILD_DIR = join(ROOT, "build");
 const CONFIG_DIR = join(ROOT, "config");
 
 // Environment detection — same logic as the old chezmoi template
-const HOME_HOSTNAME = "Adams-MacBook-Pro.local";
+const HOME_HOSTNAME = "MacBook-Pro.local";
 const environment =
   Bun.env.PI_BUILD_ENV ?? (hostname() === HOME_HOSTNAME ? "home" : "work");
 
@@ -75,15 +75,13 @@ function resolveExtensionSource(name: string): {
     return { path: filePath, isFile: true };
   }
 
-  fatal(
-    `Extension not found: "${name}" (checked ${dirPath}/ and ${filePath})`
-  );
+  fatal(`Extension not found: "${name}" (checked ${dirPath}/ and ${filePath})`);
 }
 
 /** Deep merge source into target (mutates target) */
 function deepMerge(
   target: Record<string, unknown>,
-  source: Record<string, unknown>
+  source: Record<string, unknown>,
 ): Record<string, unknown> {
   for (const key of Object.keys(source)) {
     const targetVal = target[key];
@@ -98,7 +96,7 @@ function deepMerge(
     ) {
       deepMerge(
         targetVal as Record<string, unknown>,
-        sourceVal as Record<string, unknown>
+        sourceVal as Record<string, unknown>,
       );
     } else {
       target[key] = sourceVal;
@@ -110,7 +108,7 @@ function deepMerge(
 /** Build a merged JSON config from base + environment + profile overlays */
 async function buildMergedConfig(
   prefix: string,
-  profileDir: string
+  profileDir: string,
 ): Promise<string> {
   const basePath = join(CONFIG_DIR, `${prefix}.base.json`);
   const envPath = join(CONFIG_DIR, environment, `${prefix}.json`);
@@ -122,12 +120,12 @@ async function buildMergedConfig(
 
   // Merge: base → environment → profile
   const base = await Bun.file(basePath).json();
-  
+
   if (existsSync(envPath)) {
     const overlay = await Bun.file(envPath).json();
     deepMerge(base, overlay);
   }
-  
+
   if (existsSync(profilePath)) {
     const profileOverlay = await Bun.file(profilePath).json();
     deepMerge(base, profileOverlay);
@@ -137,13 +135,12 @@ async function buildMergedConfig(
 }
 
 /** Replace {{var.name}} placeholders in text using profile vars for current environment */
-function substituteVars(
-  text: string,
-  vars: Record<string, string>
-): string {
+function substituteVars(text: string, vars: Record<string, string>): string {
   return text.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, key: string) => {
     if (!(key in vars)) {
-      fatal(`Unknown variable "{{${key}}}" — not defined in profile vars.${environment}`);
+      fatal(
+        `Unknown variable "{{${key}}}" — not defined in profile vars.${environment}`,
+      );
     }
     return vars[key];
   });
@@ -251,7 +248,7 @@ async function buildProfile(profileName: string) {
     if (!existsSync(basePath)) {
       continue; // Skip if base file doesn't exist (e.g., mcp.json is optional)
     }
-    
+
     const configJson = await buildMergedConfig(configName, profileDir);
     await Bun.write(join(outputDir, `${configName}.json`), configJson);
     console.log(`  generated ${configName}.json`);
@@ -261,10 +258,7 @@ async function buildProfile(profileName: string) {
 }
 
 /** Apply variable substitution to all files in a directory (recursive) */
-async function applyVarsToDir(
-  dir: string,
-  vars: Record<string, string>
-) {
+async function applyVarsToDir(dir: string, vars: Record<string, string>) {
   const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
@@ -277,10 +271,7 @@ async function applyVarsToDir(
 }
 
 /** Apply variable substitution to a single file (only if it contains placeholders) */
-async function applyVarsToFile(
-  filePath: string,
-  vars: Record<string, string>
-) {
+async function applyVarsToFile(filePath: string, vars: Record<string, string>) {
   // Only process text files
   if (!filePath.match(/\.(md|json|yaml|yml|ts|js|txt|sh|env)$/)) return;
   if (Object.keys(vars).length === 0) return;

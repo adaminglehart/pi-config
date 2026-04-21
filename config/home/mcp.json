@@ -1,1 +1,10 @@
-{"mcpServers": {}}
+{
+  "mcpServers": {
+    "uidotsh": {
+      "url": "https://ui.sh/mcp?agent=pi",
+      "headers": {
+        "Authorization": "Bearer ${UIDOTSH_TOKEN}"
+      }
+    }
+  }
+}
