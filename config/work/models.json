@@ -1,7 +1,7 @@
 {
   "providers": {
     "stripe-anthropic": {
-      "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
+      "baseUrl": "http://litellm.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-completions",
       "apiKey": "use_case=development&team=privy-infra-data",
       "compat": {
@@ -45,7 +45,7 @@
       ]
     },
     "stripe-openai": {
-      "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
+      "baseUrl": "http://litellm.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-responses",
       "apiKey": "use_case=development&team=privy-infra-data",
       "models": [
@@ -79,7 +79,7 @@
       ]
     },
     "stripe-google": {
-      "baseUrl": "http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1",
+      "baseUrl": "http://litellm.corp.stripe.com.certproxy.localhost:7891/v1",
       "api": "openai-completions",
       "apiKey": "use_case=development&team=privy-infra-data",
       "compat": {
