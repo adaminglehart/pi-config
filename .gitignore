@@ -21,3 +21,5 @@ honcho/.env
 agent/extensions/honcho/node_modules
 **/node_modules
 **/dist
+
+plans/**
