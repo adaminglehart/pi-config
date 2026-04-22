@@ -5,7 +5,7 @@
   "description": "Dev dependencies for type-checking pi extensions",
   "devDependencies": {
     "@mariozechner/pi-ai": "^0.66.1",
-    "@mariozechner/pi-coding-agent": "^0.66.1",
+    "@mariozechner/pi-coding-agent": "^0.68.0",
     "@mariozechner/pi-tui": "^0.66.1",
     "@sinclair/typebox": "0.34.48",
     "typescript": "5.8.2",
