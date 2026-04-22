@@ -11,11 +11,15 @@ build-all:
       just build "$profile"
     done
 
+# Read destDir from a profile's package.json or package.jsonc
+_dest profile:
+    @bun scripts/dest.ts {{ profile }}
+
 # Deploy a single built profile to its destination
 apply-profile profile:
     #!/usr/bin/env bash
     set -euo pipefail
-    DEST=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('profiles/{{ profile }}/package.json','utf-8')).pi.destDir.replace('~', process.env.HOME))")
+    DEST=$(just _dest {{ profile }})
     BUILD="build/{{ profile }}/agent"
     if [ ! -d "$BUILD" ]; then
       echo "error: build/{{ profile }}/agent/ not found. Run 'just build {{ profile }}' first."
@@ -47,7 +51,7 @@ deploy profile: (build profile) (apply-profile profile)
 diff profile:
     #!/usr/bin/env bash
     set -euo pipefail
-    DEST=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('profiles/{{ profile }}/package.json','utf-8')).pi.destDir.replace('~', process.env.HOME))")
+    DEST=$(just _dest {{ profile }})
     BUILD="build/{{ profile }}/agent"
     if [ ! -d "$BUILD" ]; then
       echo "error: build/{{ profile }}/agent/ not found. Run 'just build {{ profile }}' first."
@@ -59,7 +63,7 @@ diff profile:
 clean profile:
     #!/usr/bin/env bash
     set -euo pipefail
-    DEST=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('profiles/{{ profile }}/package.json','utf-8')).pi.destDir.replace('~', process.env.HOME))")
+    DEST=$(just _dest {{ profile }})
     echo "Cleaning build/{{ profile }}/ and $DEST (excluding sessions, auth.json, git, node_modules)"
     rm -rf "build/{{ profile }}"
     for item in agents AGENTS.md APPEND_SYSTEM.md extensions skills settings.json models.json run_after_install_extension_deps.sh .chezmoiignore; do

@@ -6,7 +6,7 @@
     "extensions": [
       "animations",
       "answer",
-      "context-pilot",
+      // "context-pilot",
       "cost",
       "custom-compaction",
       "custom-footer",
@@ -21,28 +21,28 @@
       "todos",
       "tokens-per-second",
       "webfetch",
-      "websearch"
+      "websearch",
     ],
     "skills": [
-      "context-pilot",
+      // "context-pilot",
       "msgvault-api",
       "pi-extension",
-      "qmd-search",
-      "session-reader"
+      // "qmd-search",
+      "session-reader",
     ],
     "vars": {
       "work": {
         "model.fast": "litellm-google/gemini-3-flash",
         "model.standard": "litellm-anthropic/claude-sonnet-4.5",
         "model.strong": "litellm-anthropic/claude-opus-4.6",
-        "model.cheap": "litellm-anthropic/claude-4.5-haiku"
+        "model.cheap": "litellm-anthropic/claude-4.5-haiku",
       },
       "home": {
         "model.fast": "accounts/fireworks/routers/kimi-k2p5-turbo",
         "model.standard": "accounts/fireworks/routers/kimi-k2p5-turbo",
         "model.strong": "openai-codex/gpt-5.4",
-        "model.cheap": "accounts/fireworks/routers/kimi-k2p5-turbo"
-      }
-    }
-  }
+        "model.cheap": "accounts/fireworks/routers/kimi-k2p5-turbo",
+      },
+    },
+  },
 }

@@ -15,6 +15,7 @@ extensions/package-lock.json
 
 # Local config overrides (machine-specific, not shared)
 *.local.json
+*.local.jsonc
 
 # Honcho local environment
 honcho/.env

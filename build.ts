@@ -54,6 +54,47 @@ function fatal(msg: string): never {
   process.exit(1);
 }
 
+/** Parse JSONC (JSON with comments and trailing commas) */
+function parseJsonc(text: string): unknown {
+  const stripped = text
+    // Remove single-line comments
+    .replace(/\/\/.*$/gm, "")
+    // Remove multi-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    // Remove trailing commas before } or ]
+    .replace(/,(\s*[}\]])/g, "$1");
+  return JSON.parse(stripped);
+}
+
+/** Read and parse a JSON or JSONC file */
+async function readJson(path: string): Promise<unknown> {
+  const text = await Bun.file(path).text();
+  return path.endsWith(".jsonc") ? parseJsonc(text) : JSON.parse(text);
+}
+
+/**
+ * Find a file that may have a .json or .jsonc extension.
+ * Returns the path if found, or null. Prefers .jsonc over .json if both exist.
+ */
+function findJsonFile(pathWithoutExt: string): string | null;
+function findJsonFile(pathWithExt: string, withExt: true): string | null;
+function findJsonFile(path: string, withExt?: boolean): string | null {
+  if (withExt) {
+    // Path already has extension — check as-is, then try swapping
+    if (existsSync(path)) return path;
+    const alt = path.endsWith(".jsonc")
+      ? path.replace(/\.jsonc$/, ".json")
+      : path.replace(/\.json$/, ".jsonc");
+    return existsSync(alt) ? alt : null;
+  }
+  // Path without extension — try .jsonc first, then .json
+  const jsonc = `${path}.jsonc`;
+  if (existsSync(jsonc)) return jsonc;
+  const json = `${path}.json`;
+  if (existsSync(json)) return json;
+  return null;
+}
+
 function copyDir(src: string, dest: string) {
   cpSync(src, dest, {
     recursive: true,
@@ -110,38 +151,27 @@ async function buildMergedConfig(
   prefix: string,
   profileDir: string,
 ): Promise<string> {
-  const basePath = join(CONFIG_DIR, `${prefix}.base.json`);
-  const envPath = join(CONFIG_DIR, environment, `${prefix}.json`);
-  const envLocalPath = join(CONFIG_DIR, environment, `${prefix}.local.json`);
-  const profilePath = join(profileDir, "config", `${prefix}.json`);
-  const profileLocalPath = join(profileDir, "config", `${prefix}.local.json`);
-
-  if (!existsSync(basePath)) {
-    fatal(`Config not found: ${basePath}`);
+  const basePath = findJsonFile(join(CONFIG_DIR, `${prefix}.base`));
+  if (!basePath) {
+    fatal(`Config not found: ${join(CONFIG_DIR, `${prefix}.base.json`)}`);
   }
 
   // Merge: base → environment → environment.local → profile → profile.local
-  // *.local.json files are gitignored and used for machine-specific overrides
-  const base = await Bun.file(basePath).json();
+  // *.local.json(c) files are gitignored and used for machine-specific overrides
+  const base = (await readJson(basePath)) as Record<string, unknown>;
 
-  if (existsSync(envPath)) {
-    const overlay = await Bun.file(envPath).json();
-    deepMerge(base, overlay);
-  }
+  const layerPaths = [
+    findJsonFile(join(CONFIG_DIR, environment, prefix)),
+    findJsonFile(join(CONFIG_DIR, environment, `${prefix}.local`)),
+    findJsonFile(join(profileDir, "config", prefix)),
+    findJsonFile(join(profileDir, "config", `${prefix}.local`)),
+  ];
 
-  if (existsSync(envLocalPath)) {
-    const localOverlay = await Bun.file(envLocalPath).json();
-    deepMerge(base, localOverlay);
-  }
-
-  if (existsSync(profilePath)) {
-    const profileOverlay = await Bun.file(profilePath).json();
-    deepMerge(base, profileOverlay);
-  }
-
-  if (existsSync(profileLocalPath)) {
-    const profileLocalOverlay = await Bun.file(profileLocalPath).json();
-    deepMerge(base, profileLocalOverlay);
+  for (const layerPath of layerPaths) {
+    if (layerPath) {
+      const overlay = (await readJson(layerPath)) as Record<string, unknown>;
+      deepMerge(base, overlay);
+    }
   }
 
   // Resolve ${ENV_VAR} references in string values from process.env
@@ -180,12 +210,12 @@ async function buildProfile(profileName: string) {
     fatal(`Profile not found: ${profileDir}`);
   }
 
-  const manifestPath = join(profileDir, "package.json");
-  if (!existsSync(manifestPath)) {
-    fatal(`No package.json in profile: ${profileDir}`);
+  const manifestPath = findJsonFile(join(profileDir, "package"));
+  if (!manifestPath) {
+    fatal(`No package.json(c) in profile: ${profileDir}`);
   }
 
-  const manifest: ProfileManifest = await Bun.file(manifestPath).json();
+  const manifest = (await readJson(manifestPath)) as ProfileManifest;
 
   if (!manifest.pi) {
     fatal(`package.json missing "pi" field in ${manifestPath}`);
@@ -253,7 +283,7 @@ async function buildProfile(profileName: string) {
   // 5. Copy profile-level files with variable substitution
   const profileFiles = readdirSync(profileDir);
   for (const item of profileFiles) {
-    if (item === "package.json" || item === "node_modules") continue;
+    if (item === "package.json" || item === "package.jsonc" || item === "node_modules") continue;
 
     const src = join(profileDir, item);
     const dest = join(outputDir, item);
@@ -301,7 +331,7 @@ async function applyVarsToDir(dir: string, vars: Record<string, string>) {
 /** Apply variable substitution to a single file (only if it contains placeholders) */
 async function applyVarsToFile(filePath: string, vars: Record<string, string>) {
   // Only process text files
-  if (!filePath.match(/\.(md|json|yaml|yml|ts|js|txt|sh|env)$/)) return;
+  if (!filePath.match(/\.(md|jsonc?|yaml|yml|ts|js|txt|sh|env)$/)) return;
   if (Object.keys(vars).length === 0) return;
 
   const text = await Bun.file(filePath).text();
