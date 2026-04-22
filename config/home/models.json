@@ -1,0 +1,59 @@
+{
+  "providers": {
+    "fireworks": {
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "apiKey": "FIREWORKS_API_KEY",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "accounts/fireworks/routers/kimi-k2p5-turbo",
+          "name": "Kimi 2.5 Turbo",
+          "reasoning": true,
+          "contextWindow": 256000,
+          "cost": {
+            "input": 0.6,
+            "output": 3,
+            "cacheRead": 0.1,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "accounts/fireworks/models/glm-5p1",
+          "name": "GLM 5.1 (fireworks)",
+          "reasoning": true,
+          "contextWindow": 204800,
+          "cost": {
+            "input": 1.4,
+            "output": 4.4,
+            "cacheRead": 0.26,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    },
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKey": "OPENROUTER_API_KEY",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "z-ai/glm-5.1",
+          "name": "GLM-5.1",
+          "reasoning": true,
+          "contextWindow": 204800,
+          "cost": {
+            "input": 1.4,
+            "output": 4.4,
+            "cacheRead": 0.26,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "openRouterRouting": {
+              "order": ["together", "friendli"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

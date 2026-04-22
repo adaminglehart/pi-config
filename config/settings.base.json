@@ -1,0 +1,13 @@
+{
+  "lastChangelogVersion": "0.67.3",
+  "packages": [
+    "npm:@plannotator/pi-extension",
+    "npm:glimpseui",
+    "git:github.com/HazAT/pi-interactive-subagents",
+    "npm:pi-mcp-adapter"
+  ],
+  "extensions": ["~/.config/pi/bake/pi-extension/status-writer.ts"],
+  "skills": ["~/.agents/skills"],
+  "hideThinkingBlock": true,
+  "quietStartup": true
+}

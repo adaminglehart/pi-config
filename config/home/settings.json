@@ -1,0 +1,23 @@
+{
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/routers/kimi-k2p5-turbo",
+  "enabledModels": [
+    "accounts/fireworks/routers/kimi-k2p5-turbo",
+    "openai-codex/gpt-5.4",
+    "minimax/minimax-m2.7",
+    "z-ai/glm-5.1",
+    "google/gemini-3-flash-preview",
+    "google/gemini-3.1-flash-lite-preview",
+    "accounts/fireworks/models/glm-5p1"
+  ],
+  "defaultThinkingLevel": "high",
+  "compaction": {
+    "provider": "openrouter",
+    "model": "google/gemini-3.1-flash-lite-preview"
+  },
+  "librarian": {
+    "maxTurns": 10,
+    "maxSearchResults": 30,
+    "models": "google/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p5-turbo:high"
+  }
+}

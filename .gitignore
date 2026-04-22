@@ -1,0 +1,23 @@
+# Generated/installed files
+.DS_Store
+build/
+
+# Environment secrets (see .env.example)
+.env
+
+# Node modules for extensions
+extensions/node_modules/
+extensions/package-lock.json
+
+# Chezmoi state
+.chezmoi.yaml
+.chezmoi.toml
+
+# Local config overrides (machine-specific, not shared)
+*.local.json
+
+# Honcho local environment
+honcho/.env
+agent/extensions/honcho/node_modules
+**/node_modules
+**/dist

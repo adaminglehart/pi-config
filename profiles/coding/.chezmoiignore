@@ -1,0 +1,9 @@
+# Don't install node_modules or build artifacts
+extensions/node_modules
+extensions/**/node_modules
+extensions/bun.lock
+extensions/package.json
+extensions/tsconfig.json
+extensions/*/node_modules
+extensions/*/bun.lock
+extensions/*/package-lock.json

@@ -1,0 +1,14 @@
+{
+  "name": "dev-browser-extension",
+  "version": "1.0.0",
+  "description": "Pi extension for browser automation with Playwright and QuickJS sandbox",
+  "dependencies": {
+    "playwright": "^1.52.0",
+    "playwright-core": "^1.52.0",
+    "quickjs-emscripten": "^0.32.0",
+    "zod": "^3.25.76"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
