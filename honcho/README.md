@@ -37,9 +37,9 @@ Honcho is a self-hosted memory service that gives Pi persistent, cross-session m
    export GEMINI_API_KEY="..."
    ```
    
-   For **work** environment (Stripe LiteLLM proxy):
+   For **work** environment (LiteLLM proxy):
    ```bash
-   # No keys needed - uses Stripe's proxy
+   # No keys needed - uses internal LiteLLM proxy
    ```
 
 2. **Generate the environment file:**
@@ -75,17 +75,17 @@ Honcho is a self-hosted memory service that gives Pi persistent, cross-session m
 
 The `.env` file is automatically generated from templates based on your environment (work/home). The configuration is managed in `.chezmoitemplates/honcho/`.
 
-### Work Environment (Stripe)
+### Work Environment (LiteLLM Proxy)
 
-Uses the LiteLLM proxy with these models:
+Uses an internal LiteLLM proxy with these models:
 - **minimal/low:** `gemini-3-flash`
 - **medium:** `claude-4.5-haiku`
 - **high/max:** `claude-sonnet-4.5`
 
-Configuration:
-```env
-LLM_OPENAI_COMPATIBLE_BASE_URL=http://litellm.qa.corp.stripe.com.certproxy.localhost:7891/v1
-LLM_OPENAI_COMPATIBLE_API_KEY=use_case=development&team=privy-infra-data
+Configuration (set these env vars before running `just honcho-env`):
+```bash
+export LITELLM_BASE_URL="https://your-litellm-proxy.example.com/v1"
+export LITELLM_API_KEY="your-api-key"
 ```
 
 ### Home Environment (OpenRouter + Fireworks)

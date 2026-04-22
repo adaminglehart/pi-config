@@ -112,13 +112,16 @@ async function buildMergedConfig(
 ): Promise<string> {
   const basePath = join(CONFIG_DIR, `${prefix}.base.json`);
   const envPath = join(CONFIG_DIR, environment, `${prefix}.json`);
+  const envLocalPath = join(CONFIG_DIR, environment, `${prefix}.local.json`);
   const profilePath = join(profileDir, "config", `${prefix}.json`);
+  const profileLocalPath = join(profileDir, "config", `${prefix}.local.json`);
 
   if (!existsSync(basePath)) {
     fatal(`Config not found: ${basePath}`);
   }
 
-  // Merge: base → environment → profile
+  // Merge: base → environment → environment.local → profile → profile.local
+  // *.local.json files are gitignored and used for machine-specific overrides
   const base = await Bun.file(basePath).json();
 
   if (existsSync(envPath)) {
@@ -126,12 +129,37 @@ async function buildMergedConfig(
     deepMerge(base, overlay);
   }
 
+  if (existsSync(envLocalPath)) {
+    const localOverlay = await Bun.file(envLocalPath).json();
+    deepMerge(base, localOverlay);
+  }
+
   if (existsSync(profilePath)) {
     const profileOverlay = await Bun.file(profilePath).json();
     deepMerge(base, profileOverlay);
   }
 
-  return JSON.stringify(base, null, 2) + "\n";
+  if (existsSync(profileLocalPath)) {
+    const profileLocalOverlay = await Bun.file(profileLocalPath).json();
+    deepMerge(base, profileLocalOverlay);
+  }
+
+  // Resolve ${ENV_VAR} references in string values from process.env
+  const output = JSON.stringify(base, null, 2);
+  return resolveEnvVars(output) + "\n";
+}
+
+/** Replace ${VAR_NAME} placeholders in text with values from process.env */
+function resolveEnvVars(text: string): string {
+  return text.replace(/\$\{(\w+)\}/g, (_match, varName: string) => {
+    const value = Bun.env[varName];
+    if (value === undefined) {
+      fatal(
+        `Environment variable "\${${varName}}" is not set. Add it to your .env file.`,
+      );
+    }
+    return value;
+  });
 }
 
 /** Replace {{var.name}} placeholders in text using profile vars for current environment */

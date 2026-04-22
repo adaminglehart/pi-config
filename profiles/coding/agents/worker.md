@@ -1,7 +1,7 @@
 ---
 name: worker
 description: Implements tasks from todos - writes code, runs tests, commits with polished messages
-tools: read, bash, write, edit
+tools: read, bash, write, edit, todo
 model: {{model.standard}}
 spawning: false
 auto-exit: true

@@ -31,7 +31,7 @@ Profile-based Pi configuration with shared libraries and per-profile customizati
   │   │   └── honcho.env          # Home Honcho config
   │   └── work/
   │       ├── settings.json       # Work environment overrides
-  │       ├── models.json         # Work models (Stripe LiteLLM)
+  │       ├── models.json         # Work models (LiteLLM proxy)
   │       └── honcho.env          # Work Honcho config
   └── build/               # Build output (gitignored)
       └── coding/agent/    # Ready to deploy → ~/.pi/agent/

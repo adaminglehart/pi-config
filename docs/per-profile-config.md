@@ -65,7 +65,7 @@ Prefer faster models for coding:
 // profiles/coding/config/settings.json
 {
   "model": {
-    "default": "stripe-google/gemini-3-flash"
+    "default": "litellm-google/gemini-3-flash"
   }
 }
 ```
@@ -77,7 +77,7 @@ Prefer stronger models for personal research:
 // profiles/personal/config/settings.json
 {
   "model": {
-    "default": "stripe-anthropic/claude-opus-4.6"
+    "default": "litellm-anthropic/claude-opus-4.6"
   }
 }
 ```

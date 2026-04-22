@@ -32,10 +32,10 @@
     ],
     "vars": {
       "work": {
-        "model.fast": "stripe-google/gemini-3-flash",
-        "model.standard": "stripe-anthropic/claude-sonnet-4.5",
-        "model.strong": "stripe-anthropic/claude-opus-4.6",
-        "model.cheap": "stripe-anthropic/claude-4.5-haiku"
+        "model.fast": "litellm-google/gemini-3-flash",
+        "model.standard": "litellm-anthropic/claude-sonnet-4.5",
+        "model.strong": "litellm-anthropic/claude-opus-4.6",
+        "model.cheap": "litellm-anthropic/claude-4.5-haiku"
       },
       "home": {
         "model.fast": "accounts/fireworks/routers/kimi-k2p5-turbo",
