@@ -186,8 +186,8 @@ export default function (pi: ExtensionAPI) {
 
     // Split token budget: 60% for representation, 40% for chat
     // This ensures we always have parts of both context sources
-    const repChars = Math.floor(config.contextTokens * 0.6 * 4);
-    const chatChars = Math.floor(config.contextTokens * 0.4 * 4);
+    const repChars = Math.floor(config.contextTokens * 0.4 * 4);
+    const chatChars = Math.floor(config.contextTokens * 0.6 * 4);
 
     let contextParts: string[] = [];
 
@@ -195,7 +195,9 @@ export default function (pi: ExtensionAPI) {
       contextParts.push(representation.slice(0, repChars));
     }
     if (chatResult) {
-      contextParts.push(`## Synthesized Context\n${chatResult.slice(0, chatChars)}`);
+      contextParts.push(
+        `## Synthesized Context\n${chatResult.slice(0, chatChars)}`,
+      );
     }
 
     return contextParts.join("\n\n");
