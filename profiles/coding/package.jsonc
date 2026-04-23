@@ -8,8 +8,8 @@
       "answer",
       // "context-pilot",
       "cost",
-      "custom-compaction",
       "custom-footer",
+      "lossless-context",
       "custom-startup-info",
       "dev-browser",
       "execute-command",
@@ -33,8 +33,8 @@
     "vars": {
       "work": {
         "model.fast": "litellm-google/gemini-3-flash",
-        "model.standard": "litellm-anthropic/claude-sonnet-4.5",
-        "model.strong": "litellm-anthropic/claude-opus-4.6",
+        "model.standard": "litellm-anthropic/claude-sonnet-4-6",
+        "model.strong": "litellm-anthropic/claude-opus-4.6-1m",
         "model.cheap": "litellm-anthropic/claude-4.5-haiku",
       },
       "home": {
