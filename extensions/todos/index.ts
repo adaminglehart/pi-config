@@ -64,7 +64,13 @@ import {
 } from "@mariozechner/pi-tui";
 
 const TODO_PATH_ENV = "PI_TODO_PATH";
-const GLOBAL_PI_DIR = path.join(os.homedir(), ".obsidian", "vaults", "agents");
+const GLOBAL_PI_DIR = path.join(
+  os.homedir(),
+  ".obsidian",
+  "vaults",
+  "agents",
+  "todos",
+);
 const TODO_SETTINGS_NAME = "settings.json";
 const TODO_ID_PREFIX = "TODO-";
 const TODO_ID_PATTERN = /^[a-f0-9]{8}$/i;
@@ -830,7 +836,7 @@ function getTodosDir(cwd: string): string {
   if (overridePath && overridePath.trim()) {
     return path.resolve(cwd, overridePath.trim());
   }
-  return path.join(GLOBAL_PI_DIR, getProjectSlug(cwd), "todos");
+  return path.join(GLOBAL_PI_DIR, getProjectSlug(cwd));
 }
 
 function getTodosDirLabel(cwd: string): string {
@@ -838,7 +844,7 @@ function getTodosDirLabel(cwd: string): string {
   if (overridePath && overridePath.trim()) {
     return path.resolve(cwd, overridePath.trim());
   }
-  return path.join("~/.obsidian/vaults/agents", getProjectSlug(cwd), "todos");
+  return path.join("~/.obsidian/vaults/agents/todos", getProjectSlug(cwd));
 }
 
 function getTodoSettingsPath(todosDir: string): string {
@@ -2009,7 +2015,7 @@ export default function todosExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("todos", {
-    description: "List todos from ~/.pi/history/<project>/todos",
+    description: "List todos from ~/.obsidian/vaults/agents/todos/<project>",
     getArgumentCompletions: (argumentPrefix: string) => {
       const todos = listTodosSync(getTodosDir(process.cwd()));
       if (!todos.length) return null;

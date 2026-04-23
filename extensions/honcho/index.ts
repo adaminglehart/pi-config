@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { Honcho } from "@honcho-ai/sdk";
-import * as path from "path";
-import * as os from "os";
+import * as path from "node:path";
+import * as os from "node:os";
+import { getNamespacedConfig } from "../_lib/settings.js";
 
 // Module-level state
 let enabled = false;
@@ -14,16 +15,19 @@ let cachedContext: string | null = null;
 let turnCounter = 0;
 let pendingWrites: Promise<void>[] = [];
 
-// Configuration
-const config = {
-  baseUrl: process.env.HONCHO_BASE_URL ?? "http://localhost:8100",
-  workspace: process.env.HONCHO_WORKSPACE ?? "pi",
-  userName: process.env.HONCHO_PEER_NAME ?? process.env.USER ?? "user",
-  aiName: process.env.HONCHO_AI_PEER ?? "pi",
-  contextTokens: parseInt(process.env.HONCHO_CONTEXT_TOKENS ?? "2000", 10),
-  refreshInterval: parseInt(process.env.HONCHO_REFRESH_INTERVAL ?? "5", 10),
-  enabled: (process.env.HONCHO_ENABLED ?? "true").toLowerCase() !== "false",
-};
+// Eager promises for parallel fetching
+let eagerContextPromise: Promise<string | null> | null = null;
+
+// Configuration - read from Pi settings
+const config = getNamespacedConfig("honcho", {
+  baseUrl: "http://localhost:8100",
+  workspace: "pi",
+  userName: process.env.USER ?? "user",
+  aiName: "pi",
+  contextTokens: 8000,
+  refreshInterval: 5,
+  enabled: true,
+});
 
 /**
  * Sanitize a file path to use as a session external_id
@@ -60,6 +64,39 @@ export default function (pi: ExtensionAPI) {
   if (!config.enabled) return;
 
   // ===========================
+  // Helper: Fetch layered context from Honcho
+  // ===========================
+  async function fetchLayeredContext(): Promise<string | null> {
+    if (!client || !sessionId || !userPeerId) return null;
+
+    try {
+      const session = await client.session(sessionId);
+      const sessionContext = await session.context({
+        tokens: config.contextTokens,
+        peerTarget: userPeerId,
+      });
+
+      const userPeer = await client.peer(userPeerId);
+      let chatResult: string | null = null;
+
+      try {
+        chatResult = await userPeer.chat(
+          "What are this user's key preferences, workflow habits, past decisions, and important context I should know right now?",
+        );
+      } catch {
+        // Chat query is optional
+      }
+
+      return buildLayeredContext(
+        sessionContext.peerRepresentation || null,
+        chatResult,
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  // ===========================
   // Session Initialization
   // ===========================
   pi.on("session_start", async (_event, ctx) => {
@@ -84,18 +121,8 @@ export default function (pi: ExtensionAPI) {
       });
       sessionId = session.id;
 
-      // Fetch initial context using session.context() with peer representation
-      try {
-        const session = await client.session(sessionId);
-        const sessionContext = await session.context({
-          tokens: config.contextTokens,
-          peerTarget: userPeerId,
-        });
-        // Get the peer representation from the context
-        cachedContext = sessionContext.peerRepresentation || null;
-      } catch {
-        cachedContext = null;
-      }
+      // Kick off eager context fetch (don't await - let it run in parallel)
+      eagerContextPromise = fetchLayeredContext();
 
       enabled = true;
       turnCounter = 0;
@@ -114,21 +141,26 @@ export default function (pi: ExtensionAPI) {
   // ===========================
   // Context Injection
   // ===========================
-  pi.on("before_agent_start", async (event, _ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     if (!enabled) return;
 
     turnCounter++;
-    const shouldRefresh =
-      turnCounter === 1 || turnCounter % config.refreshInterval === 0;
+    // disable refreshing after first turn for now
+    const shouldRefresh = turnCounter === 1;
+    // const shouldRefresh =
+    //   turnCounter === 1 || turnCounter % config.refreshInterval === 0;
 
     if (shouldRefresh) {
+      // Await the eager promise from session_start (or kick off new one on refresh)
       try {
-        const session = await client.session(sessionId);
-        const sessionContext = await session.context({
-          tokens: config.contextTokens,
-          peerTarget: userPeerId,
-        });
-        cachedContext = sessionContext.peerRepresentation || null;
+        if (eagerContextPromise && turnCounter === 1) {
+          // First turn: await the eager promise started in session_start
+          cachedContext = await eagerContextPromise;
+          eagerContextPromise = null; // Clear it after first use
+        } else {
+          // Subsequent refreshes: fetch synchronously
+          cachedContext = await fetchLayeredContext();
+        }
       } catch {
         // Use cached on failure
       }
@@ -136,16 +168,38 @@ export default function (pi: ExtensionAPI) {
 
     if (!cachedContext) return;
 
-    // Truncate to rough token estimate
-    const maxChars = config.contextTokens * 4;
-    const truncated = cachedContext.slice(0, maxChars);
-
     return {
       systemPrompt:
         event.systemPrompt +
-        `\n\n## User Memory (Honcho)\nThe following is what you know about this user from previous sessions:\n\n${truncated}`,
+        `\n\n## User Memory (Honcho)\nThe following is what you know about this user from previous sessions:\n\n${cachedContext}`,
     };
   });
+
+  // ===========================
+  // Helper to build and truncate layered context
+  // ===========================
+  function buildLayeredContext(
+    representation: string | null,
+    chatResult: string | null,
+  ): string | null {
+    if (!representation && !chatResult) return null;
+
+    // Split token budget: 60% for representation, 40% for chat
+    // This ensures we always have parts of both context sources
+    const repChars = Math.floor(config.contextTokens * 0.6 * 4);
+    const chatChars = Math.floor(config.contextTokens * 0.4 * 4);
+
+    let contextParts: string[] = [];
+
+    if (representation) {
+      contextParts.push(representation.slice(0, repChars));
+    }
+    if (chatResult) {
+      contextParts.push(`## Synthesized Context\n${chatResult.slice(0, chatChars)}`);
+    }
+
+    return contextParts.join("\n\n");
+  }
 
   // ===========================
   // Message Storage

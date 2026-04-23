@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.67.3",
+  "lastChangelogVersion": "0.69.0",
   "packages": [
     "npm:@plannotator/pi-extension",
     "npm:glimpseui",

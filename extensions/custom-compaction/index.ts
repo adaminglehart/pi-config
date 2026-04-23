@@ -1,43 +1,17 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { compact } from "@mariozechner/pi-coding-agent";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import { getNamespacedConfig } from "../_lib/settings.js";
 
 interface CompactionModelConfig {
-  provider?: string;
-  model?: string;
+  provider: string;
+  model: string;
 }
 
-interface PiSettings {
-  compaction?: {
-    provider?: string;
-    model?: string;
-  };
-}
-
-function readCompactionSettings(): CompactionModelConfig | undefined {
-  try {
-    const globalSettingsPath = path.join(
-      os.homedir(),
-      ".pi",
-      "agent",
-      "settings.json",
-    );
-    if (fs.existsSync(globalSettingsPath)) {
-      const content = fs.readFileSync(globalSettingsPath, "utf-8");
-      const settings: PiSettings = JSON.parse(content);
-      if (settings.compaction?.provider || settings.compaction?.model) {
-        return {
-          provider: settings.compaction.provider,
-          model: settings.compaction.model,
-        };
-      }
-    }
-  } catch {
-    // Ignore errors and return undefined to use defaults
-  }
-  return undefined;
+function readCompactionSettings(): CompactionModelConfig {
+  return getNamespacedConfig("compaction", {
+    provider: "openrouter",
+    model: "google/gemini-3-flash-preview",
+  });
 }
 
 /**
@@ -50,13 +24,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_before_compact", async (event, ctx) => {
     const { preparation, customInstructions, signal } = event;
 
-    // Read compaction model settings from pi settings file
+    // Read compaction model settings from pi settings file (with defaults)
     const compactionSettings = readCompactionSettings();
-
-    // Use settings or fall back to defaults
-    const provider = compactionSettings?.provider ?? "openrouter";
-    const modelId =
-      compactionSettings?.model ?? "google/gemini-3-flash-preview";
+    const { provider, model: modelId } = compactionSettings;
 
     const model = ctx.modelRegistry.find(provider, modelId);
     if (!model) {

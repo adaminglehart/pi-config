@@ -1,0 +1,16 @@
+{
+  "name": "pi-knowledge-graph",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tobilu/qmd": "^2.1.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}

@@ -6,7 +6,7 @@
     "extensions": [
       "animations",
       "answer",
-      "context-pilot",
+      // "context-pilot",
       "cost",
       "custom-compaction",
       "custom-footer",
@@ -14,20 +14,23 @@
       "dev-browser",
       "execute-command",
       "honcho",
+      "knowledge-graph",
       "minimal-tools",
       "notify",
       "personal-system-prompt",
       "todos",
       "tokens-per-second",
+      // "void",
       "webfetch",
-      "websearch"
+      "websearch",
     ],
     "skills": [
-      "context-pilot",
+      // "context-pilot",
+      "knowledge-graph",
       "msgvault-api",
       "pi-extension",
-      "qmd-search",
-      "session-reader"
-    ]
-  }
+      // "qmd-search",
+      "session-reader",
+    ],
+  },
 }

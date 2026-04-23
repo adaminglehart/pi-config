@@ -229,6 +229,15 @@ function renderProfileSegment(): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Profile detection
+// ═══════════════════════════════════════════════════════════════════════════
+
+function isPersonalProfile(): boolean {
+  const agentDir = process.env.PI_CODING_AGENT_DIR || "~/.pi/agent";
+  return agentDir.includes("pi-personal");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Main footer builder
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -291,8 +300,9 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Info Line 2
   resultLines.push(truncateToWidth(line2Content + " ".repeat(line2Pad), width));
 
-  // Scene content — skip animation in subagent processes
-  if (!isSubagent()) {
+  // Scene content — skip animation in subagent processes and personal profile
+  // (personal profile uses void extension for theatrical particle animation instead)
+  if (!isSubagent() && !isPersonalProfile()) {
     // Use cached render to avoid recomputing on every TUI
     // render pass (the cache only refreshes on our own animation tick)
     const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
@@ -393,6 +403,10 @@ export default function customFooter(pi: ExtensionAPI) {
   pi.registerCommand("footer-scene", {
     description: "Cycle footer scene",
     handler: async (_args, ctx) => {
+      if (isPersonalProfile()) {
+        ctx.ui.notify("Scene cycling not available in personal profile (void extension active)", "warning");
+        return;
+      }
       const scene = cycleScene();
       ctx.ui.notify(`Scene: ${scene}`, "info");
       tuiRef?.requestRender();
@@ -402,6 +416,10 @@ export default function customFooter(pi: ExtensionAPI) {
   pi.registerCommand("fish", {
     description: "Interact with the current scene",
     handler: async (_args, ctx) => {
+      if (isPersonalProfile()) {
+        ctx.ui.notify("Scene interaction not available in personal profile (void extension active)", "warning");
+        return;
+      }
       const scene = getActiveScene();
       if (scene.onCommand) {
         scene.onCommand(ctx);
@@ -487,7 +505,7 @@ export default function customFooter(pi: ExtensionAPI) {
         };
       },
     );
-    if (!isSubagent()) startAnimation(tuiRef);
+    if (!isSubagent() && !isPersonalProfile()) startAnimation(tuiRef);
   }
 
   pi.on("session_start", async (_event, ctx) => {
