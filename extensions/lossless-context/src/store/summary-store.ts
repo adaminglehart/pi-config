@@ -193,21 +193,49 @@ export class SummaryStore {
   }
 
   /**
-   * Get parent summary IDs for a condensed summary.
+   * Delete all summaries and related records for a conversation.
+   * Used by recompact to start fresh.
+   */
+  clearConversationSummaries(conversationId: string): void {
+    this.db
+      .prepare(
+        `DELETE FROM summary_messages WHERE summary_id IN (
+          SELECT id FROM summaries WHERE conversation_id = ?
+        )`,
+      )
+      .run(conversationId);
+
+    this.db
+      .prepare(
+        `DELETE FROM summary_parents WHERE summary_id IN (
+          SELECT id FROM summaries WHERE conversation_id = ?
+        ) OR parent_summary_id IN (
+          SELECT id FROM summaries WHERE conversation_id = ?
+        )`,
+      )
+      .run(conversationId, conversationId);
+
+    this.db
+      .prepare(`DELETE FROM summaries WHERE conversation_id = ?`)
+      .run(conversationId);
+  }
+
+  /**
+   * Get parent summary IDs (condensed summaries that consumed this one).
    */
   getSummaryParentIds(summaryId: string): string[] {
     const rows = this.db
       .prepare(
         `
-        SELECT parent_summary_id
+        SELECT summary_id
         FROM summary_parents
-        WHERE summary_id = ?
-        ORDER BY parent_summary_id
+        WHERE parent_summary_id = ?
+        ORDER BY summary_id
       `,
       )
-      .all(summaryId) as Array<{ parent_summary_id: string }>;
+      .all(summaryId) as Array<{ summary_id: string }>;
 
-    return rows.map((row) => row.parent_summary_id);
+    return rows.map((row) => row.summary_id);
   }
 
   /**
@@ -219,8 +247,8 @@ export class SummaryStore {
         `
         SELECT s.id, s.conversation_id, s.kind, s.depth, s.content, s.token_count, s.metadata, s.created_at
         FROM summaries s
-        JOIN summary_parents sp ON sp.summary_id = s.id
-        WHERE sp.parent_summary_id = ?
+        JOIN summary_parents sp ON s.id = sp.parent_summary_id
+        WHERE sp.summary_id = ?
         ORDER BY s.created_at
       `,
       )

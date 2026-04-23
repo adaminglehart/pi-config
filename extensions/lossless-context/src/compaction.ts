@@ -23,6 +23,8 @@ export interface CompactionDeps {
   config: LcmConfig;
   modelRegistry: ModelRegistry;
   signal?: AbortSignal;
+  /** Optional override for testing — replaces the imported `summarize` function. */
+  summarizeFn?: typeof summarize;
 }
 
 export class CompactionEngine {
@@ -32,6 +34,12 @@ export class CompactionEngine {
    * Check if compaction is needed.
    * Returns true if total stored context tokens exceed the threshold,
    * OR if there are enough raw messages outside the fresh tail to warrant a leaf pass.
+   *
+   * NOTE: This method is used for diagnostics and testing only. In production,
+   * compaction is triggered by Pi's built-in auto-compaction — LCM does not
+   * poll or call this method at runtime. The entry point is the
+   * `session_before_compact` hook in index.ts, which Pi invokes when it decides
+   * the context needs pruning.
    */
   shouldCompact(conversationId: string, tokenBudget: number): boolean {
     const contextItems =
@@ -40,8 +48,27 @@ export class CompactionEngine {
     if (contextItems.length === 0) return false;
 
     const freshTailCount = this.deps.config.freshTailCount;
-    const freshTailStart = Math.max(0, contextItems.length - freshTailCount);
+    const freshTailMaxTokens = this.deps.config.freshTailMaxTokens;
     const threshold = tokenBudget * this.deps.config.contextThreshold;
+
+    // Walk backwards to find fresh tail boundary (count + token capped)
+    let messagesSeen = 0;
+    let freshTailTokens = 0;
+    const freshTailIndices = new Set<number>();
+
+    for (let i = contextItems.length - 1; i >= 0; i--) {
+      const item = contextItems[i];
+      if (item.item_type !== "message" || !item.message_id) continue;
+
+      const message = this.deps.conversationStore.getMessageById(item.message_id);
+      const tokens = message?.token_count ?? 0;
+      messagesSeen++;
+
+      if (messagesSeen <= freshTailCount && freshTailTokens + tokens <= freshTailMaxTokens) {
+        freshTailIndices.add(i);
+        freshTailTokens += tokens;
+      }
+    }
 
     // Count total tokens across all context items (messages + summaries)
     let totalTokens = 0;
@@ -57,7 +84,7 @@ export class CompactionEngine {
         if (message) {
           totalTokens += message.token_count;
           if (
-            i < freshTailStart &&
+            !freshTailIndices.has(i) &&
             !this.deps.summaryStore.isMessageSummarized(item.message_id)
           ) {
             evictableMessageTokens += message.token_count;
@@ -71,11 +98,10 @@ export class CompactionEngine {
       }
     }
 
-    // Trigger if total context exceeds threshold OR there are enough raw messages to leaf-compact
-    const overThreshold = totalTokens > threshold;
-    const hasLeafWork = evictableMessageTokens >= this.deps.config.leafChunkTokens;
-
-    return overThreshold || hasLeafWork;
+    // Only trigger when total context exceeds threshold.
+    // The leaf/condensed passes will determine what work to do.
+    // We don't compact preemptively just because evictable messages exist.
+    return totalTokens > threshold;
   }
 
   /**
@@ -98,14 +124,34 @@ export class CompactionEngine {
     const contextItems =
       this.deps.contextItemsStore.getContextItems(conversationId);
 
-    // Calculate fresh tail boundary
+    // Calculate fresh tail boundary using both message count and token cap.
+    // Walk backwards to find where the fresh tail ends.
     const freshTailCount = this.deps.config.freshTailCount;
-    const freshTailStart = Math.max(0, contextItems.length - freshTailCount);
+    const freshTailMaxTokens = this.deps.config.freshTailMaxTokens;
+    let messagesSeen = 0;
+    let freshTailTokens = 0;
+    let freshTailStart = contextItems.length; // default: everything is fresh
+
+    for (let i = contextItems.length - 1; i >= 0; i--) {
+      const item = contextItems[i];
+      if (item.item_type !== "message" || !item.message_id) continue;
+
+      const message = this.deps.conversationStore.getMessageById(item.message_id);
+      const tokens = message?.token_count ?? 0;
+      messagesSeen++;
+
+      if (messagesSeen > freshTailCount || freshTailTokens + tokens > freshTailMaxTokens) {
+        // This message is beyond the fresh tail — everything at or before this index is evictable
+        freshTailStart = i;
+        break;
+      }
+      freshTailTokens += tokens;
+    }
 
     // Collect evictable message items (outside fresh tail)
     // Skip messages already covered by an existing summary to prevent duplicates
     const evictableItems = contextItems
-      .slice(0, freshTailStart)
+      .slice(0, freshTailStart + 1)
       .filter(
         (item) =>
           item.item_type === "message" &&
@@ -137,7 +183,13 @@ export class CompactionEngine {
       prev.ordinals.push(...last.ordinals);
     }
 
-    // Process each chunk
+    // Process all chunks and collect replacements before modifying context items.
+    // This avoids ordinal drift from replaceContextItems being called in a loop.
+    const replacements: Array<{
+      removeOrdinals: number[];
+      summaryId: string;
+    }> = [];
+
     for (const chunk of chunks) {
       if (chunk.messageIds.length < this.deps.config.leafMinFanout) {
         // Skip chunks below minimum fanout (only possible with a single small chunk)
@@ -161,7 +213,8 @@ export class CompactionEngine {
       );
 
       // Call LLM to summarize
-      const summaryContent = await summarize(
+      const doSummarize = this.deps.summarizeFn ?? summarize;
+      const summaryContent = await doSummarize(
         serialized,
         "leaf",
         0,
@@ -184,12 +237,25 @@ export class CompactionEngine {
         chunk.messageIds,
       );
 
-      // Replace context items: remove message ordinals, add summary
-      const removeOrdinals = chunk.ordinals;
+      replacements.push({
+        removeOrdinals: chunk.ordinals,
+        summaryId: summary.id,
+      });
+    }
+
+    // Apply all replacements in a single pass.
+    // Collect all ordinals to remove and new items to insert.
+    if (replacements.length > 0) {
+      const allRemoveOrdinals = replacements.flatMap((r) => r.removeOrdinals);
+      const allNewItems = replacements.map((r) => ({
+        itemType: "summary" as const,
+        summaryId: r.summaryId,
+      }));
+
       this.deps.contextItemsStore.replaceContextItems(
         conversationId,
-        removeOrdinals,
-        [{ itemType: "summary", summaryId: summary.id }],
+        allRemoveOrdinals,
+        allNewItems,
       );
     }
   }
@@ -243,7 +309,8 @@ export class CompactionEngine {
     );
 
     // Call LLM to summarize
-    const condensedContent = await summarize(
+    const doSummarize = this.deps.summarizeFn ?? summarize;
+    const condensedContent = await doSummarize(
       serialized,
       "condensed",
       targetDepth,

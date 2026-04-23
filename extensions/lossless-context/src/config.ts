@@ -14,6 +14,7 @@ export function loadLcmConfig(): LcmConfig {
     // Context assembly
     contextThreshold: 0.75,
     freshTailCount: 64,
+    freshTailMaxTokens: 40000,
 
     // Compaction fanout
     leafMinFanout: 8,

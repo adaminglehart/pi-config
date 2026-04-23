@@ -54,6 +54,7 @@ export default function (pi: ExtensionAPI) {
   let integrityChecker: IntegrityChecker | undefined;
   let conversation: ConversationRecord | undefined;
   let isCompacting = false;
+  let lastTurnHadToolUse = false;
   let modelRegistryRef:
     | { find: Function; getApiKeyAndHeaders: Function }
     | undefined;
@@ -152,21 +153,33 @@ export default function (pi: ExtensionAPI) {
   });
 
   /**
-   * Turn end: Trigger Pi's compaction if threshold exceeded.
-   * Pi will fire session_before_compact, which runs LCM's DAG pass and
-   * returns a CompactionResult so Pi trims its own native session branch too.
+   * Turn end: Track whether the agent was mid-task (using tools).
+   * This is used to decide whether to auto-continue after compaction.
    */
-  pi.on("turn_end", async (_event, ctx) => {
-    if (!compactionEngine || !conversation || isCompacting) {
-      return;
-    }
+  pi.on("turn_end", async (event, _ctx) => {
+    // If the turn produced tool results, the agent was actively working
+    lastTurnHadToolUse = event.toolResults.length > 0;
+  });
 
-    const contextWindow = ctx.model?.contextWindow ?? 200000;
-    if (compactionEngine.shouldCompact(conversation.id, contextWindow)) {
-      // Trigger Pi's compaction pipeline — session_before_compact will intercept
-      // and run LCM's pass, returning a valid CompactionResult to Pi.
-      ctx.compact();
-    }
+  /**
+   * After compaction completes, send a continuation message so the agent
+   * resumes work if it was mid-task. Pi's threshold auto-compaction does not
+   * auto-retry by design, but LCM compaction should be seamless when the
+   * agent was actively using tools.
+   */
+  pi.on("session_compact", async (event, _ctx) => {
+    if (!event.fromExtension) return;
+    if (!lastTurnHadToolUse) return;
+
+    // Reset the flag
+    lastTurnHadToolUse = false;
+
+    // Send a user message to kick the agent back into action.
+    // This is queued and processed after the compaction pipeline completes.
+    pi.sendUserMessage(
+      "Context was automatically compacted. Your conversation history is preserved in summaries above. Continue with your current task.",
+      { deliverAs: "followUp" },
+    );
   });
 
   /**
@@ -290,6 +303,7 @@ export default function (pi: ExtensionAPI) {
       integrityChecker = undefined;
       conversation = undefined;
       isCompacting = false;
+      lastTurnHadToolUse = false;
       modelRegistryRef = undefined;
     }
   });

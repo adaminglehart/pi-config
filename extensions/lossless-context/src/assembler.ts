@@ -126,13 +126,16 @@ export class ContextAssembler {
     freshTail: ResolvedItem[];
   } {
     const freshTailCount = this.deps.config.freshTailCount;
+    const freshTailMaxTokens = this.deps.config.freshTailMaxTokens;
     const freshTail: ResolvedItem[] = [];
     const evictable: ResolvedItem[] = [];
 
     // Walk backwards, count message-type items for fresh tail.
     // Summaries always go to evictable — they're not native messages
     // and should always be available for injection as the historical prefix.
+    // Fresh tail is bounded by both message count AND token budget.
     let messagesSeen = 0;
+    let freshTailTokens = 0;
     for (let i = resolved.length - 1; i >= 0; i--) {
       const item = resolved[i];
       if (item.kind === "summary") {
@@ -140,8 +143,12 @@ export class ContextAssembler {
         continue;
       }
       messagesSeen++;
-      if (messagesSeen <= freshTailCount) {
+      if (
+        messagesSeen <= freshTailCount &&
+        freshTailTokens + item.tokens <= freshTailMaxTokens
+      ) {
         freshTail.unshift(item);
+        freshTailTokens += item.tokens;
       } else {
         evictable.unshift(item);
       }

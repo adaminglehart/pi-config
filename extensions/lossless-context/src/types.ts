@@ -72,6 +72,7 @@ export interface LcmConfig extends Record<string, unknown> {
   // Context assembly
   contextThreshold: number;
   freshTailCount: number;
+  freshTailMaxTokens: number;
 
   // Compaction fanout
   leafMinFanout: number;

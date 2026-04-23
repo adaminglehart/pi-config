@@ -132,7 +132,7 @@ async function handleStatus(
     // Config section
     container.addChild(new Text(theme.fg("accent", theme.bold("  Configuration")), 0, 0));
     container.addChild(new Text(`    Model               ${theme.fg("text", `${config.summaryProvider}/${config.summaryModel}`)}`, 0, 0));
-    container.addChild(new Text(`    Context threshold   ${theme.fg("text", String(config.contextThreshold))}`, 0, 0));
+    container.addChild(new Text(`    Assembly budget     ${theme.fg("text", String(config.contextThreshold))}`, 0, 0));
     container.addChild(new Text(`    Fresh tail count    ${theme.fg("text", String(config.freshTailCount))}`, 0, 0));
     container.addChild(new Text(`    Leaf chunk tokens   ${theme.fg("text", String(config.leafChunkTokens))}`, 0, 0));
     container.addChild(new Text(`    Max depth           ${theme.fg("text", String(config.incrementalMaxDepth))}`, 0, 0));
@@ -208,7 +208,7 @@ async function handleContext(
   lines.push(`- Context items: ${contextItems.length} (${ctxSummaries} summaries + ${ctxMessages} messages)`);
   lines.push(`- Summaries in DB: ${counts.total} (${counts.leaf} leaf, ${counts.condensed} condensed)`);
   lines.push(`- Injected messages: ${summaryMessages.length}`);
-  lines.push(`- Token budget: ${tokenBudget.toLocaleString()} (threshold: ${config.contextThreshold})`);
+  lines.push(`- Token budget: ${tokenBudget.toLocaleString()} (assembly budget fraction: ${config.contextThreshold})`);
   lines.push(`- Fresh tail count: ${config.freshTailCount}`);
   lines.push("");
 
@@ -245,21 +245,29 @@ async function handleRecompact(
 ): Promise<void> {
   const conv = deps.getConversation();
   const engine = deps.getCompactionEngine();
+  const summaryStore = deps.getSummaryStore();
+  const contextItemsStore = deps.getContextItemsStore();
 
-  if (!conv || !engine) {
+  if (!conv || !engine || !summaryStore || !contextItemsStore) {
     ctx.ui.notify("LCM not initialized", "error");
     return;
   }
 
-  ctx.ui.notify("Running LCM recompaction...", "info");
+  ctx.ui.notify("Clearing summaries and rebuilding context items...", "info");
 
   try {
+    // Clear all existing summaries
+    summaryStore.clearConversationSummaries(conv.id);
+
+    // Rebuild context items from all messages
+    contextItemsStore.rebuildFromMessages(conv.id);
+
+    // Run fresh compaction
     await engine.runCompaction(conv.id);
 
-    const summaryStore = deps.getSummaryStore();
-    const counts = summaryStore?.getSummaryCounts(conv.id);
+    const counts = summaryStore.getSummaryCounts(conv.id);
     ctx.ui.notify(
-      `Recompaction complete: ${counts?.total ?? 0} summaries (${counts?.leaf ?? 0} leaf, ${counts?.condensed ?? 0} condensed)`,
+      `Recompaction complete: ${counts.total} summaries (${counts.leaf} leaf, ${counts.condensed} condensed)`,
       "info",
     );
   } catch (error) {
@@ -350,12 +358,14 @@ async function handleRotate(
   _deps: CommandDeps,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
-  // Rotation triggers compaction on the next turn (compaction engine
-  // evaluates shouldCompact automatically; rotate is a hint to the user).
+  // Compaction is triggered by Pi's built-in auto-compaction, which LCM
+  // intercepts via the session_before_compact hook. LCM does not trigger
+  // compaction itself — rotate is informational only.
   ctx.ui.notify(
-    "🔄 Rotate: compaction runs automatically at turn_end when the context " +
-      "threshold is reached. If you want to force it, reduce contextThreshold " +
-      "in your LCM config or wait for the next turn.",
+    "🔄 Rotate: compaction is handled by Pi's built-in auto-compaction. " +
+      "LCM intercepts that event via session_before_compact and runs its own " +
+      "summarization pass. There is no manual trigger — compaction fires " +
+      "automatically when Pi decides the context needs pruning.",
     "info",
   );
 }

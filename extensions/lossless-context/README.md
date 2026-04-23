@@ -70,10 +70,9 @@ message_end event
   → conversationStore.addMessage()  // also creates context_item + FTS5 index
 ```
 
-### Compaction (after each turn)
+### Compaction (triggered by Pi's auto-compaction)
 ```
-turn_end event
-  → shouldCompact(conversationId, tokenBudget)?
+session_before_compact hook (Pi triggers this when context needs pruning)
   → Leaf pass:
       Group evictable messages into ~leafChunkTokens chunks
       For each chunk: serialize → LLM summarize → create leaf summary
@@ -143,7 +142,7 @@ Defaults are used when settings are omitted. Uses the same `getNamespacedConfig`
 | `dbPath` | `~/.pi/lcm.db` | SQLite database path |
 | `summaryProvider` | `openrouter` | LLM provider for summarization |
 | `summaryModel` | `google/gemini-3-flash-preview` | LLM model for summarization |
-| `contextThreshold` | `0.75` | Fraction of context window that triggers compaction |
+| `contextThreshold` | `0.75` | Fraction of context window used as budget for summary assembly |
 | `freshTailCount` | `64` | Recent messages always protected from compaction |
 | `leafChunkTokens` | `20000` | Max tokens per leaf compaction chunk |
 | `leafMinFanout` | `8` | Min messages required to create a leaf summary |

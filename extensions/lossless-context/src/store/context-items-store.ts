@@ -178,4 +178,34 @@ export class ContextItemsStore {
       throw error;
     }
   }
+
+  /**
+   * Rebuild context items from all messages in a conversation.
+   * Removes all existing context items and re-creates them from the message table.
+   * Used by recompact to start from a clean state.
+   */
+  rebuildFromMessages(conversationId: string): void {
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+
+      this.db
+        .prepare(`DELETE FROM context_items WHERE conversation_id = ?`)
+        .run(conversationId);
+
+      this.db
+        .prepare(
+          `INSERT INTO context_items (id, conversation_id, ordinal, item_type, message_id)
+           SELECT lower(hex(randomblob(16))), conversation_id, seq - 1, 'message', id
+           FROM messages
+           WHERE conversation_id = ?
+           ORDER BY seq`,
+        )
+        .run(conversationId);
+
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
 }
