@@ -9,6 +9,7 @@ import { setupTestDb, createStores, addMessages } from "./helpers.js";
 
 describe("ContextItemsStore", () => {
   let db: DatabaseSync;
+  let drizzleDb: import("../db/connection.js").DrizzleDB;
   let hasFts5: boolean;
   let conversationStore: ReturnType<typeof createStores>["conversationStore"];
   let summaryStore: ReturnType<typeof createStores>["summaryStore"];
@@ -16,8 +17,8 @@ describe("ContextItemsStore", () => {
   let conversationId: string;
 
   beforeEach(() => {
-    ({ db, hasFts5 } = setupTestDb());
-    ({ conversationStore, summaryStore, contextItemsStore } = createStores(db, hasFts5));
+    ({ db, drizzleDb, hasFts5 } = setupTestDb());
+    ({ conversationStore, summaryStore, contextItemsStore } = createStores(drizzleDb, db, hasFts5));
     const convo = conversationStore.getOrCreateConversation("test-session");
     conversationId = convo.id;
   });
@@ -179,6 +180,7 @@ describe("ContextItemsStore", () => {
 
 describe("SummaryStore", () => {
   let db: DatabaseSync;
+  let drizzleDb: import("../db/connection.js").DrizzleDB;
   let hasFts5: boolean;
   let conversationStore: ReturnType<typeof createStores>["conversationStore"];
   let summaryStore: ReturnType<typeof createStores>["summaryStore"];
@@ -186,8 +188,8 @@ describe("SummaryStore", () => {
   let conversationId: string;
 
   beforeEach(() => {
-    ({ db, hasFts5 } = setupTestDb());
-    ({ conversationStore, summaryStore, contextItemsStore } = createStores(db, hasFts5));
+    ({ db, drizzleDb, hasFts5 } = setupTestDb());
+    ({ conversationStore, summaryStore, contextItemsStore } = createStores(drizzleDb, db, hasFts5));
     const convo = conversationStore.getOrCreateConversation("test-session");
     conversationId = convo.id;
   });

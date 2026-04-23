@@ -2,7 +2,6 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { loadLcmConfig } from "./src/config.js";
 import { LcmDatabase } from "./src/db/connection.js";
-import { runMigrations } from "./src/db/migration.js";
 import { ConversationStore } from "./src/store/conversation-store.js";
 import { SummaryStore } from "./src/store/summary-store.js";
 import { ContextItemsStore } from "./src/store/context-items-store.js";
@@ -64,9 +63,8 @@ export default function (pi: ExtensionAPI) {
    */
   pi.on("session_start", async (_event, ctx) => {
     try {
-      // Initialize database
+      // Initialize database (constructor creates tables if needed)
       database = new LcmDatabase(config.dbPath);
-      runMigrations(database);
 
       // Initialize stores
       conversationStore = new ConversationStore(database.drizzle, database.db, database.hasFts5);

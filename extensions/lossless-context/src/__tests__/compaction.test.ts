@@ -12,6 +12,7 @@ import type { LcmConfig } from "../types.js";
 
 describe("CompactionEngine", () => {
   let db: DatabaseSync;
+  let drizzleDb: import("../db/connection.js").DrizzleDB;
   let hasFts5: boolean;
   let conversationStore: ReturnType<typeof createStores>["conversationStore"];
   let summaryStore: ReturnType<typeof createStores>["summaryStore"];
@@ -36,8 +37,8 @@ describe("CompactionEngine", () => {
     });
 
   beforeEach(() => {
-    ({ db, hasFts5 } = setupTestDb());
-    ({ conversationStore, summaryStore, contextItemsStore } = createStores(db, hasFts5));
+    ({ db, drizzleDb, hasFts5 } = setupTestDb());
+    ({ conversationStore, summaryStore, contextItemsStore } = createStores(drizzleDb, db, hasFts5));
     const convo = conversationStore.getOrCreateConversation("compaction-test");
     conversationId = convo.id;
     summarizeCalls = [];

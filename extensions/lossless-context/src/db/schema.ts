@@ -4,8 +4,8 @@
  * Field names use snake_case to match existing record types in types.ts,
  * avoiding a cascading refactor of all consumers.
  *
- * FTS5 virtual tables are NOT managed by Drizzle — they require raw SQL
- * in migration.ts.
+ * Table creation DDL lives in connection.ts (LcmDatabase.ensureTables).
+ * FTS5 virtual tables are also created there since Drizzle has no FTS5 support.
  */
 
 import {

@@ -4,43 +4,18 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { drizzle } from "drizzle-orm/node-sqlite";
-import { LcmDatabase } from "../db/connection.js";
-import { runMigrations } from "../db/migration.js";
+import { LcmDatabase, type DrizzleDB } from "../db/connection.js";
 import { ConversationStore } from "../store/conversation-store.js";
 import { SummaryStore } from "../store/summary-store.js";
 import { ContextItemsStore } from "../store/context-items-store.js";
-import * as schema from "../db/schema.js";
 import type { LcmConfig } from "../types.js";
 
 /**
- * Create an in-memory LcmDatabase-like object for testing.
+ * Create an in-memory LcmDatabase with all tables ready.
  */
-export function createTestDb(): { db: DatabaseSync; hasFts5: boolean } {
-  const db = new DatabaseSync(":memory:");
-  db.exec("PRAGMA journal_mode=WAL");
-
-  // Detect FTS5
-  let hasFts5 = false;
-  try {
-    db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS _fts5_test USING fts5(content)");
-    db.exec("DROP TABLE IF EXISTS _fts5_test");
-    hasFts5 = true;
-  } catch {
-    hasFts5 = false;
-  }
-
-  return { db, hasFts5 };
-}
-
-/**
- * Run migrations on a test db.
- */
-export function setupTestDb(): { db: DatabaseSync; hasFts5: boolean } {
-  const { db, hasFts5 } = createTestDb();
-  // runMigrations expects an LcmDatabase-like object
-  runMigrations({ db, hasFts5 } as unknown as import("../db/connection.js").LcmDatabase);
-  return { db, hasFts5 };
+export function setupTestDb(): { db: DatabaseSync; drizzleDb: DrizzleDB; hasFts5: boolean } {
+  const lcmDb = new LcmDatabase(":memory:");
+  return { db: lcmDb.db, drizzleDb: lcmDb.drizzle, hasFts5: lcmDb.hasFts5 };
 }
 
 /**
@@ -74,8 +49,7 @@ export function makeConfig(overrides: Partial<LcmConfig> = {}): LcmConfig {
 /**
  * Create all three stores sharing a single test db.
  */
-export function createStores(db: DatabaseSync, hasFts5: boolean) {
-  const drizzleDb = drizzle({ client: db, schema });
+export function createStores(drizzleDb: DrizzleDB, db: DatabaseSync, hasFts5: boolean) {
   return {
     conversationStore: new ConversationStore(drizzleDb, db, hasFts5),
     summaryStore: new SummaryStore(drizzleDb, db, hasFts5),
@@ -92,7 +66,7 @@ export function addMessages(
   count: number,
   tokensEach = 100,
 ): ReturnType<ConversationStore["addMessage"]>[] {
-  const messages = [];
+  const messages: ReturnType<ConversationStore["addMessage"]>[] = [];
   for (let i = 0; i < count; i++) {
     messages.push(
       conversationStore.addMessage(
