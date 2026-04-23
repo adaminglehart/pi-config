@@ -4,11 +4,13 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
+import { drizzle } from "drizzle-orm/node-sqlite";
 import { LcmDatabase } from "../db/connection.js";
 import { runMigrations } from "../db/migration.js";
 import { ConversationStore } from "../store/conversation-store.js";
 import { SummaryStore } from "../store/summary-store.js";
 import { ContextItemsStore } from "../store/context-items-store.js";
+import * as schema from "../db/schema.js";
 import type { LcmConfig } from "../types.js";
 
 /**
@@ -73,10 +75,11 @@ export function makeConfig(overrides: Partial<LcmConfig> = {}): LcmConfig {
  * Create all three stores sharing a single test db.
  */
 export function createStores(db: DatabaseSync, hasFts5: boolean) {
+  const drizzleDb = drizzle({ client: db, schema });
   return {
-    conversationStore: new ConversationStore(db, hasFts5),
-    summaryStore: new SummaryStore(db, hasFts5),
-    contextItemsStore: new ContextItemsStore(db),
+    conversationStore: new ConversationStore(drizzleDb, db, hasFts5),
+    summaryStore: new SummaryStore(drizzleDb, db, hasFts5),
+    contextItemsStore: new ContextItemsStore(drizzleDb, db),
   };
 }
 

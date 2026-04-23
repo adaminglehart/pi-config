@@ -4,43 +4,39 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
+import { eq, asc, sql, inArray } from "drizzle-orm";
+import type { DrizzleDB } from "../db/connection.js";
+import { contextItems } from "../db/schema.js";
 import type { ContextItemRecord } from "../types.js";
 
 export class ContextItemsStore {
-  constructor(private db: DatabaseSync) {}
+  constructor(
+    private drizzle: DrizzleDB,
+    private rawDb: DatabaseSync,
+  ) {}
 
   /**
    * Get all context items for a conversation, ordered by ordinal.
    */
   getContextItems(conversationId: string): ContextItemRecord[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, ordinal, item_type, message_id, summary_id
-        FROM context_items
-        WHERE conversation_id = ?
-        ORDER BY ordinal ASC
-      `,
-      )
-      .all(conversationId);
-
-    return rows as unknown as ContextItemRecord[];
+    return this.drizzle
+      .select()
+      .from(contextItems)
+      .where(eq(contextItems.conversation_id, conversationId))
+      .orderBy(asc(contextItems.ordinal))
+      .all() as unknown as ContextItemRecord[];
   }
 
   /**
    * Get next ordinal for a conversation.
    */
   getNextOrdinal(conversationId: string): number {
-    const row = this.db
-      .prepare(
-        `
-        SELECT COALESCE(MAX(ordinal), -1) as max_ordinal
-        FROM context_items
-        WHERE conversation_id = ?
-      `,
-      )
-      .get(conversationId) as { max_ordinal: number } | undefined;
+    const row = this.drizzle
+      .select({ max_ordinal: sql<number>`COALESCE(MAX(${contextItems.ordinal}), -1)` })
+      .from(contextItems)
+      .where(eq(contextItems.conversation_id, conversationId))
+      .get();
 
     return (row?.max_ordinal ?? -1) + 1;
   }
@@ -57,21 +53,17 @@ export class ContextItemsStore {
     const id = randomUUID();
     const ordinal = this.getNextOrdinal(conversationId);
 
-    this.db
-      .prepare(
-        `
-        INSERT INTO context_items (id, conversation_id, ordinal, item_type, message_id, summary_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      )
-      .run(
+    this.drizzle
+      .insert(contextItems)
+      .values({
         id,
-        conversationId,
+        conversation_id: conversationId,
         ordinal,
-        itemType,
-        messageId ?? null,
-        summaryId ?? null,
-      );
+        item_type: itemType,
+        message_id: messageId ?? null,
+        summary_id: summaryId ?? null,
+      })
+      .run();
 
     return {
       id,
@@ -89,17 +81,12 @@ export class ContextItemsStore {
   removeContextItems(conversationId: string, ordinals: number[]): void {
     if (ordinals.length === 0) return;
 
-    // Build placeholders for IN clause
-    const placeholders = ordinals.map(() => "?").join(",");
-
-    this.db
-      .prepare(
-        `
-        DELETE FROM context_items
-        WHERE conversation_id = ? AND ordinal IN (${placeholders})
-      `,
+    this.drizzle
+      .delete(contextItems)
+      .where(
+        sql`${contextItems.conversation_id} = ${conversationId} AND ${contextItems.ordinal} IN (${sql.join(ordinals.map((o) => sql`${o}`), sql`, `)})`,
       )
-      .run(conversationId, ...ordinals);
+      .run();
   }
 
   /**
@@ -117,7 +104,7 @@ export class ContextItemsStore {
       summaryId?: string;
     }>,
   ): void {
-    this.db.exec("BEGIN");
+    this.rawDb.exec("BEGIN");
 
     try {
       // Remove old items
@@ -125,56 +112,80 @@ export class ContextItemsStore {
         this.removeContextItems(conversationId, removeOrdinals);
       }
 
-      // Fetch remaining items in order and renumber from 0,
-      // inserting new items at the position where the removed block started.
       const insertAt = removeOrdinals.length > 0
         ? Math.min(...removeOrdinals)
         : this.getNextOrdinal(conversationId);
 
-      const remaining = this.db
-        .prepare(
-          `SELECT id, item_type, message_id, summary_id
-           FROM context_items
-           WHERE conversation_id = ?
-           ORDER BY ordinal ASC`,
-        )
-        .all(conversationId) as Array<{
+      const remaining = this.drizzle
+        .select({
+          id: contextItems.id,
+          item_type: contextItems.item_type,
+          message_id: contextItems.message_id,
+          summary_id: contextItems.summary_id,
+        })
+        .from(contextItems)
+        .where(eq(contextItems.conversation_id, conversationId))
+        .orderBy(asc(contextItems.ordinal))
+        .all() as Array<{
           id: string;
           item_type: string;
           message_id: string | null;
           summary_id: string | null;
         }>;
 
-      // Build the new ordered list: items before insertAt, then newItems, then items from insertAt onward
-      // Since we already deleted the removed ordinals, "before insertAt" means the first `insertAt` items
-      // (ordinals 0..insertAt-1 were below the removed range).
       const before = remaining.slice(0, insertAt);
       const after = remaining.slice(insertAt);
 
       // Delete all remaining items and re-insert in correct order
-      this.db
-        .prepare(`DELETE FROM context_items WHERE conversation_id = ?`)
-        .run(conversationId);
-
-      const insertStmt = this.db.prepare(
-        `INSERT INTO context_items (id, conversation_id, ordinal, item_type, message_id, summary_id)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      );
+      this.drizzle
+        .delete(contextItems)
+        .where(eq(contextItems.conversation_id, conversationId))
+        .run();
 
       let ordinal = 0;
       for (const item of before) {
-        insertStmt.run(item.id, conversationId, ordinal++, item.item_type, item.message_id, item.summary_id);
+        this.drizzle
+          .insert(contextItems)
+          .values({
+            id: item.id,
+            conversation_id: conversationId,
+            ordinal: ordinal++,
+            item_type: item.item_type as "message" | "summary",
+            message_id: item.message_id,
+            summary_id: item.summary_id,
+          })
+          .run();
       }
       for (const item of newItems) {
-        insertStmt.run(randomUUID(), conversationId, ordinal++, item.itemType, item.messageId ?? null, item.summaryId ?? null);
+        this.drizzle
+          .insert(contextItems)
+          .values({
+            id: randomUUID(),
+            conversation_id: conversationId,
+            ordinal: ordinal++,
+            item_type: item.itemType,
+            message_id: item.messageId ?? null,
+            summary_id: item.summaryId ?? null,
+          })
+          .run();
       }
       for (const item of after) {
-        insertStmt.run(item.id, conversationId, ordinal++, item.item_type, item.message_id, item.summary_id);
+        this.drizzle
+          .insert(contextItems)
+          .values({
+            id: item.id,
+            conversation_id: conversationId,
+            ordinal: ordinal++,
+            item_type: item.item_type as "message" | "summary",
+            message_id: item.message_id,
+            summary_id: item.summary_id,
+          })
+          .run();
       }
 
-      this.db.exec("COMMIT");
+      this.rawDb.exec("COMMIT");
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.rawDb.exec("ROLLBACK");
       throw error;
     }
   }
@@ -186,13 +197,15 @@ export class ContextItemsStore {
    */
   rebuildFromMessages(conversationId: string): void {
     try {
-      this.db.exec("BEGIN IMMEDIATE");
+      this.rawDb.exec("BEGIN IMMEDIATE");
 
-      this.db
-        .prepare(`DELETE FROM context_items WHERE conversation_id = ?`)
-        .run(conversationId);
+      this.drizzle
+        .delete(contextItems)
+        .where(eq(contextItems.conversation_id, conversationId))
+        .run();
 
-      this.db
+      // Use raw SQL for lower(hex(randomblob(16))) UUID generation
+      this.rawDb
         .prepare(
           `INSERT INTO context_items (id, conversation_id, ordinal, item_type, message_id)
            SELECT lower(hex(randomblob(16))), conversation_id, seq - 1, 'message', id
@@ -202,9 +215,9 @@ export class ContextItemsStore {
         )
         .run(conversationId);
 
-      this.db.exec("COMMIT");
+      this.rawDb.exec("COMMIT");
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.rawDb.exec("ROLLBACK");
       throw error;
     }
   }

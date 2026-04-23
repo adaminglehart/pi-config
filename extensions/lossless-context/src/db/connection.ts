@@ -1,15 +1,23 @@
 /**
  * SQLite database connection management for LCM.
- * Uses built-in node:sqlite (Node.js 22+).
+ * Uses built-in node:sqlite (Node.js 22+) with Drizzle ORM.
  */
 
 import { DatabaseSync } from "node:sqlite";
+import { drizzle, type NodeSQLiteDatabase } from "drizzle-orm/node-sqlite";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import * as schema from "./schema.js";
+
+/** Drizzle database instance type for LCM. */
+export type DrizzleDB = NodeSQLiteDatabase<typeof schema>;
 
 export class LcmDatabase {
+  /** Raw node:sqlite handle (for FTS5 queries and other raw SQL). */
   public readonly db: DatabaseSync;
+  /** Typed Drizzle ORM instance. */
+  public readonly drizzle: DrizzleDB;
   public readonly hasFts5: boolean;
   private readonly dbPath: string;
 
@@ -33,6 +41,9 @@ export class LcmDatabase {
 
     // Set busy timeout
     this.db.exec("PRAGMA busy_timeout=5000");
+
+    // Create Drizzle instance wrapping the raw connection
+    this.drizzle = drizzle({ client: this.db, schema });
 
     // Detect FTS5 availability
     this.hasFts5 = this.detectFts5();

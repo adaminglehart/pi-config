@@ -4,13 +4,17 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
+import { eq, and, asc, desc, sql, count, like, inArray } from "drizzle-orm";
+import type { DrizzleDB } from "../db/connection.js";
+import { summaries, summaryMessages, summaryParents } from "../db/schema.js";
 import type { SummaryRecord, SummaryKind } from "../types.js";
 import { sanitizeFts5Query } from "./fts5-sanitize.js";
 
 export class SummaryStore {
   constructor(
-    private db: DatabaseSync,
+    private drizzle: DrizzleDB,
+    private rawDb: DatabaseSync,
     private hasFts5: boolean,
   ) {}
 
@@ -28,39 +32,37 @@ export class SummaryStore {
     const now = new Date().toISOString();
     const metadataJson = JSON.stringify(metadata ?? {});
 
-    // Insert summary
-    this.db
-      .prepare(
-        `
-        INSERT INTO summaries (id, conversation_id, kind, depth, content, token_count, metadata, created_at)
-        VALUES (?, ?, 'leaf', 0, ?, ?, ?, ?)
-      `,
-      )
-      .run(id, conversationId, content, tokenCount, metadataJson, now);
+    this.drizzle
+      .insert(summaries)
+      .values({
+        id,
+        conversation_id: conversationId,
+        kind: "leaf",
+        depth: 0,
+        content,
+        token_count: tokenCount,
+        metadata: metadataJson,
+        created_at: now,
+      })
+      .run();
 
     // Link to source messages
     if (sourceMessageIds.length > 0) {
-      const linkStmt = this.db.prepare(
-        `
-          INSERT INTO summary_messages (summary_id, message_id)
-          VALUES (?, ?)
-        `,
-      );
-
       for (const messageId of sourceMessageIds) {
-        linkStmt.run(id, messageId);
+        this.drizzle
+          .insert(summaryMessages)
+          .values({ summary_id: id, message_id: messageId })
+          .run();
       }
     }
 
     // Update FTS5 index if available
     if (this.hasFts5) {
       try {
-        this.db
+        this.rawDb
           .prepare(
-            `
-            INSERT INTO summaries_fts (rowid, content)
-            VALUES ((SELECT rowid FROM summaries WHERE id = ?), ?)
-          `,
+            `INSERT INTO summaries_fts (rowid, content)
+             VALUES ((SELECT rowid FROM summaries WHERE id = ?), ?)`,
           )
           .run(id, content);
       } catch {
@@ -95,39 +97,37 @@ export class SummaryStore {
     const now = new Date().toISOString();
     const metadataJson = JSON.stringify(metadata ?? {});
 
-    // Insert summary
-    this.db
-      .prepare(
-        `
-        INSERT INTO summaries (id, conversation_id, kind, depth, content, token_count, metadata, created_at)
-        VALUES (?, ?, 'condensed', ?, ?, ?, ?, ?)
-      `,
-      )
-      .run(id, conversationId, depth, content, tokenCount, metadataJson, now);
+    this.drizzle
+      .insert(summaries)
+      .values({
+        id,
+        conversation_id: conversationId,
+        kind: "condensed",
+        depth,
+        content,
+        token_count: tokenCount,
+        metadata: metadataJson,
+        created_at: now,
+      })
+      .run();
 
     // Link to source summaries
     if (sourceSummaryIds.length > 0) {
-      const linkStmt = this.db.prepare(
-        `
-          INSERT INTO summary_parents (summary_id, parent_summary_id)
-          VALUES (?, ?)
-        `,
-      );
-
       for (const parentId of sourceSummaryIds) {
-        linkStmt.run(id, parentId);
+        this.drizzle
+          .insert(summaryParents)
+          .values({ summary_id: id, parent_summary_id: parentId })
+          .run();
       }
     }
 
     // Update FTS5 index if available
     if (this.hasFts5) {
       try {
-        this.db
+        this.rawDb
           .prepare(
-            `
-            INSERT INTO summaries_fts (rowid, content)
-            VALUES ((SELECT rowid FROM summaries WHERE id = ?), ?)
-          `,
+            `INSERT INTO summaries_fts (rowid, content)
+             VALUES ((SELECT rowid FROM summaries WHERE id = ?), ?)`,
           )
           .run(id, content);
       } catch {
@@ -151,31 +151,23 @@ export class SummaryStore {
    * Get summary by ID.
    */
   getSummary(summaryId: string): SummaryRecord | undefined {
-    return this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, kind, depth, content, token_count, metadata, created_at
-        FROM summaries
-        WHERE id = ?
-      `,
-      )
-      .get(summaryId) as SummaryRecord | undefined;
+    return this.drizzle
+      .select()
+      .from(summaries)
+      .where(eq(summaries.id, summaryId))
+      .get() as SummaryRecord | undefined;
   }
 
   /**
    * Get source message IDs for a leaf summary.
    */
   getSummaryMessageIds(summaryId: string): string[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT message_id
-        FROM summary_messages
-        WHERE summary_id = ?
-        ORDER BY message_id
-      `,
-      )
-      .all(summaryId) as Array<{ message_id: string }>;
+    const rows = this.drizzle
+      .select({ message_id: summaryMessages.message_id })
+      .from(summaryMessages)
+      .where(eq(summaryMessages.summary_id, summaryId))
+      .orderBy(asc(summaryMessages.message_id))
+      .all();
 
     return rows.map((row) => row.message_id);
   }
@@ -184,11 +176,13 @@ export class SummaryStore {
    * Check if a message is already covered by an existing leaf summary.
    */
   isMessageSummarized(messageId: string): boolean {
-    const row = this.db
-      .prepare(
-        `SELECT 1 FROM summary_messages WHERE message_id = ? LIMIT 1`,
-      )
-      .get(messageId) as { "1": number } | undefined;
+    const row = this.drizzle
+      .select({ message_id: summaryMessages.message_id })
+      .from(summaryMessages)
+      .where(eq(summaryMessages.message_id, messageId))
+      .limit(1)
+      .get();
+
     return row !== undefined;
   }
 
@@ -197,43 +191,49 @@ export class SummaryStore {
    * Used by recompact to start fresh.
    */
   clearConversationSummaries(conversationId: string): void {
-    this.db
-      .prepare(
-        `DELETE FROM summary_messages WHERE summary_id IN (
-          SELECT id FROM summaries WHERE conversation_id = ?
-        )`,
-      )
-      .run(conversationId);
+    // Get all summary IDs for this conversation
+    const summaryIds = this.drizzle
+      .select({ id: summaries.id })
+      .from(summaries)
+      .where(eq(summaries.conversation_id, conversationId))
+      .all()
+      .map((r) => r.id);
 
-    this.db
-      .prepare(
-        `DELETE FROM summary_parents WHERE summary_id IN (
-          SELECT id FROM summaries WHERE conversation_id = ?
-        ) OR parent_summary_id IN (
-          SELECT id FROM summaries WHERE conversation_id = ?
-        )`,
-      )
-      .run(conversationId, conversationId);
+    if (summaryIds.length === 0) return;
 
-    this.db
-      .prepare(`DELETE FROM summaries WHERE conversation_id = ?`)
-      .run(conversationId);
+    // Delete junction records
+    this.drizzle
+      .delete(summaryMessages)
+      .where(inArray(summaryMessages.summary_id, summaryIds))
+      .run();
+
+    this.drizzle
+      .delete(summaryParents)
+      .where(inArray(summaryParents.summary_id, summaryIds))
+      .run();
+
+    this.drizzle
+      .delete(summaryParents)
+      .where(inArray(summaryParents.parent_summary_id, summaryIds))
+      .run();
+
+    // Delete summaries
+    this.drizzle
+      .delete(summaries)
+      .where(eq(summaries.conversation_id, conversationId))
+      .run();
   }
 
   /**
    * Get parent summary IDs (condensed summaries that consumed this one).
    */
   getSummaryParentIds(summaryId: string): string[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT summary_id
-        FROM summary_parents
-        WHERE parent_summary_id = ?
-        ORDER BY summary_id
-      `,
-      )
-      .all(summaryId) as Array<{ summary_id: string }>;
+    const rows = this.drizzle
+      .select({ summary_id: summaryParents.summary_id })
+      .from(summaryParents)
+      .where(eq(summaryParents.parent_summary_id, summaryId))
+      .orderBy(asc(summaryParents.summary_id))
+      .all();
 
     return rows.map((row) => row.summary_id);
   }
@@ -242,55 +242,48 @@ export class SummaryStore {
    * Get child summaries that reference this as parent.
    */
   getSummaryChildren(summaryId: string): SummaryRecord[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT s.id, s.conversation_id, s.kind, s.depth, s.content, s.token_count, s.metadata, s.created_at
-        FROM summaries s
-        JOIN summary_parents sp ON s.id = sp.parent_summary_id
-        WHERE sp.summary_id = ?
-        ORDER BY s.created_at
-      `,
-      )
-      .all(summaryId);
-
-    return rows as unknown as SummaryRecord[];
+    // summary_parents.summary_id = the condensed summary
+    // summary_parents.parent_summary_id = the child being referenced
+    return this.drizzle
+      .select({
+        id: summaries.id,
+        conversation_id: summaries.conversation_id,
+        kind: summaries.kind,
+        depth: summaries.depth,
+        content: summaries.content,
+        token_count: summaries.token_count,
+        metadata: summaries.metadata,
+        created_at: summaries.created_at,
+      })
+      .from(summaries)
+      .innerJoin(summaryParents, eq(summaries.id, summaryParents.parent_summary_id))
+      .where(eq(summaryParents.summary_id, summaryId))
+      .orderBy(asc(summaries.created_at))
+      .all() as SummaryRecord[];
   }
 
   /**
    * Get summaries at a specific depth for a conversation.
    */
   getSummariesAtDepth(conversationId: string, depth: number): SummaryRecord[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, kind, depth, content, token_count, metadata, created_at
-        FROM summaries
-        WHERE conversation_id = ? AND depth = ?
-        ORDER BY created_at
-      `,
-      )
-      .all(conversationId, depth);
-
-    return rows as unknown as SummaryRecord[];
+    return this.drizzle
+      .select()
+      .from(summaries)
+      .where(and(eq(summaries.conversation_id, conversationId), eq(summaries.depth, depth)))
+      .orderBy(asc(summaries.created_at))
+      .all() as unknown as SummaryRecord[];
   }
 
   /**
    * Get all summaries for a conversation.
    */
   getAllSummaries(conversationId: string): SummaryRecord[] {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, kind, depth, content, token_count, metadata, created_at
-        FROM summaries
-        WHERE conversation_id = ?
-        ORDER BY depth, created_at
-      `,
-      )
-      .all(conversationId);
-
-    return rows as unknown as SummaryRecord[];
+    return this.drizzle
+      .select()
+      .from(summaries)
+      .where(eq(summaries.conversation_id, conversationId))
+      .orderBy(asc(summaries.depth), asc(summaries.created_at))
+      .all() as unknown as SummaryRecord[];
   }
 
   /**
@@ -299,16 +292,12 @@ export class SummaryStore {
   getSummaryCounts(
     conversationId: string,
   ): { leaf: number; condensed: number; total: number } {
-    const rows = this.db
-      .prepare(
-        `
-        SELECT kind, COUNT(*) as count
-        FROM summaries
-        WHERE conversation_id = ?
-        GROUP BY kind
-      `,
-      )
-      .all(conversationId) as Array<{ kind: SummaryKind; count: number }>;
+    const rows = this.drizzle
+      .select({ kind: summaries.kind, count: count() })
+      .from(summaries)
+      .where(eq(summaries.conversation_id, conversationId))
+      .groupBy(summaries.kind)
+      .all() as Array<{ kind: SummaryKind; count: number }>;
 
     const leaf = rows.find((r) => r.kind === "leaf")?.count ?? 0;
     const condensed = rows.find((r) => r.kind === "condensed")?.count ?? 0;
@@ -332,7 +321,6 @@ export class SummaryStore {
       return [];
     }
 
-    // Try FTS5 first if available
     if (this.hasFts5) {
       try {
         return this.searchSummariesFts5(query, conversationId, limit);
@@ -341,7 +329,6 @@ export class SummaryStore {
       }
     }
 
-    // LIKE fallback
     return this.searchSummariesLike(query, conversationId, limit);
   }
 
@@ -368,7 +355,7 @@ export class SummaryStore {
 
     params.push(limit);
 
-    const sql = `
+    const rawSql = `
       SELECT s.id, s.conversation_id, s.kind, s.depth, s.content, s.token_count, s.metadata, s.created_at
       FROM summaries_fts
       JOIN summaries s ON s.rowid = summaries_fts.rowid
@@ -377,7 +364,7 @@ export class SummaryStore {
       LIMIT ?
     `;
 
-    const rows = this.db.prepare(sql).all(...params);
+    const rows = this.rawDb.prepare(rawSql).all(...params);
     return rows as unknown as SummaryRecord[];
   }
 
@@ -389,25 +376,24 @@ export class SummaryStore {
     conversationId: string | undefined,
     limit: number,
   ): SummaryRecord[] {
-    const whereClauses = ["content LIKE ?"];
-    const params: Array<string | number> = [`%${query}%`];
+    const likePattern = `%${query}%`;
 
     if (conversationId) {
-      whereClauses.push("conversation_id = ?");
-      params.push(conversationId);
+      return this.drizzle
+        .select()
+        .from(summaries)
+        .where(and(eq(summaries.conversation_id, conversationId), like(summaries.content, likePattern)))
+        .orderBy(desc(summaries.created_at))
+        .limit(limit)
+        .all() as unknown as SummaryRecord[];
     }
 
-    params.push(limit);
-
-    const sql = `
-      SELECT id, conversation_id, kind, depth, content, token_count, metadata, created_at
-      FROM summaries
-      WHERE ${whereClauses.join(" AND ")}
-      ORDER BY created_at DESC
-      LIMIT ?
-    `;
-
-    const rows = this.db.prepare(sql).all(...params);
-    return rows as unknown as SummaryRecord[];
+    return this.drizzle
+      .select()
+      .from(summaries)
+      .where(like(summaries.content, likePattern))
+      .orderBy(desc(summaries.created_at))
+      .limit(limit)
+      .all() as unknown as SummaryRecord[];
   }
 }

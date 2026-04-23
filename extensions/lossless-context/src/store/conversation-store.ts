@@ -4,7 +4,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
+import { eq, and, sql, asc, desc, gt, max, count, like } from "drizzle-orm";
+import type { DrizzleDB } from "../db/connection.js";
+import { conversations, messages, contextItems } from "../db/schema.js";
 import type {
   ConversationRecord,
   MessageRecord,
@@ -13,7 +16,8 @@ import { sanitizeFts5Query } from "./fts5-sanitize.js";
 
 export class ConversationStore {
   constructor(
-    private db: DatabaseSync,
+    private drizzle: DrizzleDB,
+    private rawDb: DatabaseSync,
     private hasFts5: boolean,
   ) {}
 
@@ -21,34 +25,24 @@ export class ConversationStore {
    * Get or create a conversation for a session key.
    */
   getOrCreateConversation(sessionKey: string): ConversationRecord {
-    // Try to find existing active conversation
-    const existing = this.db
-      .prepare(
-        `
-        SELECT id, session_key, created_at, updated_at, active 
-        FROM conversations 
-        WHERE session_key = ? AND active = 1
-        LIMIT 1
-      `,
-      )
-      .get(sessionKey) as ConversationRecord | undefined;
+    const existing = this.drizzle
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.session_key, sessionKey), eq(conversations.active, 1)))
+      .limit(1)
+      .get() as ConversationRecord | undefined;
 
     if (existing) {
       return existing;
     }
 
-    // Create new conversation
     const id = randomUUID();
     const now = new Date().toISOString();
 
-    this.db
-      .prepare(
-        `
-        INSERT INTO conversations (id, session_key, created_at, updated_at, active)
-        VALUES (?, ?, ?, ?, 1)
-      `,
-      )
-      .run(id, sessionKey, now, now);
+    this.drizzle
+      .insert(conversations)
+      .values({ id, session_key: sessionKey, created_at: now, updated_at: now, active: 1 })
+      .run();
 
     return {
       id,
@@ -63,15 +57,11 @@ export class ConversationStore {
    * Get a conversation by ID.
    */
   getConversation(id: string): ConversationRecord | undefined {
-    return this.db
-      .prepare(
-        `
-        SELECT id, session_key, created_at, updated_at, active 
-        FROM conversations 
-        WHERE id = ?
-      `,
-      )
-      .get(id) as ConversationRecord | undefined;
+    return this.drizzle
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, id))
+      .get() as ConversationRecord | undefined;
   }
 
   /**
@@ -89,59 +79,52 @@ export class ConversationStore {
     const now = new Date().toISOString();
 
     // Get next seq number
-    const lastSeqRow = this.db
-      .prepare(
-        `
-        SELECT COALESCE(MAX(seq), 0) as last_seq 
-        FROM messages 
-        WHERE conversation_id = ?
-      `,
-      )
-      .get(conversationId) as { last_seq: number } | undefined;
+    const lastSeqRow = this.drizzle
+      .select({ last_seq: sql<number>`COALESCE(MAX(${messages.seq}), 0)` })
+      .from(messages)
+      .where(eq(messages.conversation_id, conversationId))
+      .get();
 
     const seq = (lastSeqRow?.last_seq ?? 0) + 1;
 
     // Insert message
-    this.db
-      .prepare(
-        `
-        INSERT INTO messages (id, conversation_id, seq, role, content, token_count, identity_hash, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      )
-      .run(
+    this.drizzle
+      .insert(messages)
+      .values({
         id,
-        conversationId,
+        conversation_id: conversationId,
         seq,
         role,
         content,
-        tokenCount,
-        identityHash ?? null,
-        now,
-      );
+        token_count: tokenCount,
+        identity_hash: identityHash ?? null,
+        created_at: now,
+      })
+      .run();
 
     // Add context item
     const contextItemId = randomUUID();
     const nextOrdinal = this.getNextOrdinal(conversationId);
 
-    this.db
-      .prepare(
-        `
-        INSERT INTO context_items (id, conversation_id, ordinal, item_type, message_id, summary_id)
-        VALUES (?, ?, ?, 'message', ?, NULL)
-      `,
-      )
-      .run(contextItemId, conversationId, nextOrdinal, id);
+    this.drizzle
+      .insert(contextItems)
+      .values({
+        id: contextItemId,
+        conversation_id: conversationId,
+        ordinal: nextOrdinal,
+        item_type: "message",
+        message_id: id,
+        summary_id: null,
+      })
+      .run();
 
     // Update FTS5 index if available
     if (this.hasFts5) {
       try {
-        this.db
+        this.rawDb
           .prepare(
-            `
-            INSERT INTO messages_fts (rowid, content) 
-            VALUES ((SELECT rowid FROM messages WHERE id = ?), ?)
-          `,
+            `INSERT INTO messages_fts (rowid, content) 
+             VALUES ((SELECT rowid FROM messages WHERE id = ?), ?)`,
           )
           .run(id, content);
       } catch {
@@ -165,15 +148,11 @@ export class ConversationStore {
    * Get a message by ID.
    */
   getMessageById(id: string): MessageRecord | undefined {
-    return this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, seq, role, content, token_count, identity_hash, created_at 
-        FROM messages 
-        WHERE id = ?
-      `,
-      )
-      .get(id) as MessageRecord | undefined;
+    return this.drizzle
+      .select()
+      .from(messages)
+      .where(eq(messages.id, id))
+      .get() as MessageRecord | undefined;
   }
 
   /**
@@ -183,48 +162,32 @@ export class ConversationStore {
     conversationId: string,
     afterSeq?: number,
   ): MessageRecord[] {
-    let rows;
-
     if (afterSeq !== undefined) {
-      rows = this.db
-        .prepare(
-          `
-          SELECT id, conversation_id, seq, role, content, token_count, identity_hash, created_at 
-          FROM messages 
-          WHERE conversation_id = ? AND seq > ?
-          ORDER BY seq ASC
-        `,
-        )
-        .all(conversationId, afterSeq);
-    } else {
-      rows = this.db
-        .prepare(
-          `
-          SELECT id, conversation_id, seq, role, content, token_count, identity_hash, created_at 
-          FROM messages 
-          WHERE conversation_id = ?
-          ORDER BY seq ASC
-        `,
-        )
-        .all(conversationId);
+      return this.drizzle
+        .select()
+        .from(messages)
+        .where(and(eq(messages.conversation_id, conversationId), gt(messages.seq, afterSeq)))
+        .orderBy(asc(messages.seq))
+        .all() as unknown as MessageRecord[];
     }
 
-    return rows as unknown as MessageRecord[];
+    return this.drizzle
+      .select()
+      .from(messages)
+      .where(eq(messages.conversation_id, conversationId))
+      .orderBy(asc(messages.seq))
+      .all() as unknown as MessageRecord[];
   }
 
   /**
    * Get message count for a conversation.
    */
   getMessageCount(conversationId: string): number {
-    const row = this.db
-      .prepare(
-        `
-        SELECT COUNT(*) as count 
-        FROM messages 
-        WHERE conversation_id = ?
-      `,
-      )
-      .get(conversationId) as { count: number } | undefined;
+    const row = this.drizzle
+      .select({ count: count() })
+      .from(messages)
+      .where(eq(messages.conversation_id, conversationId))
+      .get();
 
     return row?.count ?? 0;
   }
@@ -233,15 +196,11 @@ export class ConversationStore {
    * Get last sequence number for a conversation.
    */
   getLastSeq(conversationId: string): number {
-    const row = this.db
-      .prepare(
-        `
-        SELECT COALESCE(MAX(seq), 0) as last_seq 
-        FROM messages 
-        WHERE conversation_id = ?
-      `,
-      )
-      .get(conversationId) as { last_seq: number } | undefined;
+    const row = this.drizzle
+      .select({ last_seq: sql<number>`COALESCE(MAX(${messages.seq}), 0)` })
+      .from(messages)
+      .where(eq(messages.conversation_id, conversationId))
+      .get();
 
     return row?.last_seq ?? 0;
   }
@@ -288,10 +247,9 @@ export class ConversationStore {
     const sanitized = sanitizeFts5Query(query);
 
     if (conversationId) {
-      const rows = this.db
+      const rows = this.rawDb
         .prepare(
-          `
-          SELECT 
+          `SELECT 
             m.id,
             m.conversation_id,
             m.seq,
@@ -303,8 +261,7 @@ export class ConversationStore {
           JOIN messages m ON messages_fts.rowid = m.rowid
           WHERE messages_fts MATCH ? AND m.conversation_id = ?
           ORDER BY rank
-          LIMIT ?
-        `,
+          LIMIT ?`,
         )
         .all(sanitized, conversationId, limit);
 
@@ -319,10 +276,9 @@ export class ConversationStore {
       }>;
     }
 
-    const rows = this.db
+    const rows = this.rawDb
       .prepare(
-        `
-        SELECT 
+        `SELECT 
           m.id,
           m.conversation_id,
           m.seq,
@@ -334,8 +290,7 @@ export class ConversationStore {
         JOIN messages m ON messages_fts.rowid = m.rowid
         WHERE messages_fts MATCH ?
         ORDER BY rank
-        LIMIT ?
-      `,
+        LIMIT ?`,
       )
       .all(sanitized, limit);
 
@@ -368,44 +323,7 @@ export class ConversationStore {
   }> {
     const likePattern = `%${query}%`;
 
-    if (conversationId) {
-      const results = this.db
-        .prepare(
-          `
-          SELECT id, conversation_id, seq, role, content, token_count, created_at
-          FROM messages
-          WHERE conversation_id = ? AND content LIKE ?
-          ORDER BY created_at DESC
-          LIMIT ?
-        `,
-        )
-        .all(conversationId, likePattern, limit) as Array<{
-        id: string;
-        conversation_id: string;
-        seq: number;
-        role: string;
-        content: string;
-        token_count: number;
-        created_at: string;
-      }>;
-
-      return results.map((r) => ({
-        ...r,
-        snippet: this.createSnippet(r.content, query),
-      }));
-    }
-
-    const results = this.db
-      .prepare(
-        `
-        SELECT id, conversation_id, seq, role, content, token_count, created_at
-        FROM messages
-        WHERE content LIKE ?
-        ORDER BY created_at DESC
-        LIMIT ?
-      `,
-      )
-      .all(likePattern, limit) as Array<{
+    let results: Array<{
       id: string;
       conversation_id: string;
       seq: number;
@@ -414,6 +332,40 @@ export class ConversationStore {
       token_count: number;
       created_at: string;
     }>;
+
+    if (conversationId) {
+      results = this.drizzle
+        .select({
+          id: messages.id,
+          conversation_id: messages.conversation_id,
+          seq: messages.seq,
+          role: messages.role,
+          content: messages.content,
+          token_count: messages.token_count,
+          created_at: messages.created_at,
+        })
+        .from(messages)
+        .where(and(eq(messages.conversation_id, conversationId), like(messages.content, likePattern)))
+        .orderBy(desc(messages.created_at))
+        .limit(limit)
+        .all() as unknown as typeof results;
+    } else {
+      results = this.drizzle
+        .select({
+          id: messages.id,
+          conversation_id: messages.conversation_id,
+          seq: messages.seq,
+          role: messages.role,
+          content: messages.content,
+          token_count: messages.token_count,
+          created_at: messages.created_at,
+        })
+        .from(messages)
+        .where(like(messages.content, likePattern))
+        .orderBy(desc(messages.created_at))
+        .limit(limit)
+        .all() as unknown as typeof results;
+    }
 
     return results.map((r) => ({
       ...r,
@@ -445,15 +397,11 @@ export class ConversationStore {
    * Get next ordinal for context items in a conversation.
    */
   private getNextOrdinal(conversationId: string): number {
-    const row = this.db
-      .prepare(
-        `
-        SELECT COALESCE(MAX(ordinal), -1) as max_ordinal 
-        FROM context_items 
-        WHERE conversation_id = ?
-      `,
-      )
-      .get(conversationId) as { max_ordinal: number } | undefined;
+    const row = this.drizzle
+      .select({ max_ordinal: sql<number>`COALESCE(MAX(${contextItems.ordinal}), -1)` })
+      .from(contextItems)
+      .where(eq(contextItems.conversation_id, conversationId))
+      .get();
 
     return (row?.max_ordinal ?? -1) + 1;
   }

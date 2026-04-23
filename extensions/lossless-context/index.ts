@@ -69,9 +69,9 @@ export default function (pi: ExtensionAPI) {
       runMigrations(database);
 
       // Initialize stores
-      conversationStore = new ConversationStore(database.db, database.hasFts5);
-      summaryStore = new SummaryStore(database.db, database.hasFts5);
-      contextItemsStore = new ContextItemsStore(database.db);
+      conversationStore = new ConversationStore(database.drizzle, database.db, database.hasFts5);
+      summaryStore = new SummaryStore(database.drizzle, database.db, database.hasFts5);
+      contextItemsStore = new ContextItemsStore(database.drizzle, database.db);
 
       // Get or create conversation for this session (keyed by session file for per-session isolation)
       const sessionFile = ctx.sessionManager.getSessionFile() ?? ctx.cwd;
