@@ -156,6 +156,14 @@ function cleanupStaleArtifacts(
 ): void {
   if (!existsSync(destDir)) return;
 
+  // Files to preserve in extensions directory (installed dependencies, not source)
+  const PRESERVE_IN_EXTENSIONS = new Set([
+    "package-lock.json",
+    "node_modules",
+    "package.json",
+    "tsconfig.json",
+  ]);
+
   // Clean up stale extensions
   const buildExtDir = join(buildDir, "extensions");
   const destExtDir = join(destDir, "extensions");
@@ -163,7 +171,7 @@ function cleanupStaleArtifacts(
     const builtExts = new Set(readdirSync(buildExtDir));
     const deployedExts = readdirSync(destExtDir);
     for (const ext of deployedExts) {
-      if (!builtExts.has(ext)) {
+      if (!builtExts.has(ext) && !PRESERVE_IN_EXTENSIONS.has(ext)) {
         const extPath = join(destExtDir, ext);
         rmSync(extPath, { recursive: true, force: true });
         console.log(`  removed stale extension: ${ext}`);

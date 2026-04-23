@@ -81,7 +81,7 @@ Prefer stronger models for personal research:
 // profiles/personal/config/settings.json
 {
   "model": {
-    "default": "litellm-anthropic/claude-opus-4.6"
+    "default": "litellm-anthropic/claude-opus-4.6-1m"
   }
 }
 ```

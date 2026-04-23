@@ -80,7 +80,7 @@ The `.env` file is automatically generated from templates based on your environm
 Uses an internal LiteLLM proxy with these models:
 - **minimal/low:** `gemini-3-flash`
 - **medium:** `claude-4.5-haiku`
-- **high/max:** `claude-sonnet-4.5`
+- **high/max:** `claude-sonnet-4-6`
 
 Configuration (set these env vars before running `just honcho-env`):
 ```bash

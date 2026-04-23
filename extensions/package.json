@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Dev dependencies for type-checking pi extensions",
+  "scripts": {
+    "postinstall": "rm -f node_modules/.bin/pi node_modules/.bin/pi-ai"
+  },
   "devDependencies": {
     "@mariozechner/pi-ai": "^0.69.0",
     "@mariozechner/pi-coding-agent": "^0.69.0",

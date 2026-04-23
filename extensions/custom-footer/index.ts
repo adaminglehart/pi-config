@@ -219,12 +219,12 @@ function renderProfileSegment(): string {
   const agentDir = process.env.PI_CODING_AGENT_DIR || "~/.pi/agent";
   let profile = "coding"; // default
   let color = colors.accent; // Pink for coding
-  
+
   if (agentDir.includes("pi-personal")) {
     profile = "personal";
     color = colors.output; // Green for personal
   }
-  
+
   return `${ansi.fg(color)}${profile}${ansi.reset}`;
 }
 
@@ -277,14 +277,14 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const thinkingSeg = renderThinkingSegment(ctx);
   const tokensSeg = renderTokensSegment(ctx);
   const costSeg = renderSessionCostSegment(ctx);
-  const acmSeg = renderAcmSegment(ctx);
+  // const acmSeg = renderAcmSegment(ctx);
   const extStatusSeg = renderExtensionStatuses(ctx);
   if (modelSeg) line2Segments.push(modelSeg);
   if (pricingSeg) line2Segments.push(pricingSeg);
   if (thinkingSeg) line2Segments.push(thinkingSeg);
   if (tokensSeg) line2Segments.push(tokensSeg);
   if (costSeg) line2Segments.push(costSeg);
-  if (acmSeg) line2Segments.push(acmSeg);
+  // if (acmSeg) line2Segments.push(acmSeg);
   if (extStatusSeg) line2Segments.push(extStatusSeg);
   const line2Content = line2Segments.join(separator);
 
@@ -404,7 +404,10 @@ export default function customFooter(pi: ExtensionAPI) {
     description: "Cycle footer scene",
     handler: async (_args, ctx) => {
       if (isPersonalProfile()) {
-        ctx.ui.notify("Scene cycling not available in personal profile (void extension active)", "warning");
+        ctx.ui.notify(
+          "Scene cycling not available in personal profile (void extension active)",
+          "warning",
+        );
         return;
       }
       const scene = cycleScene();
@@ -417,7 +420,10 @@ export default function customFooter(pi: ExtensionAPI) {
     description: "Interact with the current scene",
     handler: async (_args, ctx) => {
       if (isPersonalProfile()) {
-        ctx.ui.notify("Scene interaction not available in personal profile (void extension active)", "warning");
+        ctx.ui.notify(
+          "Scene interaction not available in personal profile (void extension active)",
+          "warning",
+        );
         return;
       }
       const scene = getActiveScene();
