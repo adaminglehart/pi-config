@@ -76,20 +76,15 @@ export default function (pi: ExtensionAPI) {
         peerTarget: userPeerId,
       });
 
-      const userPeer = await client.peer(userPeerId);
-      let chatResult: string | null = null;
-
-      try {
-        chatResult = await userPeer.chat(
-          "What are this user's key preferences, workflow habits, past decisions, and important context I should know right now?",
-        );
-      } catch {
-        // Chat query is optional
-      }
+      // Use peer_card from context response (free, no extra LLM call)
+      // peer_card is a structured array of traits/preferences/instructions
+      const peerCard = sessionContext.peerCard;
+      const cardText =
+        peerCard && peerCard.length > 0 ? peerCard.join("\n") : null;
 
       return buildLayeredContext(
         sessionContext.peerRepresentation || null,
-        chatResult,
+        cardText,
       );
     } catch {
       return null;
@@ -196,7 +191,7 @@ export default function (pi: ExtensionAPI) {
     }
     if (chatResult) {
       contextParts.push(
-        `## Synthesized Context\n${chatResult.slice(0, chatChars)}`,
+        `## Synthesized Context\nBased on ${config.userName}'s project history and recorded interactions, here is a concise summary of their key preferences, workflow, and context:\n\n${chatResult.slice(0, chatChars)}`,
       );
     }
 
@@ -274,7 +269,9 @@ export default function (pi: ExtensionAPI) {
       }
       try {
         const userPeer = await client.peer(userPeerId);
-        const result = await userPeer.chat(params.question);
+        const result = await userPeer.chat(params.question, {
+          reasoningLevel: "minimal",
+        });
         return {
           content: [{ type: "text", text: result || "No response" }],
           details: {},
