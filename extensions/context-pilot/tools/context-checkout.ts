@@ -2,7 +2,7 @@ import type {
   ExtensionAPI,
   SessionManager,
 } from "@mariozechner/pi-coding-agent";
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import { resolveTargetId, findTagInTree, getCommandCtx, setPendingCheckout } from "../utils.js";
 
 const ContextCheckoutParams = Type.Object({

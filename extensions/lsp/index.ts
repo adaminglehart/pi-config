@@ -10,7 +10,7 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type {
   ExtensionAPI,
@@ -994,17 +994,7 @@ Use bash to find files: find src -name "*.ts" -type f`,
     }
   });
 
-  pi.on("session_switch", async (_event, ctx) => {
-    restoreHookState(ctx);
-    updateLspStatus();
-  });
-
   pi.on("session_tree", async (_event, ctx) => {
-    restoreHookState(ctx);
-    updateLspStatus();
-  });
-
-  pi.on("session_fork", async (_event, ctx) => {
     restoreHookState(ctx);
     updateLspStatus();
   });

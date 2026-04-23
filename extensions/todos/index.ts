@@ -39,7 +39,7 @@ import {
   type Theme,
 } from "@mariozechner/pi-coding-agent";
 import { StringEnum } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -847,9 +847,10 @@ function getTodoSettingsPath(todosDir: string): string {
 
 function normalizeTodoSettings(raw: Partial<TodoSettings>): TodoSettings {
   const gc = raw.gc ?? DEFAULT_TODO_SETTINGS.gc;
-  const gcDays = Number.isFinite(raw.gcDays)
-    ? raw.gcDays
-    : DEFAULT_TODO_SETTINGS.gcDays;
+  const gcDays =
+    typeof raw.gcDays === "number" && Number.isFinite(raw.gcDays)
+      ? raw.gcDays
+      : DEFAULT_TODO_SETTINGS.gcDays;
   return {
     gc: Boolean(gc),
     gcDays: Math.max(0, Math.floor(gcDays)),
@@ -1972,7 +1973,7 @@ export default function todosExtension(pi: ExtensionAPI) {
         return new Text(text, 0, 0);
       }
 
-      if (!details.todo) {
+      if (!("todo" in details) || !details.todo) {
         const text = result.content[0];
         return new Text(text?.type === "text" ? text.text : "", 0, 0);
       }
@@ -2037,9 +2038,7 @@ export default function todosExtension(pi: ExtensionAPI) {
       }
 
       let nextPrompt: string | null = null;
-      let rootTui: TUI | null = null;
       await ctx.ui.custom<void>((tui, theme, _kb, done) => {
-        rootTui = tui;
         let selector: TodoSelectorComponent | null = null;
         let actionMenu: TodoActionMenuComponent | null = null;
         let deleteConfirm: TodoDeleteConfirmComponent | null = null;
@@ -2320,7 +2319,6 @@ export default function todosExtension(pi: ExtensionAPI) {
 
       if (nextPrompt) {
         ctx.ui.setEditorText(nextPrompt);
-        rootTui?.requestRender();
       }
     },
   });

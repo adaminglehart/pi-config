@@ -14,7 +14,7 @@ import type {
   Theme,
   ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
-import type { TSchema } from "@sinclair/typebox";
+import type { TSchema } from "typebox";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -22,7 +22,7 @@ import {
   truncateHead,
 } from "@mariozechner/pi-coding-agent";
 import { Text, type TUI, type Component } from "@mariozechner/pi-tui";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { tmpdir } from "os";
 import { join } from "path";
 

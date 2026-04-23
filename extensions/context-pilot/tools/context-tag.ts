@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import { findTagInTree, findTagTarget } from "../utils.js";
 
 const ContextTagParams = Type.Object({

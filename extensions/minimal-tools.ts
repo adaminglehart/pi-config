@@ -19,7 +19,7 @@ import {
 	createReadTool,
 	createWriteTool,
 } from "@mariozechner/pi-coding-agent";
-import { type Static, Type } from "@sinclair/typebox";
+import { type Static, Type } from "typebox";
 
 // Output truncation limits
 const MAX_OUTPUT_LINES = 50;

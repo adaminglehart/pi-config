@@ -165,9 +165,11 @@ class QnAComponent implements Component {
     const editorTheme: EditorTheme = {
       borderColor: this.dim,
       selectList: {
-        selectedBg: (s: string) => `\x1b[44m${s}\x1b[0m`,
-        matchHighlight: this.cyan,
-        itemSecondary: this.gray,
+        selectedPrefix: this.cyan,
+        selectedText: this.cyan,
+        description: this.gray,
+        scrollInfo: this.gray,
+        noMatch: this.yellow,
       },
     };
 
@@ -546,13 +548,11 @@ export default function (pi: ExtensionAPI) {
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
       
-      // Skip tool calls and tool results - they're not assistant messages
-      if (entry.type === "tool_call" || entry.type === "tool_result") {
-        continue;
-      }
-      
       if (entry.type === "message") {
         const msg = entry.message;
+        if (msg.role === "toolResult") {
+          continue;
+        }
         if ("role" in msg && msg.role === "assistant") {
           assistantMessagesChecked++;
           
@@ -685,7 +685,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   // Listen for trigger from other extensions (e.g., execute_command tool)
-  pi.events.on("trigger:answer", async (ctx: ExtensionContext) => {
+  pi.events.on("trigger:answer", async (data) => {
+    const ctx = data as ExtensionContext;
     try {
       await answerHandler(ctx);
     } catch (err) {

@@ -1,8 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import { exec } from "node:child_process";
+import { Type } from "typebox";
+import { exec, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { access } from "node:fs/promises";
 
 const execAsync = promisify(exec);
 
@@ -42,10 +41,10 @@ async function executeDevBrowser(
     headless?: boolean;
     connect?: string;
     timeout?: number;
-  } = {}
+  } = {},
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const args: string[] = [];
-  
+
   if (options.browser) {
     args.push("--browser", options.browser);
   }
@@ -59,21 +58,47 @@ async function executeDevBrowser(
     args.push("--timeout", options.timeout.toString());
   }
 
-  const command = `dev-browser ${args.join(" ")}`;
-  
-  try {
-    const { stdout, stderr } = await execAsync(command, {
-      input: script,
-      timeout: (options.timeout || 30) * 1000 + 5000, // Add 5s buffer
+  return await new Promise((resolve) => {
+    const child = spawn("dev-browser", args, {
+      stdio: ["pipe", "pipe", "pipe"],
     });
-    return { stdout, stderr, exitCode: 0 };
-  } catch (error: any) {
-    return {
-      stdout: error.stdout || "",
-      stderr: error.stderr || "",
-      exitCode: error.code || 1,
+
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = (exitCode: number) => {
+      if (settled) return;
+      settled = true;
+      resolve({ stdout, stderr, exitCode });
     };
-  }
+
+    const timeoutMs = (options.timeout || 30) * 1000 + 5000;
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(124);
+    }, timeoutMs);
+
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      stderr += error.message;
+      finish(1);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      finish(code ?? 1);
+    });
+
+    child.stdin.write(script);
+    child.stdin.end();
+  });
 }
 
 /**
@@ -198,6 +223,7 @@ export default function (pi: ExtensionAPI) {
           content: [
             { type: "text", text: "dev-browser not found. Attempting to install..." },
           ],
+          details: {},
         });
         
         const installed = await installDevBrowser();
@@ -212,6 +238,7 @@ export default function (pi: ExtensionAPI) {
       // Execute the script
       onUpdate?.({
         content: [{ type: "text", text: "Executing browser script..." }],
+        details: {},
       });
 
       const result = await executeDevBrowser(params.script, {
@@ -321,7 +348,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify("Installing dev-browser...", "info");
       const installed = await installDevBrowser();
       if (installed) {
-        ctx.ui.notify("dev-browser installed successfully", "success");
+        ctx.ui.notify("dev-browser installed successfully", "info");
       } else {
         ctx.ui.notify("Installation failed", "error");
       }

@@ -20,12 +20,13 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
 } from "node:fs";
 import { basename, join } from "node:path";
-import { hostname } from "node:os";
+import { homedir, hostname } from "node:os";
 
 const ROOT = import.meta.dirname;
 const EXTENSIONS_DIR = join(ROOT, "extensions");
@@ -57,8 +58,8 @@ function fatal(msg: string): never {
 /** Parse JSONC (JSON with comments and trailing commas) */
 function parseJsonc(text: string): unknown {
   const stripped = text
-    // Remove single-line comments
-    .replace(/\/\/.*$/gm, "")
+    // Remove single-line comments (but not // in URLs like https://)
+    .replace(/(?<!:)\/\/.*$/gm, "")
     // Remove multi-line comments
     .replace(/\/\*[\s\S]*?\*\//g, "")
     // Remove trailing commas before } or ]
@@ -144,6 +145,64 @@ function deepMerge(
     }
   }
   return target;
+}
+
+/** Clean up extensions and skills from destination that are not in the build output.
+ *  This removes stale extensions/skills when they're removed from the profile. */
+function cleanupStaleArtifacts(
+  buildDir: string,
+  destDir: string,
+  profileName: string,
+): void {
+  if (!existsSync(destDir)) return;
+
+  // Clean up stale extensions
+  const buildExtDir = join(buildDir, "extensions");
+  const destExtDir = join(destDir, "extensions");
+  if (existsSync(buildExtDir) && existsSync(destExtDir)) {
+    const builtExts = new Set(readdirSync(buildExtDir));
+    const deployedExts = readdirSync(destExtDir);
+    for (const ext of deployedExts) {
+      if (!builtExts.has(ext)) {
+        const extPath = join(destExtDir, ext);
+        rmSync(extPath, { recursive: true, force: true });
+        console.log(`  removed stale extension: ${ext}`);
+      }
+    }
+  }
+
+  // Clean up stale skills
+  const buildSkillDir = join(buildDir, "skills");
+  const destSkillDir = join(destDir, "skills");
+  if (existsSync(buildSkillDir) && existsSync(destSkillDir)) {
+    const builtSkills = new Set(readdirSync(buildSkillDir));
+    const deployedSkills = readdirSync(destSkillDir);
+    for (const skill of deployedSkills) {
+      if (!builtSkills.has(skill)) {
+        const skillPath = join(destSkillDir, skill);
+        rmSync(skillPath, { recursive: true, force: true });
+        console.log(`  removed stale skill: ${skill}`);
+      }
+    }
+  }
+}
+
+/** Get the destination directory for a profile from its manifest */
+async function getProfileDestDir(profileName: string) {
+  const manifestPath = findJsonFile(join(PROFILES_DIR, profileName, "package"));
+  if (!manifestPath) {
+    fatal(`Profile manifest not found: ${profileName}`);
+  }
+
+  const parsed = (await readJson(manifestPath)) as ProfileManifest;
+  const destDir = parsed.pi?.destDir;
+
+  if (!destDir) {
+    fatal(`Profile manifest missing pi.destDir: ${profileName}`);
+  }
+
+  // Expand ~ to home directory
+  return destDir.replace(/^~/, homedir());
 }
 
 /** Build a merged JSON config from base + environment + profile overlays */
@@ -283,7 +342,12 @@ async function buildProfile(profileName: string) {
   // 5. Copy profile-level files with variable substitution
   const profileFiles = readdirSync(profileDir);
   for (const item of profileFiles) {
-    if (item === "package.json" || item === "package.jsonc" || item === "node_modules") continue;
+    if (
+      item === "package.json" ||
+      item === "package.jsonc" ||
+      item === "node_modules"
+    )
+      continue;
 
     const src = join(profileDir, item);
     const dest = join(outputDir, item);
@@ -302,7 +366,10 @@ async function buildProfile(profileName: string) {
   // 6. Generate merged config files (settings.json, models.json, mcp.json, etc.)
   const configFiles = ["settings", "models", "mcp"];
   for (const configName of configFiles) {
-    const basePath = join(CONFIG_DIR, `${configName}.base.json`);
+    const basePath = findJsonFile(
+      join(CONFIG_DIR, `${configName}.base.json`),
+      true,
+    );
     if (!existsSync(basePath)) {
       continue; // Skip if base file doesn't exist (e.g., mcp.json is optional)
     }
@@ -311,6 +378,10 @@ async function buildProfile(profileName: string) {
     await Bun.write(join(outputDir, `${configName}.json`), configJson);
     console.log(`  generated ${configName}.json`);
   }
+
+  // 7. Clean up stale extensions and skills from destination
+  const destDir = await getProfileDestDir(profileName);
+  cleanupStaleArtifacts(outputDir, destDir, profileName);
 
   console.log(`\n✓ Built profile "${profileName}" → ${outputDir}`);
 }

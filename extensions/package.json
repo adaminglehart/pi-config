@@ -4,10 +4,10 @@
   "type": "module",
   "description": "Dev dependencies for type-checking pi extensions",
   "devDependencies": {
-    "@mariozechner/pi-ai": "^0.66.1",
-    "@mariozechner/pi-coding-agent": "^0.66.1",
-    "@mariozechner/pi-tui": "^0.66.1",
-    "@sinclair/typebox": "0.34.48",
+    "@mariozechner/pi-ai": "^0.69.0",
+    "@mariozechner/pi-coding-agent": "^0.69.0",
+    "@mariozechner/pi-tui": "^0.69.0",
+    "typebox": "^1.1.31",
     "typescript": "5.8.2",
     "vscode-languageserver-protocol": "3.17.5"
   },

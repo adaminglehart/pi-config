@@ -1,6 +1,6 @@
 import type { ExtensionAPI, SessionEntry } from "@mariozechner/pi-coding-agent";
 import type { SessionTreeNode } from "../utils.js";
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import {
   formatTokens,
   isInternalTool,

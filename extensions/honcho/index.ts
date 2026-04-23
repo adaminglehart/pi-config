@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { Honcho } from "@honcho-ai/sdk";
 import * as path from "path";
 import * as os from "os";

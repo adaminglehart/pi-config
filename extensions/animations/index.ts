@@ -368,11 +368,6 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingMessage();
   });
 
-  pi.on("session_switch", async (_e, ctx) => {
-    stopAnimation(ctx);
-    ctx.ui.setWorkingMessage();
-  });
-
   pi.on("session_shutdown", async () => {
     stopAnimation();
   });

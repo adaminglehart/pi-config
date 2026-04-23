@@ -9,7 +9,7 @@
  * - The tool will be automatically available to the LLM
  */
 
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatSize } from "@mariozechner/pi-coding-agent";

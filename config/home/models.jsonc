@@ -14,22 +14,22 @@
             "input": 0.6,
             "output": 3,
             "cacheRead": 0.1,
-            "cacheWrite": 0
-          }
+            "cacheWrite": 0,
+          },
         },
-        {
-          "id": "accounts/fireworks/models/glm-5p1",
-          "name": "GLM 5.1 (fireworks)",
-          "reasoning": true,
-          "contextWindow": 204800,
-          "cost": {
-            "input": 1.4,
-            "output": 4.4,
-            "cacheRead": 0.26,
-            "cacheWrite": 0
-          }
-        }
-      ]
+        // {
+        //   "id": "accounts/fireworks/models/glm-5p1",
+        //   "name": "GLM 5.1 (fireworks)",
+        //   "reasoning": true,
+        //   "contextWindow": 204800,
+        //   "cost": {
+        //     "input": 1.4,
+        //     "output": 4.4,
+        //     "cacheRead": 0.26,
+        //     "cacheWrite": 0
+        //   }
+        // }
+      ],
     },
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
@@ -45,15 +45,15 @@
             "input": 1.4,
             "output": 4.4,
             "cacheRead": 0.26,
-            "cacheWrite": 0
+            "cacheWrite": 0,
           },
           "compat": {
             "openRouterRouting": {
-              "order": ["together", "friendli"]
-            }
-          }
-        }
-      ]
-    }
-  }
+              "order": ["together", "friendli"],
+            },
+          },
+        },
+      ],
+    },
+  },
 }
