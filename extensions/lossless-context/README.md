@@ -1,6 +1,6 @@
 # Lossless Context Management Extension
 
-A Pi extension that replaces the default sliding-window compaction with a **DAG-based summarization system**. Every message is persisted to SQLite and organized into a hierarchy of summaries. The agent can drill into any summary to recover the original detail — nothing is ever truly lost.
+A Pi extension that replaces the default compaction with a **DAG-based summarization system**. Every message is persisted to SQLite and organized into a hierarchy of summaries. The agent can drill into any summary to recover the original detail — nothing is ever truly lost.
 
 Adapted from [lossless-claw](https://github.com/martian-engineering/lossless-claw) (LCM plugin for OpenClaw).
 

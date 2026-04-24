@@ -1,5 +1,9 @@
-import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ModelRegistry,
+} from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
+import { appendFileSync } from "node:fs";
 import { loadLcmConfig } from "./src/config.js";
 import { LcmDatabase } from "./src/db/connection.js";
 import { ConversationStore } from "./src/store/conversation-store.js";
@@ -26,7 +30,7 @@ import { IntegrityChecker } from "./src/integrity.js";
 /**
  * Lossless Context Management Extension
  *
- * Replaces Pi's default sliding-window compaction with a DAG-based summarization system.
+ * Replaces Pi's default compaction with a DAG-based summarization system.
  * Stores every message in SQLite, creates hierarchical summaries (leaf → condensed),
  * and assembles context from summaries + recent messages on each turn.
  *
@@ -60,32 +64,75 @@ export default function (pi: ExtensionAPI) {
   let backgroundCompactionPromise: Promise<void> | undefined;
   let lastKnownContextWindow = 200000;
 
+  // Pi's context usage metrics (from getContextUsage)
+  let lastKnownContextTokens = 0;
+  let lastKnownContextPercent = 0;
+
   /**
-   * Calculate total tokens in active context items (messages + summaries).
+   * Get active context token count from Pi's measurement (not LCM's DB).
+   * This ensures we use the actual context size Pi is working with.
    */
-  function getActiveContextTokens(conversationId: string): number {
-    if (!contextItemsStore || !conversationStore || !summaryStore) {
-      return 0;
-    }
+  function getActiveContextTokens(_conversationId: string): number {
+    // Use Pi's reported context usage, not our own calculation
+    return lastKnownContextTokens;
+  }
 
-    const items = contextItemsStore.getContextItems(conversationId);
-    let totalTokens = 0;
+  /**
+   * Return only the suffix of Pi messages that LCM has not persisted yet.
+   * The context hook fires before the current user turn is always available in
+   * LCM's DB, so replacing Pi's message array with only assembled DB context
+   * can accidentally drop the live prompt. Keep just the new tail, not the full
+   * Pi history.
+   */
+  function extractAgentMessageText(message: AgentMessage): string {
+    if (!("content" in message)) return "";
 
-    for (const item of items) {
-      if (item.item_type === "message" && item.message_id) {
-        const message = conversationStore.getMessageById(item.message_id);
-        if (message) {
-          totalTokens += message.token_count;
-        }
-      } else if (item.item_type === "summary" && item.summary_id) {
-        const summary = summaryStore.getSummary(item.summary_id);
-        if (summary) {
-          totalTokens += summary.token_count;
-        }
+    const { content } = message;
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+
+    const parts: string[] = [];
+    for (const block of content) {
+      if (block.type === "text") {
+        parts.push(block.text);
+      } else if (block.type === "toolCall") {
+        parts.push(`[tool: ${block.name}]`);
       }
     }
+    return parts.join("\n");
+  }
 
-    return totalTokens;
+  function getUnstoredEventTail(messages: AgentMessage[]): AgentMessage[] {
+    if (!conversationStore || !conversation) return [];
+
+    const storedHashes = new Set(
+      conversationStore
+        .getMessages(conversation.id)
+        .map((message) => message.identity_hash)
+        .filter((hash): hash is string => typeof hash === "string" && hash.length > 0),
+    );
+
+    const tail: AgentMessage[] = [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i] as AgentMessage | undefined;
+      if (!message) continue;
+
+      const content = extractAgentMessageText(message);
+      if (!content || content.trim().length === 0) continue;
+
+      const hash = computeIdentityHash(message.role, content);
+      if (storedHashes.has(hash)) break;
+      tail.unshift(message);
+    }
+
+    return tail;
+  }
+
+  const LCM_LOG = "/tmp/lcm-debug.log";
+  function lcmLog(_msg: string): void {
+    // no-op — remove the line below to re-enable debug logging to /tmp/lcm-debug.log
+    void _msg;
+    void LCM_LOG;
   }
 
   /**
@@ -96,18 +143,37 @@ export default function (pi: ExtensionAPI) {
     ui: { setStatus: (id: string, status: string) => void };
   }): void {
     // Early returns for conditions that prevent background compaction
-    if (!config.backgroundCompaction) return;
-    if (isCompacting) return;
-    if (backgroundCompactionPromise) return;
-    if (!compactionEngine || !conversation) return;
+    if (!config.backgroundCompaction) {
+      lcmLog("[DEBUG] backgroundCompaction disabled");
+      return;
+    }
+    if (isCompacting) {
+      lcmLog("[DEBUG] already compacting");
+      return;
+    }
+    if (backgroundCompactionPromise) {
+      lcmLog("[DEBUG] background compaction in flight");
+      return;
+    }
+    if (!compactionEngine || !conversation) {
+      lcmLog("[DEBUG] no compaction engine or conversation");
+      return;
+    }
 
     const activeTokens = getActiveContextTokens(conversation.id);
     const softThreshold = Math.floor(
       config.softTokenThreshold * lastKnownContextWindow,
     );
 
+    lcmLog(
+      `[DEBUG] activeTokens=${activeTokens}, softThreshold=${softThreshold} (window=${lastKnownContextWindow}, threshold=${config.softTokenThreshold})`,
+    );
+
     // Below soft threshold — no compaction needed
-    if (activeTokens < softThreshold) return;
+    if (activeTokens < softThreshold) {
+      lcmLog("[DEBUG] below threshold, skipping");
+      return;
+    }
 
     // Start background compaction
     ctx.ui.setStatus("lcm", "LCM 🟡 preparing summaries");
@@ -136,13 +202,22 @@ export default function (pi: ExtensionAPI) {
       database = new LcmDatabase(config.dbPath);
 
       // Initialize stores
-      conversationStore = new ConversationStore(database.drizzle, database.db, database.hasFts5);
-      summaryStore = new SummaryStore(database.drizzle, database.db, database.hasFts5);
+      conversationStore = new ConversationStore(
+        database.drizzle,
+        database.db,
+        database.hasFts5,
+      );
+      summaryStore = new SummaryStore(
+        database.drizzle,
+        database.db,
+        database.hasFts5,
+      );
       contextItemsStore = new ContextItemsStore(database.drizzle, database.db);
 
       // Get or create conversation for this session (keyed by session file for per-session isolation)
       const sessionFile = ctx.sessionManager.getSessionFile() ?? ctx.cwd;
       const sessionKey = sessionKeyFromFile(sessionFile);
+      lcmLog(`[SESSION] file=${sessionFile}, key=${sessionKey}`);
       conversation = conversationStore.getOrCreateConversation(sessionKey);
 
       // Initialize compaction engine
@@ -229,6 +304,7 @@ export default function (pi: ExtensionAPI) {
     lastTurnHadToolUse = event.toolResults.length > 0;
 
     // Trigger background compaction check after turn completes
+    lcmLog("[DEBUG] turn_end fired");
     maybeStartBackgroundCompaction(ctx);
   });
 
@@ -254,27 +330,39 @@ export default function (pi: ExtensionAPI) {
   });
 
   /**
-   * Context assembly: Prepend LCM summary messages to Pi's native message list.
-   * We prepend rather than replace so the current user message (not yet stored in DB)
-   * is always present for the LLM.
+   * Context assembly: Replace Pi's full history with summaries + fresh tail.
+   * This reduces context usage by dropping old messages that have been compacted.
    */
   pi.on("context", async (event, ctx) => {
     if (!assembler || !conversation || !summaryStore || isCompacting) return;
 
-    // Track context window for threshold calculations
+    // Track context window and usage for threshold calculations
     lastKnownContextWindow = ctx.model?.contextWindow ?? 200000;
+    const contextUsage = (ctx as any).getContextUsage?.();
+    if (contextUsage) {
+      lastKnownContextTokens = contextUsage.tokens ?? lastKnownContextTokens;
+      lastKnownContextPercent = contextUsage.percent ?? lastKnownContextPercent;
+      lcmLog(`[CONTEXT] tokens=${contextUsage.tokens}, percent=${contextUsage.percent?.toFixed(1)}%, window=${contextUsage.contextWindow}`);
+    } else {
+      lcmLog(`[CONTEXT] getContextUsage not available, using fallback`);
+    }
 
     try {
-      // Only inject when we have summaries
       const counts = summaryStore.getSummaryCounts(conversation.id);
-      if (counts.total === 0) return;
+      if (counts.total === 0) return; // No summaries yet, let Pi handle context normally
 
       const tokenBudget = ctx.model?.contextWindow ?? 200000;
-      const summaryMessages = assembler.assembleSummariesOnly(conversation.id, tokenBudget);
 
-      if (summaryMessages.length > 0) {
-        // Prepend summary messages to Pi's native messages (which include the current user turn)
-        return { messages: [...summaryMessages, ...event.messages] as AgentMessage[] };
+      // Get properly assembled context: summaries + fresh tail (budget-aware)
+      const assembled = assembler.assemble(conversation.id, tokenBudget);
+
+      if (assembled.messages.length > 0) {
+        const unstoredTail = getUnstoredEventTail(event.messages as AgentMessage[]);
+        lcmLog(`[CONTEXT] assembled ${assembled.messages.length} messages (${assembled.totalTokens} tokens), ${assembled.summaryCount} summaries, ${assembled.messageCount} fresh messages, ${unstoredTail.length} unstored tail messages`);
+        // Return LCM-assembled context plus the current not-yet-persisted turn.
+        return {
+          messages: [...assembled.messages, ...unstoredTail] as AgentMessage[],
+        };
       }
     } catch (error) {
       console.error("LCM context error:", error);
