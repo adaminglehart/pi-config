@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.69.0",
+  "lastChangelogVersion": "0.70.0",
   "packages": [
     "npm:@plannotator/pi-extension",
     "npm:glimpseui",
@@ -9,5 +9,10 @@
   "extensions": ["~/.config/pi/bake/pi-extension/status-writer.ts"],
   "skills": ["~/.agents/skills"],
   "hideThinkingBlock": true,
-  "quietStartup": true
+  "quietStartup": true,
+  "lcm": {
+    "softTokenThreshold": 0.5,
+    "hardTokenThreshold": 0.85,
+    "backgroundCompaction": true
+  }
 }

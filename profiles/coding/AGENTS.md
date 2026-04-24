@@ -2,7 +2,7 @@
 
 ## Workflow
 
-For any task that modifies more than 2 files or involves architectural decisions:
+For any task that seems complex, modifies more than 4 or 5 files or involves architectural decisions:
 1. Ask the user to run `/plannotator plans/<task-name>.md` to enter plan mode (the agent cannot activate this directly)
 2. Once in plan mode, explore the codebase and write the plan as markdown checklists
 3. Call `exit_plan_mode` to submit for review

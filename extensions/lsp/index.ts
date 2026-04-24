@@ -545,6 +545,12 @@ export default function (pi: ExtensionAPI) {
 
 Actions: definition, references, hover, signature, rename (require file + line/column or query), symbols (file, optional query), diagnostics (file), workspace-diagnostics (files array), codeAction (file + position).
 Use bash to find files: find src -name "*.ts" -type f`,
+    promptSnippet: "Query language server for definitions, references, types, symbols, diagnostics, rename, and code actions",
+    promptGuidelines: [
+      "Use lsp for code navigation: go to definition, find references, hover for types.",
+      "For rename and codeAction, provide file path plus line/column position.",
+      "Use bash to find files first if you're unsure of file paths: find src -name '*.ts' -type f",
+    ],
     parameters: LspParams,
 
     async execute(

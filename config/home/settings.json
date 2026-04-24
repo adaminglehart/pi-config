@@ -4,6 +4,7 @@
   "enabledModels": [
     "accounts/fireworks/routers/kimi-k2p5-turbo",
     "openai-codex/gpt-5.4",
+    "openai-codex/gpt-5.5",
     "accounts/fireworks/models/minimax-m2p7",
     "accounts/fireworks/models/glm-5p1",
     "google/gemini-3-flash-preview",

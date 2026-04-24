@@ -4,7 +4,7 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { completeSimple } from "@mariozechner/pi-ai";
 import type { RetrievalEngine } from "../retrieval.js";
 import type { LcmConfig } from "../types.js";
@@ -14,9 +14,7 @@ export function registerExpandQueryTool(
   getEngine: () => RetrievalEngine | undefined,
   getConversationId: () => string | undefined,
   getConfig: () => LcmConfig,
-  getModelRegistry: () =>
-    | { find: Function; getApiKeyAndHeaders: Function }
-    | undefined,
+  getModelRegistry: () => ModelRegistry | undefined,
 ) {
   pi.registerTool({
     name: "lcm_expand_query",
@@ -125,6 +123,17 @@ export function registerExpandQueryTool(
       }
 
       const auth = await modelRegistry.getApiKeyAndHeaders(model);
+      if (!auth.ok) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `## Expanded Context\n\n${expandedContext.join("\n\n---\n\n")}`,
+            },
+          ],
+          details: {},
+        };
+      }
 
       try {
         const response = await completeSimple(
@@ -136,11 +145,13 @@ export function registerExpandQueryTool(
               {
                 role: "user",
                 content: `## Historical Context\n\n${expandedContext.join("\n\n---\n\n")}\n\n## Question\n\n${params.query}`,
+                timestamp: Date.now(),
               },
             ],
           },
           {
-            apiKey: (auth as { apiKey: string }).apiKey,
+            apiKey: auth.apiKey,
+            headers: auth.headers,
             maxTokens: 2000,
             temperature: 0,
             signal: signal ?? undefined,

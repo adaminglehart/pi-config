@@ -156,7 +156,9 @@ function renderPricingSegment(ctx: FooterContext): string {
   const inColor = ansi.fg(colors.input);
   const outColor = ansi.fg(colors.output);
   const sepColor = ansi.fg(colors.sep);
-  return `${inColor}▲${inPrice}${ansi.reset}${sepColor}/${ansi.reset}${outColor}▼${outPrice}${ansi.reset}`;
+  const costColor = ansi.fg(colors.cost);
+  const sessionCost = `$${ctx.usageCost.toFixed(2)}`;
+  return `${inColor}▲${inPrice}${ansi.reset}${sepColor}/${ansi.reset}${outColor}▼${outPrice}${ansi.reset} (${costColor}${sessionCost}${ansi.reset})`;
 }
 
 function renderThinkingSegment(ctx: FooterContext): string {
@@ -182,7 +184,7 @@ function renderBranchSegment(ctx: FooterContext): string {
   return `${ansi.fg(colors.text)}${ansi.reset}${ansi.fg(colors.model)}${branch}${ansi.reset}`;
 }
 
-function renderTokensSegment(ctx: FooterContext): string {
+function renderContextSegment(ctx: FooterContext): string {
   if (ctx.contextWindow <= 0) return "";
   const inColor = ansi.fg(colors.input);
   const textColor = ansi.fg(colors.text);
@@ -195,15 +197,19 @@ function renderTokensSegment(ctx: FooterContext): string {
   return `${textColor}ctx:${ansi.reset} ${inColor}${display}${ansi.reset}`;
 }
 
-function renderSessionCostSegment(ctx: FooterContext): string {
-  return `${ansi.fg(colors.text)}cost:${ansi.reset} ${ansi.fg(colors.cost)}$${ctx.usageCost.toFixed(3)}${ansi.reset}`;
-}
-
 function renderExtensionStatuses(ctx: FooterContext): string {
   if (ctx.extensionStatuses.size === 0) return "";
   const parts: string[] = [];
-  for (const [, text] of ctx.extensionStatuses) {
-    if (text) parts.push(text);
+  for (const [name, text] of ctx.extensionStatuses) {
+    if (!text) continue;
+    // Clean up MCP status: remove " servers" suffix (handles ANSI codes before it)
+    // Match: optional ANSI reset codes, then " servers" at end
+    let cleaned = text.replace(/(\x1b\[0m)?\s+servers$/, "$1");
+    // Also try without the ANSI group if that didn't match
+    if (cleaned === text && (name === "mcp" || text.includes("MCP"))) {
+      cleaned = text.replace(/\s+servers\b/, "");
+    }
+    parts.push(cleaned);
   }
   return parts.join(` ${ansi.fg(colors.sep)}│${ansi.reset} `);
 }
@@ -251,7 +257,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Scene box inner width (subtract 2 for left/right borders)
   const sceneInnerWidth = mainWidth - 2;
 
-  // Line 1 Content: directory and branch (left), session ID and profile (right)
+  // Line 1 Content: dir/branch (left), model/thinking/cost (center), profile/session (right)
   const line1LeftSegments: string[] = [];
   const dirSeg = renderDirectorySegment(ctx);
   const branchSeg = renderBranchSegment(ctx);
@@ -259,37 +265,53 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (branchSeg) line1LeftSegments.push(branchSeg);
   const line1Left = line1LeftSegments.join(separator);
 
+  // Center: model + thinking + context usage
+  const line1CenterSegments: string[] = [];
+  const modelSeg = renderModelSegment(ctx);
+  const thinkingSeg = renderThinkingSegment(ctx);
+  const contextSeg = renderContextSegment(ctx);
+  if (modelSeg) line1CenterSegments.push(modelSeg);
+  if (thinkingSeg) line1CenterSegments.push(thinkingSeg);
+  if (contextSeg) line1CenterSegments.push(contextSeg);
+  const line1Center = line1CenterSegments.join(separator);
+
   const profileSeg = renderProfileSegment();
   const sessionIdSeg = renderSessionIdSegment(ctx);
   const line1Right = [profileSeg, sessionIdSeg].filter(Boolean).join(separator);
 
-  // Calculate padding to push right segments to the right
+  // Calculate layout with gaps around center
   const line1LeftWidth = visibleWidth(line1Left);
+  const line1CenterWidth = visibleWidth(line1Center);
   const line1RightWidth = visibleWidth(line1Right);
-  const line1Pad = Math.max(1, mainWidth - line1LeftWidth - line1RightWidth);
+  const minGap = 4; // minimum gap on each side of center
+  const availableForCenter = mainWidth - line1LeftWidth - line1RightWidth - (minGap * 2);
+  
+  let line1Content: string;
+  if (line1CenterWidth <= availableForCenter) {
+    // Center fits with gaps
+    const totalGap = mainWidth - line1LeftWidth - line1CenterWidth - line1RightWidth;
+    const leftGap = Math.floor(totalGap / 2);
+    const rightGap = totalGap - leftGap;
+    line1Content = line1Left + " ".repeat(leftGap) + line1Center + " ".repeat(rightGap) + line1Right;
+  } else {
+    // Center too wide, just use single space separation
+    line1Content = [line1Left, line1Center, line1Right].filter(Boolean).join(" ");
+  }
 
-  const line1Content = line1Left + " ".repeat(line1Pad) + line1Right;
-
-  // Line 2 Content: model, thinking, ACM, tokens, cost, extension statuses
+  // Line 2 Content: pricing (with session cost), extension statuses (centered)
   const line2Segments: string[] = [];
-  const modelSeg = renderModelSegment(ctx);
   const pricingSeg = renderPricingSegment(ctx);
-  const thinkingSeg = renderThinkingSegment(ctx);
-  const tokensSeg = renderTokensSegment(ctx);
-  const costSeg = renderSessionCostSegment(ctx);
-  // const acmSeg = renderAcmSegment(ctx);
   const extStatusSeg = renderExtensionStatuses(ctx);
-  if (modelSeg) line2Segments.push(modelSeg);
   if (pricingSeg) line2Segments.push(pricingSeg);
-  if (thinkingSeg) line2Segments.push(thinkingSeg);
-  if (tokensSeg) line2Segments.push(tokensSeg);
-  if (costSeg) line2Segments.push(costSeg);
-  // if (acmSeg) line2Segments.push(acmSeg);
   if (extStatusSeg) line2Segments.push(extStatusSeg);
   const line2Content = line2Segments.join(separator);
 
-  // Padding
-  const line2Pad = Math.max(0, mainWidth - visibleWidth(line2Content));
+  // Center line 2 content
+  const line2ContentWidth = visibleWidth(line2Content);
+  const line2TotalPad = Math.max(0, mainWidth - line2ContentWidth);
+  const line2LeftPad = Math.floor(line2TotalPad / 2);
+  const line2RightPad = line2TotalPad - line2LeftPad;
+  const line2Padded = " ".repeat(line2LeftPad) + line2Content + " ".repeat(line2RightPad);
 
   // Build the final array of lines
   const resultLines: string[] = [];
@@ -297,8 +319,8 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Info Line 1
   resultLines.push(truncateToWidth(line1Content, width));
 
-  // Info Line 2
-  resultLines.push(truncateToWidth(line2Content + " ".repeat(line2Pad), width));
+  // Info Line 2 (centered)
+  resultLines.push(truncateToWidth(line2Padded, width));
 
   // Scene content — skip animation in subagent processes and personal profile
   // (personal profile uses void extension for theatrical particle animation instead)

@@ -74,6 +74,11 @@ export interface LcmConfig extends Record<string, unknown> {
   freshTailCount: number;
   freshTailMaxTokens: number;
 
+  // Soft/hard threshold model for background compaction
+  softTokenThreshold: number;
+  hardTokenThreshold: number;
+  backgroundCompaction: boolean;
+
   // Compaction fanout
   leafMinFanout: number;
   condensedMinFanout: number;

@@ -198,6 +198,12 @@ Features:
 - Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} if too large
 
 Use this tool when you need to retrieve and analyze web content.`,
+    promptSnippet: "Fetch content from a URL and convert to markdown, text, or html",
+    promptGuidelines: [
+      "Use webfetch when you need to retrieve and analyze web content.",
+      "URL must start with http:// or https://",
+      "Output is automatically truncated if too large.",
+    ],
     parameters: WebFetchParams,
 
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {

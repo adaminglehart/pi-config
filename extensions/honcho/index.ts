@@ -254,6 +254,11 @@ export default function (pi: ExtensionAPI) {
     label: "Honcho Chat",
     description:
       "Query long-term memory about this user. Use this before making assumptions about the user's preferences, workflow, or past decisions — especially at the start of a task, when choosing between approaches, or when you're unsure how the user likes things done. Returns synthesized knowledge from all past sessions.",
+    promptSnippet: "Query long-term memory about the user's preferences, workflow, and past decisions",
+    promptGuidelines: [
+      "Use honcho_chat before making assumptions about the user's preferences or workflow.",
+      "Query at the start of tasks, when choosing between approaches, or when unsure how the user likes things done.",
+    ],
     parameters: Type.Object({
       question: Type.String({
         description:
@@ -292,6 +297,12 @@ export default function (pi: ExtensionAPI) {
     label: "Honcho Save Insight",
     description:
       "Persist a new insight or conclusion about the user to long-term memory. Call this PROACTIVELY whenever you learn something durable: when the user corrects you, expresses a preference, makes a decision, pushes back on an approach, or reveals a workflow habit. Save concrete facts, not vague summaries. Don't wait to be asked.",
+    promptSnippet: "Save a durable insight about the user to long-term memory",
+    promptGuidelines: [
+      "Use honcho_save_insight proactively whenever you learn something durable about the user.",
+      "Save when the user corrects you, expresses a preference, makes a decision, or reveals a workflow habit.",
+      "Write insights as concrete, reusable facts, not vague summaries.",
+    ],
     parameters: Type.Object({
       content: Type.String({
         description:

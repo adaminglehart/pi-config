@@ -7,9 +7,11 @@ Adapted from [lossless-claw](https://github.com/martian-engineering/lossless-cla
 ## How it works
 
 1. **Every message is persisted** to a SQLite database on each `message_end` event
-2. **When context grows too large**, the compaction engine summarizes older messages into leaf summaries, then condenses those into higher-level summaries — forming a DAG (directed acyclic graph)
-3. **Before each LLM call**, the context assembler replaces Pi's default message array with a budget-aware mix of summaries + the fresh tail of recent raw messages
-4. **The agent gets retrieval tools** (`lcm_grep`, `lcm_expand`, etc.) to search and drill back into any compacted history
+2. **Soft threshold (background compaction)**: When active context tokens exceed `softTokenThreshold` (default 65%) of the model's context window, LCM starts compaction in the background between turns
+3. **Hard threshold (blocking compaction)**: If tokens exceed `hardTokenThreshold` (default 85%), LCM blocks in `session_before_compact` to ensure context fits. If background compaction already completed, this may return immediately
+4. **The compaction engine** summarizes older messages into leaf summaries, then condenses those into higher-level summaries — forming a DAG (directed acyclic graph)
+5. **Before each LLM call**, the context assembler replaces Pi's default message array with a budget-aware mix of summaries + the fresh tail of recent raw messages
+6. **The agent gets retrieval tools** (`lcm_grep`, `lcm_expand`, etc.) to search and drill back into any compacted history
 
 Pi's default compaction is cancelled — LCM handles everything.
 
@@ -70,17 +72,26 @@ message_end event
   → conversationStore.addMessage()  // also creates context_item + FTS5 index
 ```
 
-### Compaction (triggered by Pi's auto-compaction)
+### Background compaction (soft threshold)
+```
+turn_end event (after each agent turn)
+  → Compute active context tokens from context_items
+  → If tokens > softTokenThreshold * contextWindow:
+      Start async background compaction
+      Set status: "LCM 🟡 preparing summaries"
+      Run compactionEngine.runCompaction()
+      Clear status when done
+```
+
+### Blocking compaction (hard threshold safety path)
 ```
 session_before_compact hook (Pi triggers this when context needs pruning)
-  → Leaf pass:
-      Group evictable messages into ~leafChunkTokens chunks
-      For each chunk: serialize → LLM summarize → create leaf summary
-      Replace context_items: remove message refs, add summary ref
-  → Condensed pass (if incrementalMaxDepth >= 1):
-      Group same-depth summaries meeting condensedMinFanout
-      Serialize → LLM summarize → create condensed summary at depth+1
-      Replace context_items
+  → If background compaction in-flight: await it
+  → Recompute active tokens
+  → If tokens now below hardTokenThreshold: return early (already compacted)
+  → Otherwise run blocking compaction:
+      Leaf pass + condensed pass
+      Return compaction summary to Pi
 ```
 
 ### Context assembly (before each LLM call)
@@ -129,7 +140,10 @@ All settings live under the `lcm` namespace in Pi's `settings.json`:
     "condensedTargetTokens": 2000,
     "maxExpandTokens": 4000,
     "largeFileTokenThreshold": 25000,
-    "summaryTimeoutMs": 60000
+    "summaryTimeoutMs": 60000,
+    "softTokenThreshold": 0.65,
+    "hardTokenThreshold": 0.85,
+    "backgroundCompaction": true
   }
 }
 ```
@@ -142,7 +156,10 @@ Defaults are used when settings are omitted. Uses the same `getNamespacedConfig`
 | `dbPath` | `~/.pi/lcm.db` | SQLite database path |
 | `summaryProvider` | `openrouter` | LLM provider for summarization |
 | `summaryModel` | `google/gemini-3-flash-preview` | LLM model for summarization |
-| `contextThreshold` | `0.75` | Fraction of context window used as budget for summary assembly |
+| `contextThreshold` | `0.75` | **Assembly budget** — fraction of context window used when injecting summaries |
+| `softTokenThreshold` | `0.65` | **Runtime trigger** — fraction of context window that starts background compaction |
+| `hardTokenThreshold` | `0.85` | **Safety limit** — fraction of context window that requires blocking compaction |
+| `backgroundCompaction` | `true` | Enable background compaction between turns |
 | `freshTailCount` | `64` | Recent messages always protected from compaction |
 | `leafChunkTokens` | `20000` | Max tokens per leaf compaction chunk |
 | `leafMinFanout` | `8` | Min messages required to create a leaf summary |
@@ -205,3 +222,4 @@ Key differences from the original OpenClaw plugin:
 - **No native deps** — uses `node:sqlite` instead of `better-sqlite3`
 - **Modular files** — no file exceeds ~460 lines (vs 6500-line engine.ts in lossless-claw)
 - **Settings via Pi** — uses Pi's `settings.json` instead of environment variables
+- **Soft/hard threshold model** — adds background compaction at soft threshold (default 65%) and blocking compaction only at hard threshold (default 85%), aligning with the Voltropy LCM paper

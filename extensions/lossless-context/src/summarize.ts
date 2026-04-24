@@ -41,20 +41,23 @@ export async function summarize(
       : buildCondensedSummaryPrompt(content, depth, targetTokens);
 
   // Resolve model from registry
-  let model;
-  try {
-    model = deps.modelRegistry.find(
-      deps.config.summaryProvider,
-      deps.config.summaryModel,
-    );
-  } catch (error) {
+  const model = deps.modelRegistry.find(
+    deps.config.summaryProvider,
+    deps.config.summaryModel,
+  );
+  if (!model) {
     throw new Error(
-      `Failed to find summary model: ${deps.config.summaryProvider}/${deps.config.summaryModel}. Error: ${error}`,
+      `Failed to find summary model: ${deps.config.summaryProvider}/${deps.config.summaryModel}`,
     );
   }
 
   // Get auth
   const auth = await deps.modelRegistry.getApiKeyAndHeaders(model);
+  if (!auth.ok) {
+    throw new Error(
+      `Failed to resolve auth for summary model ${model.id}: ${auth.error}`,
+    );
+  }
 
   // Call the LLM
   try {
@@ -66,11 +69,13 @@ export async function summarize(
           {
             role: "user",
             content: userPrompt,
+            timestamp: Date.now(),
           },
         ],
       },
       {
         apiKey: auth.apiKey,
+        headers: auth.headers,
         maxTokens: targetTokens,
         temperature: 0,
         signal: deps.signal,

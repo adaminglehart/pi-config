@@ -18,12 +18,16 @@ import {
 	createLsTool,
 	createReadTool,
 	createWriteTool,
+	truncateHead,
+	truncateTail,
+	formatSize,
+	DEFAULT_MAX_BYTES,
 } from "@mariozechner/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
 // Output truncation limits
-const MAX_OUTPUT_LINES = 50;
-const MAX_OUTPUT_CHARS = 10000;
+const MAX_EXPANDED_LINES = 50;     // Lines to show when expanded
+const STREAMING_PREVIEW_LINES = 5; // Recent lines to show while streaming
 
 // Parameter schemas
 const ReadParams = Type.Object({
@@ -83,14 +87,32 @@ function getTextContent(result: { content: Array<{ type: string; text?: string }
 }
 
 function truncateOutput(text: string): { text: string; wasTruncated: boolean } {
-	if (text.length > MAX_OUTPUT_CHARS) {
-		return { text: text.slice(0, MAX_OUTPUT_CHARS) + "\n... (truncated)", wasTruncated: true };
+	const result = truncateHead(text, {
+		maxLines: MAX_EXPANDED_LINES,
+		maxBytes: DEFAULT_MAX_BYTES,
+	});
+	return { text: result.content, wasTruncated: result.truncated };
+}
+
+/**
+ * Get the most recent N lines from text using built-in truncateTail.
+ * Returns formatted output with truncation info prefix if truncated.
+ */
+function getRecentLines(text: string, n: number, theme: any): string {
+	const result = truncateTail(text, { maxLines: n, maxBytes: DEFAULT_MAX_BYTES });
+	if (result.truncated) {
+		const skipped = result.totalLines - result.outputLines;
+		return theme.fg("dim", `... (${skipped} earlier lines)\n`) + result.content;
 	}
-	const lines = text.split("\n");
-	if (lines.length > MAX_OUTPUT_LINES) {
-		return { text: lines.slice(0, MAX_OUTPUT_LINES).join("\n") + "\n... (truncated)", wasTruncated: true };
-	}
-	return { text, wasTruncated: false };
+	return result.content;
+}
+
+/**
+ * Store streaming state in context.state for dynamic updates
+ */
+interface StreamingState {
+	outputBuffer: string;
+	lastUpdateTime: number;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -99,6 +121,11 @@ export default function (pi: ExtensionAPI) {
 		name: "read",
 		label: "read",
 		description: "Read the contents of a file.",
+		promptSnippet: "Read the contents of a file",
+		promptGuidelines: [
+			"Use read to examine file contents before making changes.",
+			"Prefer grep or find first if you're unsure of the file path.",
+		],
 		parameters: ReadParams,
 
 		async execute(toolCallId, params: Static<typeof ReadParams>, signal, onUpdate, ctx) {
@@ -117,23 +144,48 @@ export default function (pi: ExtensionAPI) {
 			return new Text(` ${theme.fg("dim", "→")} ${theme.fg("toolTitle", "read")} ${theme.fg("accent", display)}`, 0, 0);
 		},
 
-		renderResult(result, { expanded }, theme) {
+		renderResult(result, { expanded, isPartial }, theme, context) {
+			const text = getTextContent(result);
+			const state = context.state as StreamingState | undefined;
+
+			// While streaming large files, show progress
+			if (isPartial && !expanded && text.length > 1000) {
+				if (!state) {
+					context.state = { outputBuffer: text, lastUpdateTime: Date.now() } as StreamingState;
+				} else {
+					state.outputBuffer = text;
+					state.lastUpdateTime = Date.now();
+				}
+
+				const lines = text.split("\n").length;
+				const recent = getRecentLines(text, Math.min(STREAMING_PREVIEW_LINES, lines), theme);
+				const status = theme.fg("warning", ` ⟳ Reading ${formatSize(text.length)}...`);
+
+				return new Text(`${status}\n${theme.fg("toolOutput", recent)}`, 0, 0);
+			}
+
 			if (!expanded) {
-				const text = getTextContent(result);
-				const lines = text ? text.split("\n").length : 0;
+				const lines = text ? text.split("\n") : [];
 				const size = text?.length || 0;
+				const indicator = theme.fg("success", "✓");
+
+				// Show first 5 lines
+				const previewLines = lines.filter(l => l.trim()).slice(0, 5);
+				const preview = previewLines.map(l => `  ${theme.fg("muted", l.slice(0, 70))}`).join("\n");
+
+				// Include size info
 				let info = "";
 				if (size > 0) {
-					const sizeStr = size < 1024 ? `${size}B` : size < 1024*1024 ? `${(size/1024).toFixed(1)}KB` : `${(size/(1024*1024)).toFixed(1)}MB`;
-					info = sizeStr;
-					if (lines > 0) info += `, ${lines} lines`;
-				} else if (lines > 0) {
-					info = `${lines} lines`;
+					info = formatSize(size);
+					if (lines.length > 0) info += `, ${lines.length} lines`;
+				} else if (lines.length > 0) {
+					info = `${lines.length} lines`;
 				}
 				const summary = info ? ` ${theme.fg("muted", `(${info})`)}` : "";
-				return new Text(` ${theme.fg("success", "✓")}${summary}`, 0, 0);
+
+				return new Text(` ${indicator}${summary}${preview ? "\n" + preview : ""}`, 0, 0);
 			}
-			const text = getTextContent(result);
+
 			if (!text) return new Text("", 0, 0);
 			const { text: truncated, wasTruncated } = truncateOutput(text);
 			const output = wasTruncated ? truncated : text;
@@ -146,6 +198,11 @@ export default function (pi: ExtensionAPI) {
 		name: "bash",
 		label: "bash",
 		description: "Execute a bash command.",
+		promptSnippet: "Execute a bash command",
+		promptGuidelines: [
+			"Use bash for file exploration, running tests, builds, or git operations.",
+			"Prefer grep/find/ls tools over bash for file exploration when available.",
+		],
 		parameters: BashParams,
 
 		async execute(toolCallId, params: Static<typeof BashParams>, signal, onUpdate, ctx) {
@@ -153,20 +210,46 @@ export default function (pi: ExtensionAPI) {
 			return tool.execute(toolCallId, params, signal, onUpdate);
 		},
 
-		renderCall(args: Static<typeof BashParams>, theme) {
+		renderCall(args: Static<typeof BashParams>, theme, context) {
 			const cmd = args.command || "...";
-			return new Text(` ${theme.fg("dim", "⚙")} ${theme.fg("toolTitle", "$")} ${theme.fg("toolOutput", cmd)}`, 0, 0);
+			const state = context.state as StreamingState | undefined;
+			const indicator = state ? theme.fg("warning", " ● ") : theme.fg("dim", "⚙ ");
+			return new Text(`${indicator}${theme.fg("toolTitle", "$")} ${theme.fg("toolOutput", cmd)}`, 0, 0);
 		},
 
-		renderResult(result, { expanded }, theme) {
+		renderResult(result, { expanded, isPartial }, theme, context) {
 			const text = getTextContent(result);
+			const state = context.state as StreamingState | undefined;
+
+			// While streaming, show the most recent lines dynamically
+			if (isPartial && !expanded) {
+				if (!state) {
+					context.state = { outputBuffer: text, lastUpdateTime: Date.now() } as StreamingState;
+				} else {
+					state.outputBuffer = text;
+					state.lastUpdateTime = Date.now();
+				}
+
+				const recent = getRecentLines(text, STREAMING_PREVIEW_LINES, theme);
+				const preview = theme.fg("toolOutput", recent);
+				const status = theme.fg("warning", " ⟳ Running...");
+
+				return new Text(`${status}\n${preview}`, 0, 0);
+			}
+
+			// Static result (complete or expanded) - show LAST 5 lines (final status matters)
 			if (!expanded) {
 				const isError = text.toLowerCase().includes("error");
-				const firstLine = text.split("\n")[0]?.slice(0, 60) || "";
 				const indicator = isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
-				const preview = firstLine ? ` ${theme.fg("muted", firstLine)}` : "";
+
+				// Show last 5 lines (most recent output matters for bash)
+				const lines = text.split("\n").filter(l => l.trim()).slice(-5);
+				const preview = lines.length > 0
+					? "\n" + lines.map(l => `  ${theme.fg("muted", l.slice(0, 70))}`).join("\n")
+					: "";
 				return new Text(` ${indicator}${preview}`, 0, 0);
 			}
+
 			if (!text.trim()) return new Text("", 0, 0);
 			const { text: truncated, wasTruncated } = truncateOutput(text.trim());
 			const output = wasTruncated ? truncated : text.trim();
@@ -179,6 +262,11 @@ export default function (pi: ExtensionAPI) {
 		name: "write",
 		label: "write",
 		description: "Write content to a file.",
+		promptSnippet: "Write content to a file",
+		promptGuidelines: [
+			"Use write to create new files with full content.",
+			"For modifying existing files, prefer edit over write.",
+		],
 		parameters: WriteParams,
 
 		async execute(toolCallId, params: Static<typeof WriteParams>, signal, onUpdate, ctx) {
@@ -209,6 +297,12 @@ export default function (pi: ExtensionAPI) {
 		name: "edit",
 		label: "edit",
 		description: "Edit a file by replacing exact text.",
+		promptSnippet: "Edit a file by replacing exact text",
+		promptGuidelines: [
+			"Use edit for precise text replacements in existing files.",
+			"The oldText must match exactly, including whitespace and indentation.",
+			"Read the file first to ensure you have the correct text to replace.",
+		],
 		parameters: EditParams,
 
 		async execute(toolCallId, params: Static<typeof EditParams>, signal, onUpdate, ctx) {
@@ -251,6 +345,11 @@ export default function (pi: ExtensionAPI) {
 		name: "find",
 		label: "find",
 		description: "Find files by name pattern.",
+		promptSnippet: "Find files by name pattern",
+		promptGuidelines: [
+			"Use find to locate files when you know the name or part of it.",
+			"Supports glob patterns like '*.ts' or '**/config.*'.",
+		],
 		parameters: FindParams,
 
 		async execute(toolCallId, params: Static<typeof FindParams>, signal, onUpdate, ctx) {
@@ -262,13 +361,29 @@ export default function (pi: ExtensionAPI) {
 			return new Text(` ${theme.fg("dim", "◎")} ${theme.fg("toolTitle", "find")} ${theme.fg("accent", args.pattern || "")}`, 0, 0);
 		},
 
-		renderResult(result, { expanded }, theme) {
-			if (!expanded) {
-				const text = getTextContent(result);
-				const count = text.trim().split("\n").filter(Boolean).length;
-				return new Text(` ${count > 0 ? theme.fg("muted", `→ ${count} files`) : theme.fg("success", "✓")}`, 0, 0);
-			}
+		renderResult(result, { expanded, isPartial }, theme, context) {
 			const text = getTextContent(result);
+
+			// While streaming, show files as they're discovered
+			if (isPartial && !expanded) {
+				const files = text.trim().split("\n").filter(Boolean);
+				const recentFiles = files.slice(-3); // Last 3 files
+				const fileDisplay = recentFiles.map(f => `  ${theme.fg("accent", f)}`).join("\n");
+				const status = theme.fg("warning", ` ⟳ ${files.length} files...`);
+
+				return new Text(`${status}\n${fileDisplay}`, 0, 0);
+			}
+
+			if (!expanded) {
+				const files = text.trim().split("\n").filter(Boolean);
+				const count = files.length;
+				const indicator = count > 0 ? theme.fg("muted", `→ ${count} files`) : theme.fg("success", "✓");
+
+				// Show first 5 files
+				const preview = files.slice(0, 5).map(f => `  ${theme.fg("accent", f)}`).join("\n");
+				return new Text(` ${indicator}${preview ? "\n" + preview : ""}`, 0, 0);
+			}
+
 			return text ? new Text(`\n${theme.fg("toolOutput", text.trim())}`, 0, 0) : new Text("", 0, 0);
 		},
 	});
@@ -278,6 +393,11 @@ export default function (pi: ExtensionAPI) {
 		name: "grep",
 		label: "grep",
 		description: "Search file contents by regex.",
+		promptSnippet: "Search file contents by regex",
+		promptGuidelines: [
+			"Use grep to search for patterns across multiple files.",
+			"Supports regex patterns. Use simple strings for literal matches.",
+		],
 		parameters: GrepParams,
 
 		async execute(toolCallId, params: Static<typeof GrepParams>, signal, onUpdate, ctx) {
@@ -289,13 +409,37 @@ export default function (pi: ExtensionAPI) {
 			return new Text(` ${theme.fg("dim", "⌕")} ${theme.fg("toolTitle", "grep")} ${theme.fg("accent", `/${args.pattern}/`)}`, 0, 0);
 		},
 
-		renderResult(result, { expanded }, theme) {
-			if (!expanded) {
-				const text = getTextContent(result);
-				const count = text.trim().split("\n").filter(Boolean).length;
-				return new Text(` ${count > 0 ? theme.fg("muted", `→ ${count} matches`) : theme.fg("success", "✓")}`, 0, 0);
-			}
+		renderResult(result, { expanded, isPartial }, theme, context) {
 			const text = getTextContent(result);
+			const state = context.state as StreamingState | undefined;
+
+			// While streaming, show matches as they're found
+			if (isPartial && !expanded) {
+				if (!state) {
+					context.state = { outputBuffer: text, lastUpdateTime: Date.now() } as StreamingState;
+				} else {
+					state.outputBuffer = text;
+					state.lastUpdateTime = Date.now();
+				}
+
+				const matches = text.trim().split("\n").filter(Boolean);
+				const recentMatches = matches.slice(-3); // Last 3 matches
+				const matchDisplay = recentMatches.map(m => `  ${theme.fg("toolOutput", m)}`).join("\n");
+				const status = theme.fg("warning", ` ⟳ ${matches.length} matches...`);
+
+				return new Text(`${status}\n${matchDisplay}`, 0, 0);
+			}
+
+			if (!expanded) {
+				const matches = text.trim().split("\n").filter(Boolean);
+				const count = matches.length;
+				const indicator = count > 0 ? theme.fg("muted", `→ ${count} matches`) : theme.fg("success", "✓");
+
+				// Show first 5 matches
+				const preview = matches.slice(0, 5).map(m => `  ${theme.fg("toolOutput", m)}`).join("\n");
+				return new Text(` ${indicator}${preview ? "\n" + preview : ""}`, 0, 0);
+			}
+
 			return text ? new Text(`\n${theme.fg("toolOutput", text.trim())}`, 0, 0) : new Text("", 0, 0);
 		},
 	});
@@ -305,6 +449,11 @@ export default function (pi: ExtensionAPI) {
 		name: "ls",
 		label: "ls",
 		description: "List directory contents.",
+		promptSnippet: "List directory contents",
+		promptGuidelines: [
+			"Use ls to explore directory structure and see what files exist.",
+			"Use find instead if you need to filter by name pattern.",
+		],
 		parameters: LsParams,
 
 		async execute(toolCallId, params: Static<typeof LsParams>, signal, onUpdate, ctx) {

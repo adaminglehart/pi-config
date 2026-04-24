@@ -11,10 +11,15 @@ import type { LcmConfig } from "./types.js";
  */
 export function loadLcmConfig(): LcmConfig {
   return getNamespacedConfig<LcmConfig>("lcm", {
-    // Context assembly
+    // Context assembly (budget for injecting summaries into context)
     contextThreshold: 0.75,
     freshTailCount: 64,
     freshTailMaxTokens: 40000,
+
+    // Soft/hard threshold model for runtime compaction
+    softTokenThreshold: 0.65,
+    hardTokenThreshold: 0.85,
+    backgroundCompaction: true,
 
     // Compaction fanout
     leafMinFanout: 8,

@@ -355,19 +355,38 @@ async function handleDoctor(
 }
 
 async function handleRotate(
-  _deps: CommandDeps,
+  deps: CommandDeps,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
-  // Compaction is triggered by Pi's built-in auto-compaction, which LCM
-  // intercepts via the session_before_compact hook. LCM does not trigger
-  // compaction itself — rotate is informational only.
-  ctx.ui.notify(
-    "🔄 Rotate: compaction is handled by Pi's built-in auto-compaction. " +
-      "LCM intercepts that event via session_before_compact and runs its own " +
-      "summarization pass. There is no manual trigger — compaction fires " +
-      "automatically when Pi decides the context needs pruning.",
-    "info",
-  );
+  const conv = deps.getConversation();
+  const engine = deps.getCompactionEngine();
+  const summaryStore = deps.getSummaryStore();
+
+  if (!conv || !engine || !summaryStore) {
+    ctx.ui.notify("LCM not initialized", "error");
+    return;
+  }
+
+  ctx.ui.notify("🔄 Rotating: force-compacting all raw messages...", "info");
+
+  try {
+    const beforeCounts = summaryStore.getSummaryCounts(conv.id);
+
+    await engine.runCompaction(conv.id);
+
+    const afterCounts = summaryStore.getSummaryCounts(conv.id);
+
+    ctx.ui.notify(
+      `✅ Rotate complete: ${beforeCounts.total} → ${afterCounts.total} summaries ` +
+        `(${afterCounts.leaf} leaf, ${afterCounts.condensed} condensed)`,
+      "info",
+    );
+  } catch (error) {
+    ctx.ui.notify(
+      `❌ Rotate failed: ${error instanceof Error ? error.message : String(error)}`,
+      "error",
+    );
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

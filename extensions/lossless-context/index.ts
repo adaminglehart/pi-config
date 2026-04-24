@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { loadLcmConfig } from "./src/config.js";
 import { LcmDatabase } from "./src/db/connection.js";
@@ -54,9 +54,78 @@ export default function (pi: ExtensionAPI) {
   let conversation: ConversationRecord | undefined;
   let isCompacting = false;
   let lastTurnHadToolUse = false;
-  let modelRegistryRef:
-    | { find: Function; getApiKeyAndHeaders: Function }
-    | undefined;
+  let modelRegistryRef: ModelRegistry | undefined;
+
+  // Background compaction state
+  let backgroundCompactionPromise: Promise<void> | undefined;
+  let lastKnownContextWindow = 200000;
+
+  /**
+   * Calculate total tokens in active context items (messages + summaries).
+   */
+  function getActiveContextTokens(conversationId: string): number {
+    if (!contextItemsStore || !conversationStore || !summaryStore) {
+      return 0;
+    }
+
+    const items = contextItemsStore.getContextItems(conversationId);
+    let totalTokens = 0;
+
+    for (const item of items) {
+      if (item.item_type === "message" && item.message_id) {
+        const message = conversationStore.getMessageById(item.message_id);
+        if (message) {
+          totalTokens += message.token_count;
+        }
+      } else if (item.item_type === "summary" && item.summary_id) {
+        const summary = summaryStore.getSummary(item.summary_id);
+        if (summary) {
+          totalTokens += summary.token_count;
+        }
+      }
+    }
+
+    return totalTokens;
+  }
+
+  /**
+   * Start background compaction if tokens exceed soft threshold.
+   * Called after turns complete (not on the hot path of context assembly).
+   */
+  function maybeStartBackgroundCompaction(ctx: {
+    ui: { setStatus: (id: string, status: string) => void };
+  }): void {
+    // Early returns for conditions that prevent background compaction
+    if (!config.backgroundCompaction) return;
+    if (isCompacting) return;
+    if (backgroundCompactionPromise) return;
+    if (!compactionEngine || !conversation) return;
+
+    const activeTokens = getActiveContextTokens(conversation.id);
+    const softThreshold = Math.floor(
+      config.softTokenThreshold * lastKnownContextWindow,
+    );
+
+    // Below soft threshold — no compaction needed
+    if (activeTokens < softThreshold) return;
+
+    // Start background compaction
+    ctx.ui.setStatus("lcm", "LCM 🟡 preparing summaries");
+
+    backgroundCompactionPromise = (async () => {
+      try {
+        isCompacting = true;
+        await compactionEngine!.runCompaction(conversation!.id);
+        ctx.ui.setStatus("lcm", "LCM 🟢");
+      } catch (error) {
+        console.error("LCM background compaction error:", error);
+        ctx.ui.setStatus("lcm", "LCM 🔴 error");
+      } finally {
+        isCompacting = false;
+        backgroundCompactionPromise = undefined;
+      }
+    })();
+  }
 
   /**
    * Session start: Initialize database and stores.
@@ -153,10 +222,14 @@ export default function (pi: ExtensionAPI) {
   /**
    * Turn end: Track whether the agent was mid-task (using tools).
    * This is used to decide whether to auto-continue after compaction.
+   * Also triggers background compaction if soft threshold is exceeded.
    */
-  pi.on("turn_end", async (event, _ctx) => {
+  pi.on("turn_end", async (event, ctx) => {
     // If the turn produced tool results, the agent was actively working
     lastTurnHadToolUse = event.toolResults.length > 0;
+
+    // Trigger background compaction check after turn completes
+    maybeStartBackgroundCompaction(ctx);
   });
 
   /**
@@ -188,6 +261,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("context", async (event, ctx) => {
     if (!assembler || !conversation || !summaryStore || isCompacting) return;
 
+    // Track context window for threshold calculations
+    lastKnownContextWindow = ctx.model?.contextWindow ?? 200000;
+
     try {
       // Only inject when we have summaries
       const counts = summaryStore.getSummaryCounts(conversation.id);
@@ -209,6 +285,10 @@ export default function (pi: ExtensionAPI) {
    * Intercept Pi's compaction (including /compact command).
    * Run LCM's own DAG compaction, then return a summary to Pi so it has a
    * valid compaction entry. This also handles the /compact command path.
+   *
+   * Hard threshold safety: if background compaction is in-flight, await it.
+   * If tokens are now below hard threshold, return without blocking.
+   * Otherwise, run blocking compaction.
    */
   pi.on("session_before_compact", async (event, ctx) => {
     if (!compactionEngine || !summaryStore || !conversation) {
@@ -217,6 +297,43 @@ export default function (pi: ExtensionAPI) {
     }
 
     try {
+      // If background compaction is in-flight, await it first.
+      // Only skip blocking compaction when that in-flight work brought us
+      // below the hard threshold; otherwise preserve the original hard-stop
+      // behavior for Pi-triggered auto-compaction and manual /compact.
+      let awaitedBackgroundCompaction = false;
+      if (backgroundCompactionPromise) {
+        ctx.ui.setStatus("lcm", "🟡 LCM awaiting background compaction...");
+        awaitedBackgroundCompaction = true;
+        await backgroundCompactionPromise;
+      }
+
+      if (awaitedBackgroundCompaction) {
+        const activeTokens = getActiveContextTokens(conversation.id);
+        const hardThreshold = Math.floor(
+          config.hardTokenThreshold * lastKnownContextWindow,
+        );
+
+        if (activeTokens < hardThreshold) {
+          const counts = summaryStore.getSummaryCounts(conversation.id);
+          const summary =
+            `[LCM] Background compaction already completed. ` +
+            `${counts.leaf} leaf summaries, ${counts.condensed} condensed summaries. ` +
+            `Full message history is preserved in the LCM database.`;
+
+          ctx.ui.setStatus("lcm", "🟢 LCM active");
+
+          return {
+            compaction: {
+              summary,
+              firstKeptEntryId: event.preparation.firstKeptEntryId,
+              tokensBefore: event.preparation.tokensBefore,
+            },
+          };
+        }
+      }
+
+      // No background compaction was available, or it was not enough — run blocking compaction.
       ctx.ui.setStatus("lcm", "🟡 LCM compacting...");
       isCompacting = true;
 
