@@ -48,11 +48,6 @@ Honcho is a self-hosted memory service that gives Pi persistent, cross-session m
    ```
    This creates `honcho/.env` configured for your current environment (work or home).
    
-   To verify which environment will be used:
-   ```bash
-   chezmoi data | grep environment
-   ```
-
 3. **Start the services:**
    ```bash
    cd honcho
@@ -73,7 +68,7 @@ Honcho is a self-hosted memory service that gives Pi persistent, cross-session m
 
 ## LLM Configuration
 
-The `.env` file is automatically generated from templates based on your environment (work/home). The configuration is managed in `.chezmoitemplates/honcho/`.
+The `.env` file is automatically generated from templates based on your environment (work/home). The configuration is managed in `config` in the project root.
 
 ### Work Environment (LiteLLM Proxy)
 
@@ -109,11 +104,6 @@ These model IDs were verified against the live OpenRouter and Fireworks APIs. Th
 - **Fireworks speed** — The Kimi router is fast and works for higher-effort derivation
 
 ### Customizing Configuration
-
-To modify environment-specific settings, edit the template files:
-- `.chezmoitemplates/honcho/env.base` — Shared configuration
-- `.chezmoitemplates/honcho/env.work` — Work-specific settings
-- `.chezmoitemplates/honcho/env.home` — Home-specific settings
 
 After editing, regenerate `.env`:
 ```bash

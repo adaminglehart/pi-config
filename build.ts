@@ -36,7 +36,6 @@ const PROFILES_DIR = join(ROOT, "profiles");
 const BUILD_DIR = join(ROOT, "build");
 const CONFIG_DIR = join(ROOT, "config");
 
-// Environment detection — same logic as the old chezmoi template
 const HOME_HOSTNAME = "MacBook-Pro.local";
 const environment =
   Bun.env.PI_BUILD_ENV ?? (hostname() === HOME_HOSTNAME ? "home" : "work");

@@ -86,6 +86,7 @@ honcho-env:
     cat config/honcho.env.base > "$TMP"
     printf '\n' >> "$TMP"
     cat "config/$ENV/honcho.env" >> "$TMP"
+    # we use chezmoi just for the templating here, not for broader management of configs
     chezmoi execute-template < "$TMP" > honcho/.env
     rm -f "$TMP"
     echo "✓ honcho/.env generated"
