@@ -386,7 +386,14 @@ async function buildProfile(profileName: string) {
     console.log(`  generated ${configName}.json`);
   }
 
-  // 7. Clean up stale extensions and skills from destination
+  // 7. Copy fnox.toml for encrypted secrets (if it exists)
+  const fnoxPath = join(ROOT, "fnox.toml");
+  if (existsSync(fnoxPath)) {
+    cpSync(fnoxPath, join(outputDir, "fnox.toml"));
+    console.log(`  copied fnox.toml (encrypted secrets)`);
+  }
+
+  // 8. Clean up stale extensions and skills from destination
   const destDir = await getProfileDestDir(profileName);
   cleanupStaleArtifacts(outputDir, destDir, profileName);
 

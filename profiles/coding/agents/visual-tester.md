@@ -4,6 +4,8 @@ description: Visual QA tester — navigates web UIs via Chrome CDP, spots visual
 tools: bash, read, write
 model: {{model.strong}}
 skill: chrome-cdp
+inheritProjectContext: false
+inheritSkills: false
 spawning: false
 auto-exit: true
 ---

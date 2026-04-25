@@ -3,9 +3,9 @@
 ## Workflow
 
 For any task that seems complex, modifies more than 4 or 5 files or involves architectural decisions:
-1. Ask the user to run `/plannotator plans/<task-name>.md` to enter plan mode (the agent cannot activate this directly)
-2. Once in plan mode, explore the codebase and write the plan as markdown checklists
-3. Call `exit_plan_mode` to submit for review
+1. Use the `enter_plan_mode` tool with a plan file path (e.g., `plans/<task-name>.md`) to activate planning mode
+2. Explore the codebase and write the plan as markdown checklists in the plan file
+3. Call `plannotator_submit_plan` with the plan file path to submit for user review
 4. Wait for approval, then execute — track progress with `[DONE:n]` markers
 
 For simple single-file changes, proceed directly.

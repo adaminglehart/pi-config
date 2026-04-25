@@ -1,5 +1,10 @@
 [tools]
 bun = "latest"
+fnox = "latest"
 
 [env]
+# Load from .env as fallback (for users not using fnox)
 _.file = ".env"
+
+[settings]
+experimental = true

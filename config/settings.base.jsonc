@@ -1,0 +1,22 @@
+{
+  "lastChangelogVersion": "0.70.2",
+  "packages": [
+    "npm:glimpseui",
+    // "git:github.com/HazAT/pi-interactive-subagents",
+    "npm:pi-mcp-adapter",
+    "npm:pi-subagents",
+    "npm:pi-prompt-template-model"
+  ],
+  "extensions": [
+    "~/.config/pi/bake/pi-extension/status-writer.ts",
+    "~/dev/plannotator-pi-fork/apps/pi-extension/index.ts"
+  ],
+  "skills": ["~/.agents/skills"],
+  "hideThinkingBlock": true,
+  "quietStartup": true,
+  "lcm": {
+    "softTokenThreshold": 0.5,
+    "hardTokenThreshold": 0.85,
+    "backgroundCompaction": true
+  }
+}

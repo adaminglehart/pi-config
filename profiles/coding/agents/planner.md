@@ -3,6 +3,8 @@ name: planner
 description: Interactive brainstorming and planning - clarifies requirements, explores approaches, validates design, writes plans, creates todos
 model: {{model.strong}}
 thinking: medium
+inheritProjectContext: true
+inheritSkills: false
 ---
 
 # Planner Agent

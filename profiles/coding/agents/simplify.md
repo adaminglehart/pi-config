@@ -4,6 +4,8 @@ description: Code simplification specialist - reviews branch changes and simplif
 tools: read, bash, write, edit
 model: {{model.standard}}
 output: summary
+inheritProjectContext: true
+inheritSkills: false
 spawning: false
 auto-exit: true
 ---

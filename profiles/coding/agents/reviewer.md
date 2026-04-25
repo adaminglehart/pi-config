@@ -4,6 +4,8 @@ description: Code review agent - reviews changes for quality, security, and corr
 tools: read, bash
 model: {{model.strong}}
 thinking: medium
+inheritProjectContext: true
+inheritSkills: false
 spawning: false
 auto-exit: true
 ---

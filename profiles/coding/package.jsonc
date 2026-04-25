@@ -16,6 +16,7 @@
       "lsp",
       "minimal-tools",
       "notify",
+      "subagent",
       "todos",
       "tokens-per-second",
       "webfetch",
@@ -38,7 +39,7 @@
       "home": {
         "model.fast": "accounts/fireworks/routers/kimi-k2p5-turbo",
         "model.standard": "accounts/fireworks/routers/kimi-k2p5-turbo",
-        "model.strong": "openai-codex/gpt-5.4",
+        "model.strong": "openai-codex/gpt-5.5",
         "model.cheap": "accounts/fireworks/routers/kimi-k2p5-turbo",
       },
     },

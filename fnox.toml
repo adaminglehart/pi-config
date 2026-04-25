@@ -1,0 +1,36 @@
+# FNOX configuration for pi-config secrets
+# 
+# Setup:
+# 1. Install fnox: mise install fnox
+# 2. First sync from 1Password: fnox sync --provider op --force
+# 3. For fast cached access: fnox sync --provider age --force
+#
+# Loading secrets:
+# The .mise.toml loads from .env by default. For fnox, either:
+# - Add to your shell config: eval "$(fnox export --format env)"
+# - Or run manually before pi: eval "$(fnox export --format env)"
+# - Or set up a shell wrapper that exports fnox env vars before launching pi
+
+[providers.age]
+type = "age"
+recipients = ["age1q6el4a8vtj0uyzt7447m43mp887z28eqvhmfs3a5nl383wxhpf9szjj9jc"]
+
+[providers.op]
+type = "1password"
+
+[secrets]
+# WebSearch extension - Parallel Web API
+# Get key at: https://platform.parallel.ai
+PARALLEL_API_KEY = { provider = "op", value = "op://dotenv/PARALLEL_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBaQVNEU280aGFjOXFKaVlDY1lpemtaRkttUzhFenArSEVFNXFQbm42N1ZjCmZpbHhTVEQ3TmVpeGswWkhaWEJIUHB4R2RMeTlxRHY3L3liSmpDYmhWMU0KLT4geS1ncmVhc2UgPz8pa2IgL3VRIm4gbyd1IDFtClpSZU5uNkV1aklDWjF1WWlueVJWenQ2dkdVVFUveXNMdlNFdW0rY3daRzJaWE5Ub0o5ZWMKLS0tIDJuVzVjQ3VtbXhBOGJuY2l0WU90ZmhjUVpuRWZEMkZUNDMvV3BDUmdjRG8KpWjf9qNOw+ZJLrwTNmKuR8SILq3iUrWQ8m6loXQ1ecbiDxTIiDnC88j8TNWZIXXflN1aPQoU0cJ1fyspTLljJy2bBw1HY/NB" } }
+
+# Work environment - LiteLLM
+# LITELLM_API_KEY = { provider = "op", value = "op://dotenv/LITELLM_API_KEY/value" }
+
+# Home environment - OpenRouter & Fireworks
+OPENROUTER_API_KEY = { provider = "op", value = "op://dotenv/OPENROUTER_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmWFA2WDZ3WVlYUE14VndFNE1lODIzWWp6UmdTVkpNQ1Z3WkwzY1llSUdjCmZVR2UvOC81UWZwcUJwc1JiMS9DWmYzQVBXUFFCejZYRWVEclBUd1QxVGsKLT4gfT9SaFZPLWdyZWFzZSA3WyBOVnJUJSBGZiBHK3EKSm1NcjJGRDhzU1p0Qm1Ma1RwRTlNQzFkRjJ6Y1ZGWXpFclI5SzUxdThyUW5wRkgxRW9JNmY0TUwzZ3VWVXpEeApBUWVhbUNDNEd5dS90UHVwa0hUaExVNURadlRrY2tCakhWNTJQckdKeUtVMTJCQmpzK3cKLS0tIEIrdVR2aVhMRlJYMTBGTmtMV1dvTDNMYngrWStyMVZ6bVFqYW9Cd0hta2MKzVtliJMpFkfFzZdiH0g813AqziXtsH50DZW/5MBMqI0GNBR6SQ8ortpqsTR2P5scnds42LYOA6S15oFHBwFih+Oa9jZok1MJHzQ5Vz0UNtN2LRVu4dD3F69p2nP6EO5cNW8Jorwkbs9X" } }
+FIREWORKS_API_KEY = { provider = "op", value = "op://dotenv/FIREWORKS_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMUXplUlBnYTR5cjdGWmhiQ1hsRGNaUGhVNVcyVkJYdXkydCsyM2VIMUVZCkFod0QvM3poSVU3bjhsMXoveU9XMkVTS1VXVm1DUWt2b0dVQlc1QW0vVHMKLT4gN0NxUlItZ3JlYXNlCkVkNXY1cG9wQUJUVjVBCi0tLSBFejY1aU9ZTWRtR2E4T3VncnhOdnl4Q0FDR01RV0V6WEpQa2NEWTVkR0hRClHZ3IP88zDIhHFOGocB4ShyDX17bKkP0FjUzMltu0kD5ajN/FSVAqODlAZxUDK9LmpecqaTVCyYBQ==" } }
+ANTHROPIC_API_KEY= { provider = "op", value = "op://dotenv/ANTHROPIC_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBrNGVTWm50UmMzZ1ltK2ZSQ0F1Y0F6Qmo2NnU5TU5LdkxtWkdmL3g3MG5nCnpOcXZwUTVyZ1VqcDJKdUp3RVd6clgwWjIrUWJGVDNsVW1pSCs0YU5NRGMKLT4gdyQhZiMuQSUtZ3JlYXNlIG4gQkJpPmdcICVBID5cczl4WV1ECkFhWUxHaE1QWERKV1NqY2R5Q3pNVFdsVmlFbnJsVDR5Y01aUFJZQ2tjRjVTbUtzCi0tLSBhcjhQVmR6S0NYcERmenZseElrOFk4VGNMemYrZ29KLy9WNkdSSUZRSExzCop8GtDOfnUOUY4i75tXpezl60IQrD34cZRpiblk33M7YK57fEpquOwcAgTqhgHkh+y7gFi1ePLVgqCzoy/XoRlgH6yXHDXVhL7WNmRsbSX960it/oYk1/yYHREMdJYQXdTXvS8yE4I7WGWn93DdKM0ICTrLOzrXTU0C9lRklvbxhNl/cl/5o2QcOlEX" } }
+GEMINI_API_KEY= { provider = "op", value = "op://dotenv/GEMINI_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAxSzdKRlRoNFNWZk5NT1NUMEs2RGczSDhsUlgvdWhXSkpCQktRMlZMWWhrCktITndyMDl6dWljZDhIYnhkRFQxMXdQaVVhK1htZkVsYWhYL0hCbDZ1ZGMKLT4gYC1ncmVhc2UgUUlZIGtSZkMtRSBqOXcKSmZiN3czMEJFQUxYSWc1OEJPWFBRUmMKLS0tIGo0ZjVTYnlMUG5Nd1BQU3B6SkpGS0RVZGk2NXJPYThBOUVreFR3b25pMjgK6fI1vAHo7Gn7RT5SVysanLAAh/ZODGJtE9EnvMv7I/rpj5PmWQAfRj0hwL8+9ZKoJWWSPJXKa4gQuC50DHpdyPfHKOGJFKg=" } }
+OPENAI_API_KEY= { provider = "op", value = "op://dotenv/OPENAI_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSAzNDl2eEJiQlAxRW9TRmpDSFZycVcxMVBFdTdNYU9WOEVJREx5UGY5TlU4Ci9oR3VxN2JHT0pLcjMxNktrWDB2TGEvT0FRbTR3MW1hNGx2Ti9aNG1YRWcKLT4gfCVWei1ncmVhc2UgPTZeICY7XicuTGEgaHtgCmNYUkxkbm1Na2RRanZEQm1kQmt0WlgwVFNYMzNqK0xCQnVUT3JickJ6akFydkZBSXhVY3p0Y1h2T0Jrc3BaK3kKOEcrMkRGQ0M1VW44WG1zTGZ2MkJtL0ZrOTRKaUZRd1JWYWppOGFqWERRTnhScnNqbFZRdlExSWMvSXJxWWcKLS0tIFV5WGoycXZtcUxBUDVJT1hwRGV2UFkrN1hVVHhsVXJGeTZVRWtSYW0vL2cK+7sbjTzqWIzmGWyu60QPc9WOdVAP2remdEhNx6ojXrcanBxRoQndrt5HEO790QjAET9jqGJVlPgoifW2RW7ST5v/gFTf8b+Jo+KeyKjeQJJmOOpDYU0H7Q121SaeDaLOveYPd55CsSvMfPSJHHj14l8N5AIK+totQSPBdpdAEPsIsPeOtI/9IsEQt6sSG0vH1LI9wBJjMJJGeCe+Bg/5GVYTGEVlk6Y1MC+wltmPDPIvjSyfCZfxiCKTbt7Ibv6J/FMUbQ==" } }
+MORPHLLM_API_KEY= { provider = "op", value = "op://dotenv/MORPHLLM_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB0M1RPMk8rbFpSbXQvV3FnTVlPR0JTWkJWdWltcmdmR2Y1SkhBcG9CQ1NNCnZOOGpFK0JBM3ZIaU44blVyZW9lSXRsSm1lNGo0Y1VBdDJkUVBUZGFLSE0KLT4gJXM8Ki1ncmVhc2UgJG1CVVclIFYuJG1ECm0zbEVTejBIakZqQVoyQUExRjExRnNMYXFReno2V2NhWUxLTWc2d3pVNFlUWGFmdk1rRjlwckxjSWRVdVJJZTAKTzZHTTUrZkVjY3RtM04zMHpWQmFEV0xpODJ6b3ZkcE1HY0UKLS0tIEZtajErc2RuYnZra0ZSVnk2N3gwakNhWTBSRTFpb1hCT3hXTFFuUWRCR3cKrJLQUzJmW0+3JgMNmxSz2US1BRLDX1BK7I4Kz8Fe0Gb/SqGnjWs++M3a8Ar0TSvEgEkgb6o1HMtCG1RJD8JFRW64iLeYKX3w6ZTYDsnDupysN9U=" } }
+UIDOTSH_TOKEN= { provider = "op", value = "op://dotenv/UIDOTSH_TOKEN/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB6N3J2UXduYTFNR2NiSGJYQVR2alhFaTJnUXBPR0N3d2RGMHQyM3ptV1drCmNKazNERUlsUjlwSlVHVUxzaHhkaEV1V3RzQUo4S09jOTU5TUZKUk9iMVEKLT4gJzpee2AtZ3JlYXNlIEZmLyogUispYmhXWnAgcy57I2oKR1BzYnBmaVFXek5XWkVpdkJET1ZRMWZqVjZmWEJxdS9kN1JHdDFMNXZKTGd3d2N3TSs2elArSXVLNWxOVHlvRQovOEEKLS0tIDAydmRuLzFkdmxPVDljc01JdjI4MVRJRFVmODZMUGdPcGpxQXBQSnNjeFkKdWq263MZ/YXGdOYMw7OLB4LJ6plHVLr50zL/32EaovTRaoYo5CJaK49jhY0TLrJJzs20Nwsl5bNPbwW+DBKlTg==" } }

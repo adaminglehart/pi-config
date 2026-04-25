@@ -5,6 +5,8 @@ tools: read, bash
 model: {{model.fast}}
 output: context.md
 thinking: medium
+inheritProjectContext: false
+inheritSkills: false
 spawning: false
 auto-exit: true
 ---

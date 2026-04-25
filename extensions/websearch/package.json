@@ -1,0 +1,8 @@
+{
+  "name": "websearch",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "parallel-web": "^0.4.1"
+  }
+}
