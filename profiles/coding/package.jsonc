@@ -6,7 +6,6 @@
     "extensions": [
       "animations",
       "answer",
-      // "context-pilot",
       "cost",
       "custom-footer",
       "lossless-context",
@@ -22,13 +21,7 @@
       "webfetch",
       "websearch",
     ],
-    "skills": [
-      // "context-pilot",
-      "msgvault-api",
-      "pi-extension",
-      // "qmd-search",
-      "session-reader",
-    ],
+    "skills": ["msgvault-api", "pi-extension", "session-reader"],
     "vars": {
       "work": {
         "model.fast": "litellm-google/gemini-3-flash",
