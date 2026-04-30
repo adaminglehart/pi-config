@@ -180,7 +180,11 @@ function renderDirectorySegment(ctx: FooterContext): string {
 
 function renderBranchSegment(ctx: FooterContext): string {
   if (!ctx.gitBranch) return "";
-  const branch = ctx.gitBranch === "detached" ? "◆" : ctx.gitBranch;
+  let branch = ctx.gitBranch === "detached" ? "◆" : ctx.gitBranch;
+  const maxBranchLen = 30;
+  if (branch.length > maxBranchLen) {
+    branch = branch.slice(0, maxBranchLen - 1) + "…";
+  }
   return `${ansi.fg(colors.text)}${ansi.reset}${ansi.fg(colors.model)}${branch}${ansi.reset}`;
 }
 

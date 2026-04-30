@@ -13,6 +13,6 @@ for pkg in "$EXTENSIONS_DIR"/*/package.json; do
   dir="$(dirname "$pkg")"
   if [ ! -d "$dir/node_modules" ] || [ "$pkg" -nt "$dir/node_modules" ]; then
     echo "Installing deps for $(basename "$dir")..."
-    (cd "$dir" && npm install --silent)
+    (cd "$dir" && npm install --silent --min-release-age=0)
   fi
 done

@@ -352,7 +352,8 @@ async function buildProfile(profileName: string) {
     if (
       item === "package.json" ||
       item === "package.jsonc" ||
-      item === "node_modules"
+      item === "node_modules" ||
+      item === "config" // config/ is build-time input only; merged output goes to root-level config files
     )
       continue;
 

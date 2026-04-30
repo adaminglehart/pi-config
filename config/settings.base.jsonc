@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.70.2",
+  "lastChangelogVersion": "0.70.5",
   "packages": [
     "npm:glimpseui",
     // "git:github.com/HazAT/pi-interactive-subagents",
@@ -7,12 +7,12 @@
     "npm:pi-subagents",
     "npm:pi-prompt-template-model",
   ],
-  "extensions": ["~/dev/plannotator-pi-fork/apps/pi-extension/index.ts"],
+  "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],
   "skills": ["~/.agents/skills"],
   "hideThinkingBlock": true,
   "quietStartup": true,
   "lcm": {
-    "softTokenThreshold": 0.5,
+    "softTokenThreshold": 0.65,
     "hardTokenThreshold": 0.85,
     "backgroundCompaction": true,
   },
