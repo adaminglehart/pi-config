@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@mariozechner/pi-ai": "^0.70.6",
-    "@mariozechner/pi-coding-agent": "^0.70.6",
+    "@mariozechner/pi-coding-agent": "^0.72.0",
     "@mariozechner/pi-tui": "^0.70.6",
     "parallel-web": "^0.4.1",
     "typebox": "^1.1.31",
