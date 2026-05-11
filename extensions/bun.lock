@@ -11,7 +11,7 @@
         "@earendil-works/pi-ai": "^0.74.0",
         "@earendil-works/pi-coding-agent": "^0.74.0",
         "@earendil-works/pi-tui": "^0.74.0",
-        "parallel-web": "^0.4.1",
+        "parallel-web": "^0.5.0",
         "typebox": "^1.1.31",
         "typescript": "5.8.2",
         "vscode-languageserver-protocol": "3.17.5",
@@ -417,7 +417,7 @@
 
     "pac-resolver": ["pac-resolver@7.0.1", "", { "dependencies": { "degenerator": "^5.0.0", "netmask": "^2.0.2" } }, ""],
 
-    "parallel-web": ["parallel-web@0.4.1", "", {}, "sha512-kcBwdJxgT+m2D65P5AQ2EtdbmjrA8djoqRT4wr0WCMYnpIEzadTzwJ9zS2N/BT7wTk5rComkQ/2faSUtgZwWCg=="],
+    "parallel-web": ["parallel-web@0.5.0", "", {}, "sha512-p3JR9ENwbXtQJFTn4rWrraYKzHISkG2lwoRmVQceEqepgMtpuE6v/BEMi4yAmGum6ejK2F4DDKLkcqeFxnqztg=="],
 
     "parse5": ["parse5@5.1.1", "", {}, ""],
 
