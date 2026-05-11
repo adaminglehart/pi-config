@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { exec, spawn } from "node:child_process";
 import { promisify } from "node:util";
@@ -108,13 +111,13 @@ async function installDevBrowser(): Promise<boolean> {
   try {
     // Check if npm is available
     await execAsync("which npm");
-    
+
     // Try to install dev-browser globally
     await execAsync("npm install -g dev-browser", { timeout: 120000 });
-    
+
     // Run dev-browser install for Playwright browsers
     await execAsync("dev-browser install", { timeout: 300000 });
-    
+
     return true;
   } catch {
     return false;
@@ -126,11 +129,11 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     // Check if dev-browser is available
     const available = await isDevBrowserAvailable();
-    
+
     if (!available) {
       ctx.ui.notify(
         "dev-browser not found. Run 'npm install -g dev-browser' and 'dev-browser install' to enable browser automation.",
-        "warning"
+        "warning",
       );
     } else {
       ctx.ui.notify("dev-browser extension loaded", "info");
@@ -178,59 +181,57 @@ export default function (pi: ExtensionAPI) {
       script: Type.String({
         description:
           "JavaScript code to execute in the browser sandbox. " +
-          "Example: 'const page = await browser.getPage(\"main\"); await page.goto(\"https://example.com\"); console.log(await page.title());'",
+          'Example: \'const page = await browser.getPage("main"); await page.goto("https://example.com"); console.log(await page.title());\'',
       }),
       browser: Type.Optional(
         Type.String({
-          description: "Browser instance name for isolation (default: 'default')",
+          description:
+            "Browser instance name for isolation (default: 'default')",
           default: "default",
-        })
+        }),
       ),
       headless: Type.Optional(
         Type.Boolean({
           description: "Run browser without visible window (default: true)",
           default: true,
-        })
+        }),
       ),
       connect: Type.Optional(
         Type.String({
           description:
             "Connect to existing Chrome instance via CDP URL (e.g., 'http://localhost:9222'). " +
             "Use 'auto' to auto-discover.",
-        })
+        }),
       ),
       timeout: Type.Optional(
         Type.Number({
           description: "Script timeout in seconds (default: 30)",
           default: 30,
-        })
+        }),
       ),
     }),
 
-    async execute(
-      toolCallId,
-      params,
-      signal,
-      onUpdate,
-      ctx
-    ) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       // Check if dev-browser is available
       const available = await isDevBrowserAvailable();
-      
+
       if (!available) {
         // Try to install it
         onUpdate?.({
           content: [
-            { type: "text", text: "dev-browser not found. Attempting to install..." },
+            {
+              type: "text",
+              text: "dev-browser not found. Attempting to install...",
+            },
           ],
           details: {},
         });
-        
+
         const installed = await installDevBrowser();
         if (!installed) {
           throw new Error(
             "dev-browser is not installed and automatic installation failed. " +
-            "Please install manually: npm install -g dev-browser && dev-browser install"
+              "Please install manually: npm install -g dev-browser && dev-browser install",
           );
         }
       }
@@ -258,7 +259,10 @@ export default function (pi: ExtensionAPI) {
         const stdoutData = JSON.parse(result.stdout);
         if (stdoutData.pages) {
           for (const [name, info] of Object.entries(stdoutData.pages)) {
-            browserState.namedPages.set(name, info as { url: string; title: string });
+            browserState.namedPages.set(
+              name,
+              info as { url: string; title: string },
+            );
           }
         }
       } catch {
@@ -267,11 +271,11 @@ export default function (pi: ExtensionAPI) {
 
       // Format the result
       const output: string[] = [];
-      
+
       if (result.stdout) {
         output.push("STDOUT:", result.stdout);
       }
-      
+
       if (result.stderr) {
         output.push("STDERR:", result.stderr);
       }

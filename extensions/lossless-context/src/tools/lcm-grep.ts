@@ -4,8 +4,8 @@
  */
 
 import { Type } from "typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { RetrievalEngine } from "../retrieval.js";
 
 export function registerGrepTool(
@@ -67,7 +67,10 @@ export function registerGrepTool(
         lines.push("No matches found.");
       }
 
-      return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: {},
+      };
     },
   });
 }

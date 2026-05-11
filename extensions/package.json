@@ -7,9 +7,9 @@
     "postinstall": "rm -f node_modules/.bin/pi node_modules/.bin/pi-ai"
   },
   "devDependencies": {
-    "@mariozechner/pi-ai": "^0.70.6",
-    "@mariozechner/pi-coding-agent": "^0.70.6",
-    "@mariozechner/pi-tui": "^0.70.6",
+    "@earendil-works/pi-ai": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@earendil-works/pi-tui": "^0.74.0",
     "parallel-web": "^0.4.1",
     "typebox": "^1.1.31",
     "typescript": "5.8.2",

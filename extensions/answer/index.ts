@@ -15,13 +15,13 @@ import {
   type Model,
   type Api,
   type UserMessage,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
   ModelRegistry,
-} from "@mariozechner/pi-coding-agent";
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
+import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Editor,
@@ -32,7 +32,7 @@ import {
   type TUI,
   visibleWidth,
   wrapTextWithAnsi,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 
 // Structured output format for question extraction
 interface ExtractedQuestion {
@@ -94,7 +94,9 @@ async function selectExtractionModel(
   const haikuModel = modelRegistry.find(provider, model);
   if (haikuModel) {
     // Use getApiKeyForProvider instead of getApiKey to avoid potential binding issues
-    const apiKey = await modelRegistry.getApiKeyForProvider(haikuModel.provider);
+    const apiKey = await modelRegistry.getApiKeyForProvider(
+      haikuModel.provider,
+    );
     if (apiKey) {
       return haikuModel;
     }
@@ -534,7 +536,10 @@ export default function (pi: ExtensionAPI) {
       return;
     }
     if (typeof ctx.modelRegistry.getApiKeyForProvider !== "function") {
-      ctx.ui.notify("Model registry getApiKeyForProvider method not available", "error");
+      ctx.ui.notify(
+        "Model registry getApiKeyForProvider method not available",
+        "error",
+      );
       return;
     }
 
@@ -547,7 +552,7 @@ export default function (pi: ExtensionAPI) {
     let assistantMessagesChecked = 0;
     for (let i = branch.length - 1; i >= 0; i--) {
       const entry = branch[i];
-      
+
       if (entry.type === "message") {
         const msg = entry.message;
         if (msg.role === "toolResult") {
@@ -555,7 +560,7 @@ export default function (pi: ExtensionAPI) {
         }
         if ("role" in msg && msg.role === "assistant") {
           assistantMessagesChecked++;
-          
+
           // Accept "stop" and "toolUse" (for self-invoked /answer via execute_command)
           if (msg.stopReason !== "stop" && msg.stopReason !== "toolUse") {
             ctx.ui.notify(
@@ -604,7 +609,9 @@ export default function (pi: ExtensionAPI) {
 
         const doExtract = async () => {
           // Use getApiKeyForProvider to avoid potential binding issues
-          const apiKey = await ctx.modelRegistry.getApiKeyForProvider(extractionModel.provider);
+          const apiKey = await ctx.modelRegistry.getApiKeyForProvider(
+            extractionModel.provider,
+          );
           const userMessage: UserMessage = {
             role: "user",
             content: [{ type: "text", text: lastAssistantText! }],

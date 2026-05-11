@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Honcho } from "@honcho-ai/sdk";
 import * as path from "node:path";
@@ -254,7 +254,8 @@ export default function (pi: ExtensionAPI) {
     label: "Honcho Chat",
     description:
       "Query long-term memory about this user. Use this before making assumptions about the user's preferences, workflow, or past decisions — especially at the start of a task, when choosing between approaches, or when you're unsure how the user likes things done. Returns synthesized knowledge from all past sessions.",
-    promptSnippet: "Query long-term memory about the user's preferences, workflow, and past decisions",
+    promptSnippet:
+      "Query long-term memory about the user's preferences, workflow, and past decisions",
     promptGuidelines: [
       "Use honcho_chat before making assumptions about the user's preferences or workflow.",
       "Query at the start of tasks, when choosing between approaches, or when unsure how the user likes things done.",

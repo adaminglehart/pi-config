@@ -210,8 +210,8 @@ No npm dependencies required. Uses:
 - `node:sqlite` (built-in) — SQLite database
 - `node:crypto` — UUID generation and hashing
 - `node:fs` / `node:path` / `node:os` — file operations
-- `@mariozechner/pi-ai` — `completeSimple` for LLM summarization calls
-- `@mariozechner/pi-coding-agent` — Pi extension API
+- `@earendil-works/pi-ai` — `completeSimple` for LLM summarization calls
+- `@earendil-works/pi-coding-agent` — Pi extension API
 - `typebox` — tool parameter schemas
 
 ## Adapted from lossless-claw

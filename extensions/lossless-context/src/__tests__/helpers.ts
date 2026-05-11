@@ -13,7 +13,11 @@ import type { LcmConfig } from "../types.js";
 /**
  * Create an in-memory LcmDatabase with all tables ready.
  */
-export function setupTestDb(): { db: DatabaseSync; drizzleDb: DrizzleDB; hasFts5: boolean } {
+export function setupTestDb(): {
+  db: DatabaseSync;
+  drizzleDb: DrizzleDB;
+  hasFts5: boolean;
+} {
   const lcmDb = new LcmDatabase(":memory:");
   return { db: lcmDb.db, drizzleDb: lcmDb.drizzle, hasFts5: lcmDb.hasFts5 };
 }
@@ -52,7 +56,11 @@ export function makeConfig(overrides: Partial<LcmConfig> = {}): LcmConfig {
 /**
  * Create all three stores sharing a single test db.
  */
-export function createStores(drizzleDb: DrizzleDB, db: DatabaseSync, hasFts5: boolean) {
+export function createStores(
+  drizzleDb: DrizzleDB,
+  db: DatabaseSync,
+  hasFts5: boolean,
+) {
   return {
     conversationStore: new ConversationStore(drizzleDb, db, hasFts5),
     summaryStore: new SummaryStore(drizzleDb, db, hasFts5),
@@ -90,5 +98,5 @@ export function makeModelRegistry() {
   return {
     find: () => ({ id: "test-model", provider: "test" }),
     getApiKeyAndHeaders: async () => ({ apiKey: "test-key", headers: {} }),
-  } as unknown as import("@mariozechner/pi-coding-agent").ModelRegistry;
+  } as unknown as import("@earendil-works/pi-coding-agent").ModelRegistry;
 }

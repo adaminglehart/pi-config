@@ -1,4 +1,7 @@
-import type { ExtensionAPI, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  SessionEntry,
+} from "@earendil-works/pi-coding-agent";
 import type { SessionTreeNode } from "../utils.js";
 import { Type, type Static } from "typebox";
 import {
@@ -12,13 +15,13 @@ const ContextLogParams = Type.Object({
   limit: Type.Optional(
     Type.Number({
       description: "Max visible entries (default: 50).",
-    })
+    }),
   ),
   verbose: Type.Optional(
     Type.Boolean({
       description:
         "If true, show ALL messages. If false (default), show only milestones: user messages, tags, summaries, and branch points.",
-    })
+    }),
   ),
 });
 
@@ -37,7 +40,7 @@ export function registerContextLog(pi: ExtensionAPI) {
       params: Static<typeof ContextLogParams>,
       _signal,
       _onUpdate,
-      ctx
+      ctx,
     ) {
       const sm = ctx.sessionManager;
       const branch = sm.getBranch();
@@ -148,7 +151,7 @@ export function registerContextLog(pi: ExtensionAPI) {
         const marker = isHead ? "*" : role === "USER" ? "•" : "|";
 
         lines.push(
-          `${marker} ${entry.id}${meta ? ` (${meta})` : ""} [${role}] ${body}`
+          `${marker} ${entry.id}${meta ? ` (${meta})` : ""} [${role}] ${body}`,
         );
       }
 
@@ -159,7 +162,12 @@ export function registerContextLog(pi: ExtensionAPI) {
       // Context Dashboard (HUD)
       const usage = await ctx.getContextUsage();
       let usageStr = "Unknown";
-      if (usage && usage.percent !== null && usage.tokens !== null && usage.contextWindow !== null) {
+      if (
+        usage &&
+        usage.percent !== null &&
+        usage.tokens !== null &&
+        usage.contextWindow !== null
+      ) {
         usageStr = `${usage.percent.toFixed(1)}% (${formatTokens(usage.tokens)}/${formatTokens(usage.contextWindow)})`;
       }
 

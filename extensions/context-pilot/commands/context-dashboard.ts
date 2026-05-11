@@ -1,6 +1,6 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Container, Text, Spacer } from "@mariozechner/pi-tui";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Container, Text, Spacer } from "@earendil-works/pi-tui";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { formatTokens } from "../utils.js";
 
 export function registerContextDashboard(pi: ExtensionAPI) {
@@ -82,109 +82,117 @@ export function registerContextDashboard(pi: ExtensionAPI) {
       const toolUseTokens = Math.round(toolUseTokensRaw * ratio);
       const toolResultTokens = Math.round(toolResultTokensRaw * ratio);
 
-      await ctx.ui.custom((tui, theme, kb, done) => {
-        const container = new Container();
-        container.addChild(
-          new DynamicBorder((s: string) => theme.fg("accent", s))
-        );
-        container.addChild(
-          new Text(theme.fg("accent", theme.bold(" Context Usage")), 1, 0)
-        );
-        container.addChild(new Spacer(1));
+      await ctx.ui.custom(
+        (tui, theme, kb, done) => {
+          const container = new Container();
+          container.addChild(
+            new DynamicBorder((s: string) => theme.fg("accent", s)),
+          );
+          container.addChild(
+            new Text(theme.fg("accent", theme.bold(" Context Usage")), 1, 0),
+          );
+          container.addChild(new Spacer(1));
 
-        const categories = [
-          { label: "System Prompt", value: systemTokens, color: "muted" },
-          { label: "System Tools", value: toolDefTokens, color: "dim" },
-          {
-            label: "Tool Call",
-            value: toolUseTokens + toolResultTokens,
-            color: "success",
-          },
-          { label: "Messages", value: msgTokens, color: "accent" },
-        ];
+          const categories = [
+            { label: "System Prompt", value: systemTokens, color: "muted" },
+            { label: "System Tools", value: toolDefTokens, color: "dim" },
+            {
+              label: "Tool Call",
+              value: toolUseTokens + toolResultTokens,
+              color: "success",
+            },
+            { label: "Messages", value: msgTokens, color: "accent" },
+          ];
 
-        const otherTokens = Math.max(
-          0,
-          totalActual -
-            (systemTokens +
-              toolDefTokens +
-              msgTokens +
-              toolUseTokens +
-              toolResultTokens)
-        );
-        if (otherTokens > 10)
-          categories.push({ label: "Other", value: otherTokens, color: "dim" });
+          const otherTokens = Math.max(
+            0,
+            totalActual -
+              (systemTokens +
+                toolDefTokens +
+                msgTokens +
+                toolUseTokens +
+                toolResultTokens),
+          );
+          if (otherTokens > 10)
+            categories.push({
+              label: "Other",
+              value: otherTokens,
+              color: "dim",
+            });
 
-        categories.push({
-          label: "Available",
-          value: Math.max(0, limit - totalActual),
-          color: "borderMuted",
-        });
+          categories.push({
+            label: "Available",
+            value: Math.max(0, limit - totalActual),
+            color: "borderMuted",
+          });
 
-        const gridWidth = 10;
-        const gridHeight = 5;
-        const totalBlocks = gridWidth * gridHeight;
+          const gridWidth = 10;
+          const gridHeight = 5;
+          const totalBlocks = gridWidth * gridHeight;
 
-        const blocks: { color: string; filled: boolean }[] = [];
-        for (const cat of categories) {
-          if (cat.label === "Available") continue;
-          let count = Math.round((cat.value / limit) * totalBlocks);
-          if (count === 0 && cat.value > 0) count = 1;
-          for (let i = 0; i < count && blocks.length < totalBlocks; i++) {
-            blocks.push({ color: cat.color, filled: true });
+          const blocks: { color: string; filled: boolean }[] = [];
+          for (const cat of categories) {
+            if (cat.label === "Available") continue;
+            let count = Math.round((cat.value / limit) * totalBlocks);
+            if (count === 0 && cat.value > 0) count = 1;
+            for (let i = 0; i < count && blocks.length < totalBlocks; i++) {
+              blocks.push({ color: cat.color, filled: true });
+            }
           }
-        }
-        while (blocks.length < totalBlocks) {
-          blocks.push({ color: "borderMuted", filled: false });
-        }
-
-        const gridLines: string[] = [];
-        for (let r = 0; r < gridHeight; r++) {
-          let rowStr = "";
-          for (let c = 0; c < gridWidth; c++) {
-            const b = blocks[r * gridWidth + c];
-            rowStr += theme.fg(b.color as any, b.filled ? "■ " : "□ ");
+          while (blocks.length < totalBlocks) {
+            blocks.push({ color: "borderMuted", filled: false });
           }
-          gridLines.push(rowStr.trimEnd());
-        }
 
-        const percent = limit > 0 ? ((totalActual / limit) * 100).toFixed(1) : "0.0";
-        const totalUsageTitle = `${theme.fg("text", theme.bold("Total Usage".padEnd(16)))} ${theme.fg("text", theme.bold(formatTokens(totalActual).padStart(7)))} ${theme.fg("text", theme.bold(`(${percent.padStart(5)}%)`))}`;
+          const gridLines: string[] = [];
+          for (let r = 0; r < gridHeight; r++) {
+            let rowStr = "";
+            for (let c = 0; c < gridWidth; c++) {
+              const b = blocks[r * gridWidth + c];
+              rowStr += theme.fg(b.color as any, b.filled ? "■ " : "□ ");
+            }
+            gridLines.push(rowStr.trimEnd());
+          }
 
-        const catDetailLines = categories.map((cat) => {
-          const labelStr = cat.label.padEnd(14);
-          const valStr = formatTokens(cat.value).padStart(7);
-          const rowPercent = ((cat.value / limit) * 100)
-            .toFixed(1)
-            .padStart(5);
-          const icon = cat.label === "Available" ? "□" : "■";
-          return `${theme.fg(cat.color as any, icon)} ${theme.fg("text", labelStr)} ${theme.fg("accent", valStr)} (${rowPercent}%)`;
-        });
+          const percent =
+            limit > 0 ? ((totalActual / limit) * 100).toFixed(1) : "0.0";
+          const totalUsageTitle = `${theme.fg("text", theme.bold("Total Usage".padEnd(16)))} ${theme.fg("text", theme.bold(formatTokens(totalActual).padStart(7)))} ${theme.fg("text", theme.bold(`(${percent.padStart(5)}%)`))}`;
 
-        const allDetailLines = [totalUsageTitle, "", ...catDetailLines];
+          const catDetailLines = categories.map((cat) => {
+            const labelStr = cat.label.padEnd(14);
+            const valStr = formatTokens(cat.value).padStart(7);
+            const rowPercent = ((cat.value / limit) * 100)
+              .toFixed(1)
+              .padStart(5);
+            const icon = cat.label === "Available" ? "□" : "■";
+            return `${theme.fg(cat.color as any, icon)} ${theme.fg("text", labelStr)} ${theme.fg("accent", valStr)} (${rowPercent}%)`;
+          });
 
-        const leftSideWidth = 20;
-        const maxH = Math.max(gridLines.length, allDetailLines.length);
-        for (let i = 0; i < maxH; i++) {
-          const left = (gridLines[i] || "").padEnd(leftSideWidth);
-          const right = allDetailLines[i] || "";
-          container.addChild(new Text(`    ${left}      ${right}`, 1, 0));
-        }
+          const allDetailLines = [totalUsageTitle, "", ...catDetailLines];
 
-        container.addChild(new Spacer(1));
-        container.addChild(
-          new Text(theme.fg("dim", " Press any key to close"), 1, 0)
-        );
-        container.addChild(
-          new DynamicBorder((s: string) => theme.fg("accent", s))
-        );
+          const leftSideWidth = 20;
+          const maxH = Math.max(gridLines.length, allDetailLines.length);
+          for (let i = 0; i < maxH; i++) {
+            const left = (gridLines[i] || "").padEnd(leftSideWidth);
+            const right = allDetailLines[i] || "";
+            container.addChild(new Text(`    ${left}      ${right}`, 1, 0));
+          }
 
-        return {
-          render: (w: number) => container.render(w),
-          invalidate: () => container.invalidate(),
-          handleInput: (_data: string) => done(undefined),
-        };
-      }, { overlay: true });
+          container.addChild(new Spacer(1));
+          container.addChild(
+            new Text(theme.fg("dim", " Press any key to close"), 1, 0),
+          );
+          container.addChild(
+            new DynamicBorder((s: string) => theme.fg("accent", s)),
+          );
+
+          return {
+            render: (w: number) => container.render(w),
+            invalidate: () => container.invalidate(),
+            handleInput: (_data: string) => done(undefined),
+          };
+        },
+        { overlay: true },
+      );
     },
   });
 }

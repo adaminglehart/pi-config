@@ -11,12 +11,12 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { Type, type Static } from "typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import type { Diagnostic } from "vscode-languageserver-protocol";
 import {
   getOrCreateManager,
@@ -545,7 +545,8 @@ export default function (pi: ExtensionAPI) {
 
 Actions: definition, references, hover, signature, rename (require file + line/column or query), symbols (file, optional query), diagnostics (file), workspace-diagnostics (files array), codeAction (file + position).
 Use bash to find files: find src -name "*.ts" -type f`,
-    promptSnippet: "Query language server for definitions, references, types, symbols, diagnostics, rename, and code actions",
+    promptSnippet:
+      "Query language server for definitions, references, types, symbols, diagnostics, rename, and code actions",
     promptGuidelines: [
       "Use lsp for code navigation: go to definition, find references, hover for types.",
       "For rename and codeAction, provide file path plus line/column position.",

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { findTagInTree, findTagTarget } from "../utils.js";
 
@@ -11,7 +11,7 @@ const ContextTagParams = Type.Object({
     Type.String({
       description:
         "Entry ID to tag. Defaults to HEAD (current state), skipping internal tool noise.",
-    })
+    }),
   ),
 });
 
@@ -21,7 +21,8 @@ export function registerContextTag(pi: ExtensionAPI) {
     label: "Context Tag",
     description:
       "Create a named bookmark/save-point in the conversation history. Use before risky changes, at task boundaries, or when a feature is stable.",
-    promptSnippet: "Bookmark a point in conversation history with a semantic name",
+    promptSnippet:
+      "Bookmark a point in conversation history with a semantic name",
     parameters: ContextTagParams,
 
     async execute(
@@ -29,7 +30,7 @@ export function registerContextTag(pi: ExtensionAPI) {
       params: Static<typeof ContextTagParams>,
       _signal,
       _onUpdate,
-      ctx
+      ctx,
     ) {
       const sm = ctx.sessionManager;
 

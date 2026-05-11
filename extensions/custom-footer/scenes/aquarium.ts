@@ -1,5 +1,5 @@
 import { ansi, colors } from "../index.js";
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Scene } from "./types.js";
 
 const CONFIG = {

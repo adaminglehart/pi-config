@@ -27,6 +27,16 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    environment:
+      # Override Docker/Orbstack proxy injection - IPv6 CIDR in NO_PROXY breaks httpx
+      - HTTP_PROXY=
+      - http_proxy=
+      - HTTPS_PROXY=
+      - https_proxy=
+      - ALL_PROXY=
+      - all_proxy=
+      - NO_PROXY=
+      - no_proxy=
     extra_hosts:
       - "host.docker.internal:host-gateway"
       # Map the LLM proxy hostname so containers can reach it on the host.
@@ -43,6 +53,14 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    environment:
+      # Override Docker/Orbstack proxy injection - IPv6 CIDR in NO_PROXY breaks httpx
+      - HTTP_PROXY=
+      - http_proxy=
+      - HTTPS_PROXY=
+      - https_proxy=
+      - ALL_PROXY=
+      - all_proxy=
     # The default healthcheck tries to hit localhost:8000 but the deriver has no web server
     healthcheck:
       test: ["CMD-SHELL", "ls /proc/1/status"]

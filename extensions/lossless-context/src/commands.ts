@@ -3,9 +3,12 @@
  * Provides /lcm (status), /lcm context, /lcm backup, /lcm doctor, /lcm doctor fix, /lcm rotate.
  */
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
-import { Container, Text, Spacer } from "@mariozechner/pi-tui";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import { Container, Text, Spacer } from "@earendil-works/pi-tui";
 import type { LcmDatabase } from "./db/connection.js";
 import type { ConversationStore } from "./store/conversation-store.js";
 import type { SummaryStore } from "./store/summary-store.js";
@@ -74,9 +77,10 @@ async function handleStatus(
   const contextItems =
     deps.getContextItemsStore()?.getContextItems(conv.id) ?? [];
   const largeFileStore = deps.getLargeFileStore();
-  const largeFileStats = largeFileStore && conv
-    ? largeFileStore.getLargeFileStats(conv.id)
-    : { count: 0, totalTokens: 0 };
+  const largeFileStats =
+    largeFileStore && conv
+      ? largeFileStore.getLargeFileStats(conv.id)
+      : { count: 0, totalTokens: 0 };
 
   let dbSize = "unknown";
   try {
@@ -94,67 +98,200 @@ async function handleStatus(
     else ctxSummaries++;
   }
 
-  await ctx.ui.custom((_tui, theme, _kb, done) => {
-    const container = new Container();
+  await ctx.ui.custom(
+    (_tui, theme, _kb, done) => {
+      const container = new Container();
 
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-    container.addChild(new Text(theme.fg("accent", theme.bold(" 📚 LCM Status")), 1, 0));
-    container.addChild(new Spacer(1));
+      container.addChild(
+        new DynamicBorder((s: string) => theme.fg("accent", s)),
+      );
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold(" 📚 LCM Status")), 1, 0),
+      );
+      container.addChild(new Spacer(1));
 
-    // Database section
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Database")), 0, 0));
-    container.addChild(new Text(`    Path    ${theme.fg("text", db.getPath())}`, 0, 0));
-    container.addChild(new Text(`    Size    ${theme.fg("text", dbSize)}`, 0, 0));
-    container.addChild(new Text(`    FTS5    ${db.hasFts5 ? theme.fg("success", "✓ enabled") : theme.fg("error", "✗ unavailable")}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Database section
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Database")), 0, 0),
+      );
+      container.addChild(
+        new Text(`    Path    ${theme.fg("text", db.getPath())}`, 0, 0),
+      );
+      container.addChild(
+        new Text(`    Size    ${theme.fg("text", dbSize)}`, 0, 0),
+      );
+      container.addChild(
+        new Text(
+          `    FTS5    ${db.hasFts5 ? theme.fg("success", "✓ enabled") : theme.fg("error", "✗ unavailable")}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
 
-    // Conversation section
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Conversation")), 0, 0));
-    container.addChild(new Text(`    Session ${theme.fg("text", conv.session_key)}`, 0, 0));
-    container.addChild(new Text(`    ID      ${theme.fg("dim", conv.id)}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Conversation section
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Conversation")), 0, 0),
+      );
+      container.addChild(
+        new Text(`    Session ${theme.fg("text", conv.session_key)}`, 0, 0),
+      );
+      container.addChild(
+        new Text(`    ID      ${theme.fg("dim", conv.id)}`, 0, 0),
+      );
+      container.addChild(new Spacer(1));
 
-    // Data section
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Data")), 0, 0));
-    container.addChild(new Text(`    Raw messages        ${theme.fg("text", String(messageCount))}`, 0, 0));
-    container.addChild(new Text(`    Leaf summaries      ${theme.fg("text", String(counts.leaf))}`, 0, 0));
-    container.addChild(new Text(`    Condensed summaries ${theme.fg("text", String(counts.condensed))}`, 0, 0));
-    container.addChild(new Text(`    Large files         ${theme.fg("text", String(largeFileStats.count))}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Data section
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Data")), 0, 0),
+      );
+      container.addChild(
+        new Text(
+          `    Raw messages        ${theme.fg("text", String(messageCount))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Leaf summaries      ${theme.fg("text", String(counts.leaf))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Condensed summaries ${theme.fg("text", String(counts.condensed))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Large files         ${theme.fg("text", String(largeFileStats.count))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
 
-    // Context items section
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Active Context")), 0, 0));
-    container.addChild(new Text(`    Total items         ${theme.fg("text", String(contextItems.length))}`, 0, 0));
-    container.addChild(new Text(`    Messages            ${theme.fg("text", String(ctxMessages))}`, 0, 0));
-    container.addChild(new Text(`    Summaries           ${theme.fg("text", String(ctxSummaries))}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Context items section
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Active Context")), 0, 0),
+      );
+      container.addChild(
+        new Text(
+          `    Total items         ${theme.fg("text", String(contextItems.length))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Messages            ${theme.fg("text", String(ctxMessages))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Summaries           ${theme.fg("text", String(ctxSummaries))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
 
-    // Config section
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Configuration")), 0, 0));
-    container.addChild(new Text(`    Model               ${theme.fg("text", `${config.summaryProvider}/${config.summaryModel}`)}`, 0, 0));
-    container.addChild(new Text(`    Assembly budget     ${theme.fg("text", String(config.contextThreshold))}`, 0, 0));
-    container.addChild(new Text(`    Fresh tail count    ${theme.fg("text", String(config.freshTailCount))}`, 0, 0));
-    container.addChild(new Text(`    Leaf chunk tokens   ${theme.fg("text", String(config.leafChunkTokens))}`, 0, 0));
-    container.addChild(new Text(`    Max depth           ${theme.fg("text", String(config.incrementalMaxDepth))}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Config section
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Configuration")), 0, 0),
+      );
+      container.addChild(
+        new Text(
+          `    Model               ${theme.fg("text", `${config.summaryProvider}/${config.summaryModel}`)}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Assembly budget     ${theme.fg("text", String(config.contextThreshold))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Fresh tail count    ${theme.fg("text", String(config.freshTailCount))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Leaf chunk tokens   ${theme.fg("text", String(config.leafChunkTokens))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    Max depth           ${theme.fg("text", String(config.incrementalMaxDepth))}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
 
-    // Commands help
-    container.addChild(new Text(theme.fg("accent", theme.bold("  Commands")), 0, 0));
-    container.addChild(new Text(`    ${theme.fg("text", "/lcm backup")}      ${theme.fg("dim", "Create timestamped DB backup")}`, 0, 0));
-    container.addChild(new Text(`    ${theme.fg("text", "/lcm doctor")}      ${theme.fg("dim", "Check DAG integrity")}`, 0, 0));
-    container.addChild(new Text(`    ${theme.fg("text", "/lcm doctor fix")}  ${theme.fg("dim", "Check and repair DAG issues")}`, 0, 0));
-    container.addChild(new Text(`    ${theme.fg("text", "/lcm rotate")}      ${theme.fg("dim", "Force-compact raw messages")}`, 0, 0));
-    container.addChild(new Spacer(1));
+      // Commands help
+      container.addChild(
+        new Text(theme.fg("accent", theme.bold("  Commands")), 0, 0),
+      );
+      container.addChild(
+        new Text(
+          `    ${theme.fg("text", "/lcm backup")}      ${theme.fg("dim", "Create timestamped DB backup")}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    ${theme.fg("text", "/lcm doctor")}      ${theme.fg("dim", "Check DAG integrity")}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    ${theme.fg("text", "/lcm doctor fix")}  ${theme.fg("dim", "Check and repair DAG issues")}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          `    ${theme.fg("text", "/lcm rotate")}      ${theme.fg("dim", "Force-compact raw messages")}`,
+          0,
+          0,
+        ),
+      );
+      container.addChild(new Spacer(1));
 
-    container.addChild(new Text(theme.fg("dim", "  Press any key to close"), 0, 0));
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+      container.addChild(
+        new Text(theme.fg("dim", "  Press any key to close"), 0, 0),
+      );
+      container.addChild(
+        new DynamicBorder((s: string) => theme.fg("accent", s)),
+      );
 
-    return {
-      render: (w: number) => container.render(w),
-      invalidate: () => container.invalidate(),
-      handleInput: (_data: string) => done(undefined),
-    };
-  }, { overlay: true });
+      return {
+        render: (w: number) => container.render(w),
+        invalidate: () => container.invalidate(),
+        handleInput: (_data: string) => done(undefined),
+      };
+    },
+    { overlay: true },
+  );
 }
 
 async function handleContext(
@@ -205,10 +342,16 @@ async function handleContext(
   lines.push("");
   lines.push("## Overview");
   lines.push("");
-  lines.push(`- Context items: ${contextItems.length} (${ctxSummaries} summaries + ${ctxMessages} messages)`);
-  lines.push(`- Summaries in DB: ${counts.total} (${counts.leaf} leaf, ${counts.condensed} condensed)`);
+  lines.push(
+    `- Context items: ${contextItems.length} (${ctxSummaries} summaries + ${ctxMessages} messages)`,
+  );
+  lines.push(
+    `- Summaries in DB: ${counts.total} (${counts.leaf} leaf, ${counts.condensed} condensed)`,
+  );
   lines.push(`- Injected messages: ${summaryMessages.length}`);
-  lines.push(`- Token budget: ${tokenBudget.toLocaleString()} (assembly budget fraction: ${config.contextThreshold})`);
+  lines.push(
+    `- Token budget: ${tokenBudget.toLocaleString()} (assembly budget fraction: ${config.contextThreshold})`,
+  );
   lines.push(`- Fresh tail count: ${config.freshTailCount}`);
   lines.push("");
 

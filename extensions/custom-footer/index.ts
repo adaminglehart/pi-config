@@ -14,9 +14,13 @@ import type {
   ReadonlyFooterDataProvider,
   SessionMessageEntry,
   Theme,
-} from "@mariozechner/pi-coding-agent";
-import type { Api, Model } from "@mariozechner/pi-ai";
-import { truncateToWidth, visibleWidth, type TUI } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import {
+  truncateToWidth,
+  visibleWidth,
+  type TUI,
+} from "@earendil-works/pi-tui";
 import {
   startAnimation,
   stopAnimation,
@@ -288,18 +292,27 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const line1CenterWidth = visibleWidth(line1Center);
   const line1RightWidth = visibleWidth(line1Right);
   const minGap = 4; // minimum gap on each side of center
-  const availableForCenter = mainWidth - line1LeftWidth - line1RightWidth - (minGap * 2);
-  
+  const availableForCenter =
+    mainWidth - line1LeftWidth - line1RightWidth - minGap * 2;
+
   let line1Content: string;
   if (line1CenterWidth <= availableForCenter) {
     // Center fits with gaps
-    const totalGap = mainWidth - line1LeftWidth - line1CenterWidth - line1RightWidth;
+    const totalGap =
+      mainWidth - line1LeftWidth - line1CenterWidth - line1RightWidth;
     const leftGap = Math.floor(totalGap / 2);
     const rightGap = totalGap - leftGap;
-    line1Content = line1Left + " ".repeat(leftGap) + line1Center + " ".repeat(rightGap) + line1Right;
+    line1Content =
+      line1Left +
+      " ".repeat(leftGap) +
+      line1Center +
+      " ".repeat(rightGap) +
+      line1Right;
   } else {
     // Center too wide, just use single space separation
-    line1Content = [line1Left, line1Center, line1Right].filter(Boolean).join(" ");
+    line1Content = [line1Left, line1Center, line1Right]
+      .filter(Boolean)
+      .join(" ");
   }
 
   // Line 2 Content: pricing (with session cost), extension statuses (centered)
@@ -315,7 +328,8 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   const line2TotalPad = Math.max(0, mainWidth - line2ContentWidth);
   const line2LeftPad = Math.floor(line2TotalPad / 2);
   const line2RightPad = line2TotalPad - line2LeftPad;
-  const line2Padded = " ".repeat(line2LeftPad) + line2Content + " ".repeat(line2RightPad);
+  const line2Padded =
+    " ".repeat(line2LeftPad) + line2Content + " ".repeat(line2RightPad);
 
   // Build the final array of lines
   const resultLines: string[] = [];

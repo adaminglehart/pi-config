@@ -4,7 +4,7 @@
  */
 
 import type { DatabaseSync } from "node:sqlite";
-import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { LcmConfig } from "./types.js";
 import { ConversationStore } from "./store/conversation-store.js";
 import { SummaryStore } from "./store/summary-store.js";
@@ -60,11 +60,16 @@ export class CompactionEngine {
       const item = contextItems[i];
       if (item.item_type !== "message" || !item.message_id) continue;
 
-      const message = this.deps.conversationStore.getMessageById(item.message_id);
+      const message = this.deps.conversationStore.getMessageById(
+        item.message_id,
+      );
       const tokens = message?.token_count ?? 0;
       messagesSeen++;
 
-      if (messagesSeen <= freshTailCount && freshTailTokens + tokens <= freshTailMaxTokens) {
+      if (
+        messagesSeen <= freshTailCount &&
+        freshTailTokens + tokens <= freshTailMaxTokens
+      ) {
         freshTailIndices.add(i);
         freshTailTokens += tokens;
       }
@@ -80,7 +85,9 @@ export class CompactionEngine {
       if (!item) continue;
 
       if (item.item_type === "message" && item.message_id) {
-        const message = this.deps.conversationStore.getMessageById(item.message_id);
+        const message = this.deps.conversationStore.getMessageById(
+          item.message_id,
+        );
         if (message) {
           totalTokens += message.token_count;
           if (
@@ -136,11 +143,16 @@ export class CompactionEngine {
       const item = contextItems[i];
       if (item.item_type !== "message" || !item.message_id) continue;
 
-      const message = this.deps.conversationStore.getMessageById(item.message_id);
+      const message = this.deps.conversationStore.getMessageById(
+        item.message_id,
+      );
       const tokens = message?.token_count ?? 0;
       messagesSeen++;
 
-      if (messagesSeen > freshTailCount || freshTailTokens + tokens > freshTailMaxTokens) {
+      if (
+        messagesSeen > freshTailCount ||
+        freshTailTokens + tokens > freshTailMaxTokens
+      ) {
         // This message is beyond the fresh tail — everything at or before this index is evictable
         freshTailStart = i;
         break;
@@ -175,7 +187,8 @@ export class CompactionEngine {
     // on subsequent compaction passes.
     if (
       chunks.length >= 2 &&
-      chunks[chunks.length - 1].messageIds.length < this.deps.config.leafMinFanout
+      chunks[chunks.length - 1].messageIds.length <
+        this.deps.config.leafMinFanout
     ) {
       const last = chunks.pop()!;
       const prev = chunks[chunks.length - 1];
@@ -199,9 +212,7 @@ export class CompactionEngine {
       // Fetch full message content
       const messages = chunk.messageIds
         .map((id) => this.deps.conversationStore.getMessageById(id))
-        .filter(
-          (msg): msg is NonNullable<typeof msg> => msg !== undefined,
-        );
+        .filter((msg): msg is NonNullable<typeof msg> => msg !== undefined);
 
       if (messages.length === 0) {
         continue;
@@ -281,9 +292,7 @@ export class CompactionEngine {
     });
 
     // Check minimum fanout
-    if (
-      sourceSummaryItems.length < this.deps.config.condensedMinFanout
-    ) {
+    if (sourceSummaryItems.length < this.deps.config.condensedMinFanout) {
       return;
     }
 
@@ -353,8 +362,7 @@ export class CompactionEngine {
     }>,
     chunkTokens: number,
   ): Array<{ messageIds: string[]; ordinals: number[] }> {
-    const chunks: Array<{ messageIds: string[]; ordinals: number[] }> =
-      [];
+    const chunks: Array<{ messageIds: string[]; ordinals: number[] }> = [];
     let currentChunk: { messageIds: string[]; ordinals: number[] } = {
       messageIds: [],
       ordinals: [],

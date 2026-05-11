@@ -4,8 +4,11 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
-import { completeSimple } from "@mariozechner/pi-ai";
+import type {
+  ExtensionAPI,
+  ModelRegistry,
+} from "@earendil-works/pi-coding-agent";
+import { completeSimple } from "@earendil-works/pi-ai";
 import type { RetrievalEngine } from "../retrieval.js";
 import type { LcmConfig } from "../types.js";
 
@@ -51,12 +54,7 @@ export function registerExpandQueryTool(
       const maxTokens = params.max_tokens ?? config.maxExpandTokens;
 
       // Step 1: Find relevant summaries via grep
-      const grepResult = engine.grep(
-        params.query,
-        conversationId,
-        "both",
-        10,
-      );
+      const grepResult = engine.grep(params.query, conversationId, "both", 10);
 
       // Step 2: Expand the most relevant summaries
       const expandedContext: string[] = [];

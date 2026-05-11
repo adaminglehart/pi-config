@@ -1,9 +1,14 @@
 import type {
   ExtensionAPI,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
-import { resolveTargetId, findTagInTree, getCommandCtx, setPendingCheckout } from "../utils.js";
+import {
+  resolveTargetId,
+  findTagInTree,
+  getCommandCtx,
+  setPendingCheckout,
+} from "../utils.js";
 
 const ContextCheckoutParams = Type.Object({
   target: Type.String({
@@ -18,7 +23,7 @@ const ContextCheckoutParams = Type.Object({
     Type.String({
       description:
         "Optional tag to apply to the CURRENT state before checkout. Creates a backup you can return to.",
-    })
+    }),
   ),
 });
 
@@ -42,14 +47,12 @@ export function registerContextCheckout(pi: ExtensionAPI) {
       params: CheckoutParams,
       _signal,
       _onUpdate,
-      ctx
+      ctx,
     ) {
       const sm = ctx.sessionManager as any;
       const cmdCtx = getCommandCtx(sm);
       if (!cmdCtx) {
-        ctx.ui.setEditorText(
-          `/acm ${ctx.ui.getEditorText() || "continue"}`
-        );
+        ctx.ui.setEditorText(`/acm ${ctx.ui.getEditorText() || "continue"}`);
         return {
           content: [
             {
@@ -124,13 +127,16 @@ export function registerContextCheckout(pi: ExtensionAPI) {
       const branchId = sm.branchWithSummary(targetId, enrichedMessage);
 
       // Queue the checkout for turn_end → agent_end lifecycle
-      setPendingCheckout({
-        branchId,
-        targetId,
-        target: params.target,
-        enrichedMessage,
-        backupTag: params.backupTag,
-      }, sm);
+      setPendingCheckout(
+        {
+          branchId,
+          targetId,
+          target: params.target,
+          enrichedMessage,
+          backupTag: params.backupTag,
+        },
+        sm,
+      );
 
       return {
         content: [

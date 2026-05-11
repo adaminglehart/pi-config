@@ -13,15 +13,15 @@ import type {
   ToolRenderResultOptions,
   Theme,
   ToolDefinition,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   formatSize,
   truncateHead,
-} from "@mariozechner/pi-coding-agent";
-import { Text, type TUI, type Component } from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-coding-agent";
+import { Text, type TUI, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -198,7 +198,8 @@ Features:
 - Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} if too large
 
 Use this tool when you need to retrieve and analyze web content.`,
-    promptSnippet: "Fetch content from a URL and convert to markdown, text, or html",
+    promptSnippet:
+      "Fetch content from a URL and convert to markdown, text, or html",
     promptGuidelines: [
       "Use webfetch when you need to retrieve and analyze web content.",
       "URL must start with http:// or https://",

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerContextTag } from "./tools/context-tag.js";
 import { registerContextLog } from "./tools/context-log.js";
 import { registerContextCheckout } from "./tools/context-checkout.js";
@@ -40,7 +40,7 @@ export default function contextPilot(pi: ExtensionAPI) {
           content: "use context-management skill",
           display: false,
         },
-        { deliverAs: "followUp" }
+        { deliverAs: "followUp" },
       );
       if (args) {
         pi.sendUserMessage(args);
@@ -74,7 +74,7 @@ export default function contextPilot(pi: ExtensionAPI) {
 
       cmdCtx.ui.notify(
         `Checked out '${checkout.target}' (${checkout.targetId})${checkout.backupTag ? `\nBackup tag: ${checkout.backupTag}` : ""}`,
-        "info"
+        "info",
       );
 
       pi.sendMessage(
@@ -83,7 +83,7 @@ export default function contextPilot(pi: ExtensionAPI) {
           content: `context_checkout complete. Summary from previous branch:\n\n${checkout.enrichedMessage}\n\nRead the summary above carefully. Execute the 'Next Step' from it.`,
           display: false,
         },
-        { triggerTurn: true }
+        { triggerTurn: true },
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

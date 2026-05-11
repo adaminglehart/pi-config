@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.70.5",
+  "lastChangelogVersion": "0.74.0",
   "packages": [
     "npm:glimpseui",
     // "git:github.com/HazAT/pi-interactive-subagents",

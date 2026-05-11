@@ -1,8 +1,8 @@
 import type {
   ExtensionAPI,
   ModelRegistry,
-} from "@mariozechner/pi-coding-agent";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
+} from "@earendil-works/pi-coding-agent";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { appendFileSync } from "node:fs";
 import { loadLcmConfig } from "./src/config.js";
 import { LcmDatabase } from "./src/db/connection.js";
@@ -109,7 +109,9 @@ export default function (pi: ExtensionAPI) {
       conversationStore
         .getMessages(conversation.id)
         .map((message) => message.identity_hash)
-        .filter((hash): hash is string => typeof hash === "string" && hash.length > 0),
+        .filter(
+          (hash): hash is string => typeof hash === "string" && hash.length > 0,
+        ),
     );
 
     const tail: AgentMessage[] = [];
@@ -342,7 +344,9 @@ export default function (pi: ExtensionAPI) {
     if (contextUsage) {
       lastKnownContextTokens = contextUsage.tokens ?? lastKnownContextTokens;
       lastKnownContextPercent = contextUsage.percent ?? lastKnownContextPercent;
-      lcmLog(`[CONTEXT] tokens=${contextUsage.tokens}, percent=${contextUsage.percent?.toFixed(1)}%, window=${contextUsage.contextWindow}`);
+      lcmLog(
+        `[CONTEXT] tokens=${contextUsage.tokens}, percent=${contextUsage.percent?.toFixed(1)}%, window=${contextUsage.contextWindow}`,
+      );
     } else {
       lcmLog(`[CONTEXT] getContextUsage not available, using fallback`);
     }
@@ -357,8 +361,12 @@ export default function (pi: ExtensionAPI) {
       const assembled = assembler.assemble(conversation.id, tokenBudget);
 
       if (assembled.messages.length > 0) {
-        const unstoredTail = getUnstoredEventTail(event.messages as AgentMessage[]);
-        lcmLog(`[CONTEXT] assembled ${assembled.messages.length} messages (${assembled.totalTokens} tokens), ${assembled.summaryCount} summaries, ${assembled.messageCount} fresh messages, ${unstoredTail.length} unstored tail messages`);
+        const unstoredTail = getUnstoredEventTail(
+          event.messages as AgentMessage[],
+        );
+        lcmLog(
+          `[CONTEXT] assembled ${assembled.messages.length} messages (${assembled.totalTokens} tokens), ${assembled.summaryCount} summaries, ${assembled.messageCount} fresh messages, ${unstoredTail.length} unstored tail messages`,
+        );
         // Return LCM-assembled context plus the current not-yet-persisted turn.
         return {
           messages: [...assembled.messages, ...unstoredTail] as AgentMessage[],

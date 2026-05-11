@@ -1,7 +1,7 @@
 import type {
   AgentToolResult,
   ExtensionAPI,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { randomUUID } from "node:crypto";
 import { createStore, type QMDStore, type SearchOptions } from "@tobilu/qmd";

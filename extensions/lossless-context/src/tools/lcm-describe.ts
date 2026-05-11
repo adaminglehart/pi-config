@@ -4,7 +4,7 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { RetrievalEngine } from "../retrieval.js";
 
 export function registerDescribeTool(
@@ -71,7 +71,10 @@ export function registerDescribeTool(
         for (const mid of result.sourceMessageIds) lines.push(`- ${mid}`);
       }
 
-      return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: {},
+      };
     },
   });
 }

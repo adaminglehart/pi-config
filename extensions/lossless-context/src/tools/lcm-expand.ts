@@ -5,7 +5,7 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { RetrievalEngine } from "../retrieval.js";
 import type { LcmConfig } from "../types.js";
 
@@ -62,12 +62,13 @@ export function registerExpandTool(
       }
 
       if (result.items.length === 0) {
-        lines.push(
-          "\nNo items found (source messages may have been pruned).",
-        );
+        lines.push("\nNo items found (source messages may have been pruned).");
       }
 
-      return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: {},
+      };
     },
   });
 }

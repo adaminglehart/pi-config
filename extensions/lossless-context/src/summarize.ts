@@ -3,8 +3,8 @@
  * Uses Pi's model registry and completeSimple API.
  */
 
-import { completeSimple } from "@mariozechner/pi-ai";
-import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { completeSimple } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { LcmConfig } from "./types.js";
 import {
   SUMMARIZATION_SYSTEM_PROMPT,

@@ -1,14 +1,18 @@
 import type {
   SessionEntry,
   ExtensionCommandContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 // SessionTreeNode is not exported from pi-coding-agent, define locally
 export interface SessionTreeNode {
   entry: SessionEntry;
   children: SessionTreeNode[];
 }
-import type { TextContent, ImageContent, ToolCall } from "@mariozechner/pi-ai";
+import type {
+  TextContent,
+  ImageContent,
+  ToolCall,
+} from "@earendil-works/pi-ai";
 
 // --- Session-scoped state for checkout flow ---
 // CommandCtx captures ExtensionCommandContext from /acm (only source of navigateTree).
@@ -17,7 +21,7 @@ import type { TextContent, ImageContent, ToolCall } from "@mariozechner/pi-ai";
 // Use WeakMaps keyed by sessionManager to ensure each session has isolated state.
 // This prevents state pollution across forked sessions running in the same process.
 
-import type { SessionManager } from "@mariozechner/pi-coding-agent";
+import type { SessionManager } from "@earendil-works/pi-coding-agent";
 
 const commandCtxMap = new WeakMap<SessionManager, ExtensionCommandContext>();
 
@@ -30,19 +34,29 @@ export interface PendingCheckout {
 }
 const pendingCheckoutMap = new WeakMap<SessionManager, PendingCheckout>();
 
-export function getCommandCtx(sm?: SessionManager): ExtensionCommandContext | null {
+export function getCommandCtx(
+  sm?: SessionManager,
+): ExtensionCommandContext | null {
   return sm ? commandCtxMap.get(sm) || null : null;
 }
 
-export function setCommandCtx(ctx: ExtensionCommandContext, sm: SessionManager): void {
+export function setCommandCtx(
+  ctx: ExtensionCommandContext,
+  sm: SessionManager,
+): void {
   commandCtxMap.set(sm, ctx);
 }
 
-export function getPendingCheckout(sm?: SessionManager): PendingCheckout | null {
+export function getPendingCheckout(
+  sm?: SessionManager,
+): PendingCheckout | null {
   return sm ? pendingCheckoutMap.get(sm) || null : null;
 }
 
-export function setPendingCheckout(checkout: PendingCheckout | null, sm: SessionManager): void {
+export function setPendingCheckout(
+  checkout: PendingCheckout | null,
+  sm: SessionManager,
+): void {
   if (checkout === null) {
     pendingCheckoutMap.delete(sm);
   } else {
@@ -52,7 +66,11 @@ export function setPendingCheckout(checkout: PendingCheckout | null, sm: Session
 
 // --- Constants and helpers ---
 
-export const INTERNAL_TOOLS = ["context_tag", "context_log", "context_checkout"];
+export const INTERNAL_TOOLS = [
+  "context_tag",
+  "context_log",
+  "context_checkout",
+];
 
 export const isInternalTool = (name: string): boolean =>
   INTERNAL_TOOLS.includes(name);
@@ -99,7 +117,7 @@ export const resolveTargetId = (sm: ReadonlySM, target: string): string => {
 /** Check if a tag name already exists anywhere in the tree. */
 export const findTagInTree = (
   sm: ReadonlySM,
-  tagName: string
+  tagName: string,
 ): string | null => {
   const stack: SessionTreeNode[] = [...sm.getTree()];
   while (stack.length > 0) {
@@ -127,10 +145,10 @@ export const findTagTarget = (sm: ReadonlySM): string | null => {
       // Skip assistant messages that ONLY call our internal tools
       if (msg.role === "assistant" && Array.isArray(msg.content)) {
         const toolCalls = msg.content.filter(
-          (c): c is ToolCall => c.type === "toolCall"
+          (c): c is ToolCall => c.type === "toolCall",
         );
         const hasText = msg.content.some(
-          (c) => c.type === "text" && c.text.trim().length > 0
+          (c) => c.type === "text" && c.text.trim().length > 0,
         );
         if (
           toolCalls.length > 0 &&
@@ -174,7 +192,7 @@ export const getEntryRole = (entry: SessionEntry): string => {
 /** Extract a one-line content preview from any entry type. */
 export const getEntryContent = (
   entry: SessionEntry,
-  verbose: boolean
+  verbose: boolean,
 ): string => {
   if (entry.type === "branch_summary" || entry.type === "compaction") {
     return entry.summary || "[No summary]";
@@ -188,9 +206,7 @@ export const getEntryContent = (
     if (!verbose && isInternalTool(msg.toolName)) return "";
 
     const text = msg.content
-      .map((p: TextContent | ImageContent) =>
-        p.type === "text" ? p.text : ""
-      )
+      .map((p: TextContent | ImageContent) => (p.type === "text" ? p.text : ""))
       .join(" ")
       .trim();
 
@@ -214,7 +230,7 @@ export const getEntryContent = (
     } else if (Array.isArray(msg.content)) {
       text = msg.content
         .map((p: { type: string; text?: string }) =>
-          p.type === "text" ? (p.text ?? "") : ""
+          p.type === "text" ? (p.text ?? "") : "",
         )
         .join(" ")
         .trim();
@@ -222,10 +238,10 @@ export const getEntryContent = (
 
     if (msg.role === "assistant" && Array.isArray(msg.content)) {
       const toolCalls = msg.content.filter(
-        (c): c is ToolCall => c.type === "toolCall"
+        (c): c is ToolCall => c.type === "toolCall",
       );
       const visibleCalls = toolCalls.filter(
-        (tc) => verbose || !isInternalTool(tc.name)
+        (tc) => verbose || !isInternalTool(tc.name),
       );
       if (visibleCalls.length > 0) {
         const callsStr = visibleCalls

@@ -16,13 +16,13 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     // Skip startup info on reload and resume
     if (event.reason === "reload" || event.reason === "resume") return;
-    
+
     await sendCustomStartupInfo(ctx);
   });
 
