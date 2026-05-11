@@ -13,7 +13,7 @@
         "@earendil-works/pi-tui": "^0.74.0",
         "parallel-web": "^0.4.1",
         "typebox": "^1.1.31",
-        "typescript": "5.8.2",
+        "typescript": "5.9.3",
         "vscode-languageserver-protocol": "3.17.5",
       },
     },
@@ -479,7 +479,7 @@
 
     "typebox": ["typebox@1.1.31", "", {}, ""],
 
-    "typescript": ["typescript@5.8.2", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, ""],
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "uint8array-extras": ["uint8array-extras@1.5.0", "", {}, ""],
 

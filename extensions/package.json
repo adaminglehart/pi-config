@@ -12,7 +12,7 @@
     "@earendil-works/pi-tui": "^0.74.0",
     "parallel-web": "^0.4.1",
     "typebox": "^1.1.31",
-    "typescript": "5.8.2",
+    "typescript": "5.9.3",
     "vscode-languageserver-protocol": "3.17.5"
   },
   "dependencies": {
