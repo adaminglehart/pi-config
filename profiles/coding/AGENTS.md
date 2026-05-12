@@ -22,6 +22,9 @@ Plans live in the `plans/` directory in the project root, named by feature:
 
 - if asked to create, edit, or in any way modify a pi extension, do it in the correct pi configuration location under the pi-config repo (which corresponds to ~/.pi). For example, since an extension needs to end up in ~/.pi/agent/extensions, it should go in ~/dev/pi-config/agent/extensions
 
+## Tools
+
+- use ripgrep (rg) for searching files, *not* standard grep
 
 ## Honcho (Long-Term Memory)
 
