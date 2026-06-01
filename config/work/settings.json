@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "litellm-anthropic",
-  "defaultModel": "claude-sonnet-4-6",
+  "defaultProvider": "litellm-openai",
+  "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
   "enabledModels": [
     "litellm-anthropic/claude-opus-4-6",
@@ -9,9 +9,9 @@
     "litellm-anthropic/claude-sonnet-4-6-1m",
     "litellm-anthropic/claude-4.5-haiku",
     "litellm-anthropic/claude-opus-4-7",
+    "litellm-openai/gpt-5.5",
     "litellm-openai/gpt-5.4",
     "litellm-openai/gpt-5.4-pro",
-    "litellm-openai/gpt-5.3-codex",
     "litellm-google/gemini-3.1-pro",
     "litellm-google/gemini-3-flash"
   ],
