@@ -386,11 +386,13 @@ async function buildProfile(profileName: string) {
     console.log(`  generated ${configName}.json`);
   }
 
-  // 7. Copy fnox.toml for encrypted secrets (if it exists)
-  const fnoxPath = join(ROOT, "fnox.toml");
+  // 7. Copy fnox.toml for encrypted secrets (environment-specific if available)
+  const envFnoxPath = join(CONFIG_DIR, environment, "fnox.toml");
+  const baseFnoxPath = join(ROOT, "fnox.toml");
+  const fnoxPath = existsSync(envFnoxPath) ? envFnoxPath : baseFnoxPath;
   if (existsSync(fnoxPath)) {
     cpSync(fnoxPath, join(outputDir, "fnox.toml"));
-    console.log(`  copied fnox.toml (encrypted secrets)`);
+    console.log(`  copied ${fnoxPath === envFnoxPath ? `${environment}/` : ""}fnox.toml (encrypted secrets)`);
   }
 
   // 8. Clean up stale extensions and skills from destination
