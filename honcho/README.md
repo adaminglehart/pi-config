@@ -94,7 +94,7 @@ Uses OpenRouter as the primary provider for Gemini models and Fireworks for the 
 **Model tier configuration:**
 - **summary / minimal / low:** `google/gemini-3.1-flash-lite-preview` (OpenRouter)
 - **medium:** `google/gemini-3-flash-preview` (OpenRouter)
-- **high/max / deriver:** `accounts/fireworks/routers/kimi-k2p5-turbo` (Fireworks)
+- **high/max / deriver:** `accounts/fireworks/routers/kimi-k2p6-turbo` (Fireworks)
 
 These model IDs were verified against the live OpenRouter and Fireworks APIs. The older IDs `google/gemini-3-flash-lite-preview`, `google/gemini-3-flash`, and `accounts/fireworks/models/kimi-2.5-turbo` return provider errors and break Honcho chat/derivation.
 

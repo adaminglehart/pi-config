@@ -61,6 +61,8 @@ services:
       - https_proxy=
       - ALL_PROXY=
       - all_proxy=
+      - NO_PROXY=
+      - no_proxy=
     # The default healthcheck tries to hit localhost:8000 but the deriver has no web server
     healthcheck:
       test: ["CMD-SHELL", "ls /proc/1/status"]

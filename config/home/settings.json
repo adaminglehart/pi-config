@@ -1,5 +1,4 @@
 {
-  "defaultProvider": "openrouter",
   "defaultModel": "accounts/fireworks/routers/kimi-k2p6-turbo",
   "enabledModels": [
     "accounts/fireworks/routers/kimi-k2p6-turbo",
@@ -19,6 +18,6 @@
   "librarian": {
     "maxTurns": 10,
     "maxSearchResults": 30,
-    "models": "google/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p5-turbo:high"
+    "models": "google/gemini-3-flash-preview:medium,accounts/fireworks/routers/kimi-k2p6-turbo:high"
   }
 }

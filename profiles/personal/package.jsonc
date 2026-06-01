@@ -11,7 +11,7 @@
       "custom-compaction",
       "custom-footer",
       "custom-startup-info",
-      "dev-browser",
+      // "dev-browser",
       "honcho",
       "knowledge-graph",
       "minimal-tools",
@@ -30,6 +30,7 @@
       "pi-extension",
       // "qmd-search",
       "session-reader",
+      "agent-browser",
     ],
   },
 }

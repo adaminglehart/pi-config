@@ -1,10 +1,10 @@
 {
   "lastChangelogVersion": "0.74.0",
   "packages": [
-    "npm:glimpseui",
+    // "npm:glimpseui",
     // "git:github.com/HazAT/pi-interactive-subagents",
     "npm:pi-mcp-adapter",
-    "npm:pi-subagents",
+    "npm:pi-subagents@0.25.0",
     "npm:pi-prompt-template-model",
   ],
   "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],

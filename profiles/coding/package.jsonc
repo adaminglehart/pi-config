@@ -11,7 +11,7 @@
       // "lossless-context",
       "custom-compaction",
       "custom-startup-info",
-      "dev-browser",
+      // "dev-browser",
       "honcho",
       "lsp",
       "minimal-tools",
@@ -22,7 +22,12 @@
       "webfetch",
       "websearch",
     ],
-    "skills": ["msgvault-api", "pi-extension", "session-reader"],
+    "skills": [
+      "msgvault-api",
+      "pi-extension",
+      "session-reader",
+      "agent-browser",
+    ],
     "vars": {
       "work": {
         "model.fast": "litellm-google/gemini-3-flash",
@@ -31,10 +36,10 @@
         "model.cheap": "litellm-anthropic/claude-4.5-haiku",
       },
       "home": {
-        "model.fast": "accounts/fireworks/routers/kimi-k2p5-turbo",
-        "model.standard": "accounts/fireworks/routers/kimi-k2p5-turbo",
+        "model.fast": "accounts/fireworks/routers/kimi-k2p6-turbo",
+        "model.standard": "accounts/fireworks/routers/kimi-k2p6-turbo",
         "model.strong": "openai-codex/gpt-5.5",
-        "model.cheap": "accounts/fireworks/routers/kimi-k2p5-turbo",
+        "model.cheap": "accounts/fireworks/routers/kimi-k2p6-turbo",
       },
     },
   },
