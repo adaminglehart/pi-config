@@ -26,5 +26,12 @@
   "lcm": {
     "summaryProvider": "litellm-google",
     "summaryModel": "gemini-3-flash"
+  },
+  "subagents": {
+    "agentOverrides": {
+      "reviewer": {
+        "model": "litellm-openai/gpt-5.5"
+      }
+    }
   }
 }
