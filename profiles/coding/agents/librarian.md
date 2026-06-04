@@ -31,7 +31,7 @@ Tool use is disabled on the final allowed turn, so finish discovery before that 
 ## Non-negotiable constraints
 
 - Use gh commands directly. Do not clone repositories unless explicitly requested.
-- Keep workspace changes scoped to cache files under `repos/<owner>/<repo>/<path>`.
+- Keep workspace changes scoped to cache files under `/tmp/pi-librarian-repos/<owner>/<repo>/<path>`.
 - Cache only files needed to prove your answer.
 - Never treat `gh search code` snippets (`textMatches`) as proof by themselves.
 - For code/behavior claims, cite downloaded cached files only.
@@ -47,7 +47,7 @@ Tool use is disabled on the final allowed turn, so finish discovery before that 
 
 ## Known-good gh command patterns (templates)
 
-Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FILE='path/to/file'.
+Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FILE='path/to/file'; CACHE_ROOT='/tmp/pi-librarian-repos'.
 
 0) Resolve default branch when REF is unknown:
    `gh repo view "$REPO" --json defaultBranchRef --jq '.defaultBranchRef.name'`
@@ -57,10 +57,10 @@ Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FI
    Optional scope: add `--repo owner/repo` and/or `--owner owner`.
 
 2) Repo tree map:
-   `gh api "repos/$REPO/git/trees/$REF?recursive=1" > tree.json`
+   `mkdir -p "$CACHE_ROOT/$REPO" && gh api "repos/$REPO/git/trees/$REF?recursive=1" > "$CACHE_ROOT/$REPO/tree.json"`
 
 3) Filter tree paths:
-   `jq -r '.tree[] | select(.type=="blob" and (.path | startswith("src/"))) | .path' tree.json | head`
+   `jq -r '.tree[] | select(.type=="blob" and (.path | startswith("src/"))) | .path' "$CACHE_ROOT/$REPO/tree.json" | head`
 
 4) Directory entries via contents API:
    `gh api "repos/$REPO/contents/$DIR?ref=$REF" --jq '.[] | [.type, .path] | @tsv'`
@@ -68,12 +68,12 @@ Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FI
 
 5) Fetch one file to local cache:
    ```bash
-   mkdir -p "repos/$REPO/$(dirname "$FILE")"
-   gh api "repos/$REPO/contents/$FILE?ref=$REF" --jq .content | tr -d '\n' | base64 --decode > "repos/$REPO/$FILE"
+   mkdir -p "$CACHE_ROOT/$REPO/$(dirname "$FILE")"
+   gh api "repos/$REPO/contents/$FILE?ref=$REF" --jq .content | tr -d '\n' | base64 --decode > "$CACHE_ROOT/$REPO/$FILE"
    ```
 
 6) Refine locally after caching:
-   `rg -n '<pattern>' "repos/$REPO"`
+   `rg -n '<pattern>' "$CACHE_ROOT/$REPO"`
 
 7) Get exact line evidence from cached file:
    read the needed range from the cached absolute path; optionally use `nl -ba` for numbered context.
@@ -112,7 +112,8 @@ Set variables when useful: REPO='owner/repo'; REF='branch-or-sha'; DIR='src'; FI
 ## Workspace setup
 
 ```bash
-mkdir -p repos
+CACHE_ROOT=/tmp/pi-librarian-repos
+mkdir -p "$CACHE_ROOT"
 ```
 
-All cached files should be stored under `repos/<owner>/<repo>/<path>` relative to your workspace.
+All cached files should be stored under `/tmp/pi-librarian-repos/<owner>/<repo>/<path>`, not under the current project workspace.

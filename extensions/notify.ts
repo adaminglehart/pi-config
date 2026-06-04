@@ -10,6 +10,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { execSync } from "child_process";
+import { isSubagent } from "./_lib/env.js";
 
 /**
  * Check if the terminal app has focus by getting the frontmost process.
@@ -125,6 +126,10 @@ const formatNotification = (
 };
 
 export default function (pi: ExtensionAPI) {
+  if (isSubagent()) {
+    return;
+  }
+
   pi.on("agent_end", async (event) => {
     // Only notify if terminal is NOT focused (user is doing something else)
     if (isTerminalFocused()) {
