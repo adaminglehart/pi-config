@@ -1,0 +1,17 @@
+{
+  "defaultModel": "openai-codex/gpt-5.5",
+  "enabledModels": [
+    "openai-codex/gpt-5.5",
+    "openrouter/minimax/minimax-m2.5",
+    "openrouter/qwen/qwen3-coder",
+    "accounts/fireworks/models/minimax-m2p5",
+    "accounts/fireworks/models/minimax-m2p7",
+    "google/gemini-3-flash-preview",
+    "google/gemini-3.1-flash-lite-preview",
+  ],
+  "defaultThinkingLevel": "high",
+  "compaction": {
+    "provider": "openrouter",
+    "model": "google/gemini-3.1-flash-lite-preview",
+  },
+}

@@ -71,6 +71,10 @@ clean profile:
     done
     echo "✓ Cleaned {{ profile }}"
 
+# Import historical Pi JSONL sessions into Hindsight (dry-run by default; pass --write to ingest)
+hindsight-import *args:
+    bun scripts/import-sessions-to-hindsight.ts {{ args }}
+
 # Generate honcho .env file for the current environment
 honcho-env:
     #!/usr/bin/env bash

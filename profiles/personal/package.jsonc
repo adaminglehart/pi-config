@@ -13,6 +13,7 @@
       "custom-startup-info",
       // "dev-browser",
       "honcho",
+      "hindsight",
       "knowledge-graph",
       "minimal-tools",
       "notify",

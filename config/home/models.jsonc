@@ -1,51 +1,81 @@
 {
   "providers": {
-    "fireworks": {
-      "baseUrl": "https://api.fireworks.ai/inference",
-      "apiKey": "$FIREWORKS_API_KEY",
-      "api": "anthropic-messages",
-      "compat": {
-        "sendSessionAffinityHeaders": true,
-        "supportsEagerToolInputStreaming": false,
-        "supportsCacheControlOnTools": false,
-        "supportsLongCacheRetention": false,
-      },
-      "models": [
-        {
-          "id": "accounts/fireworks/routers/kimi-k2p6-turbo",
-          "name": "Kimi 2.6 Turbo",
-          "reasoning": true,
-          "contextWindow": 256000,
-          "cost": {
-            "input": 0.95,
-            "output": 4,
-            "cacheRead": 0.16,
-            "cacheWrite": 0,
-          },
-        },
-      ],
-    },
+    // "fireworks": {
+    //   "baseUrl": "https://api.fireworks.ai/inference",
+    //   "apiKey": "$FIREWORKS_API_KEY",
+    //   "api": "anthropic-messages",
+    //   "compat": {
+    //     "sendSessionAffinityHeaders": true,
+    //     "supportsEagerToolInputStreaming": false,
+    //     "supportsCacheControlOnTools": false,
+    //     "supportsLongCacheRetention": false,
+    //   },
+    //   "models": [
+    //     {
+    //       "id": "accounts/fireworks/routers/kimi-k2p6-turbo",
+    //       "name": "Kimi 2.6 Turbo",
+    //       "reasoning": true,
+    //       "contextWindow": 256000,
+    //       "cost": {
+    //         "input": 0.95,
+    //         "output": 4,
+    //         "cacheRead": 0.16,
+    //         "cacheWrite": 0,
+    //       },
+    //     },
+    //   ],
+    // },
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "$OPENROUTER_API_KEY",
       "api": "openai-completions",
       "models": [
         {
-          "id": "z-ai/glm-5.1",
-          "name": "GLM-5.1",
+          "id": "minimax/minimax-m2.5",
+          "name": "Minimax M2.5 (mara)",
           "reasoning": true,
           "contextWindow": 204800,
           "cost": {
-            "input": 1.4,
-            "output": 4.4,
-            "cacheRead": 0.26,
-            "cacheWrite": 0,
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.3,
+            "cacheWrite": 1.2,
           },
           "compat": {
             "openRouterRouting": {
-              "order": ["together", "friendli"],
+              "order": ["mara"],
             },
           },
+        },
+        {
+          "id": "qwen/qwen3-coder",
+          "name": "Qwen 3 Coder",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "cost": {
+            "input": 0.22,
+            "output": 1.8,
+            "cacheRead": 0.22,
+            "cacheWrite": 1.8,
+          },
+          "compat": {
+            "openRouterRouting": {
+              "order": ["google-vertex/us-south1"],
+            },
+          },
+        },
+      ],
+    },
+    "llama-server": {
+      "baseUrl": "https://llama-server.inglehart.io/v1",
+      "apiKey": "llama-server",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "gemma-4-26b-q4",
+          "name": "Gemma 4 26B Q4",
+          "reasoning": true,
+          "contextWindow": 163840,
         },
       ],
     },

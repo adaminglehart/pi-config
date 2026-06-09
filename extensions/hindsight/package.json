@@ -1,0 +1,16 @@
+{
+  "name": "pi-hindsight",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@vectorize-io/hindsight-client": "^0.7.2"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}

@@ -4,15 +4,15 @@
     // "npm:glimpseui",
     // "git:github.com/HazAT/pi-interactive-subagents",
     "npm:pi-mcp-adapter",
-    "npm:pi-subagents@0.25.0",
+    "npm:pi-subagents",
     "npm:pi-prompt-template-model",
   ],
   "subagents": {
     "agentOverrides": {
       "researcher": {
-        "tools": ["read", "write", "websearch", "webfetch", "intercom"]
-      }
-    }
+        "tools": ["read", "write", "websearch", "webfetch", "intercom"],
+      },
+    },
   },
   "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],
   "skills": ["~/.agents/skills"],
