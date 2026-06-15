@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.78.0",
   "packages": [
-    // "npm:glimpseui",
+    "npm:glimpseui",
     // "git:github.com/HazAT/pi-interactive-subagents",
     "npm:pi-mcp-adapter",
     "npm:pi-subagents",
@@ -9,7 +9,12 @@
   ],
   "subagents": {
     "agentOverrides": {
+      "scout": {
+        "thinking": "medium",
+        "model": "openai-codex/gpt-5.3-codex-spark",
+      },
       "researcher": {
+        "model": "openai-codex/gpt-5.3-codex-spark",
         "tools": ["read", "write", "websearch", "webfetch", "intercom"],
       },
     },

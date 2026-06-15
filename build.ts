@@ -145,8 +145,8 @@ function deepMerge(
   return target;
 }
 
-/** Clean up extensions and skills from destination that are not in the build output.
- *  This removes stale extensions/skills when they're removed from the profile. */
+/** Clean up managed destination directories that are not in the build output.
+ *  This removes stale agents/extensions/skills when they're removed from the profile. */
 function cleanupStaleArtifacts(
   buildDir: string,
   destDir: string,
@@ -162,35 +162,32 @@ function cleanupStaleArtifacts(
     "tsconfig.json",
   ]);
 
-  // Clean up stale extensions
-  const buildExtDir = join(buildDir, "extensions");
-  const destExtDir = join(destDir, "extensions");
-  if (existsSync(buildExtDir) && existsSync(destExtDir)) {
-    const builtExts = new Set(readdirSync(buildExtDir));
-    const deployedExts = readdirSync(destExtDir);
-    for (const ext of deployedExts) {
-      if (!builtExts.has(ext) && !PRESERVE_IN_EXTENSIONS.has(ext)) {
-        const extPath = join(destExtDir, ext);
-        rmSync(extPath, { recursive: true, force: true });
-        console.log(`  removed stale extension: ${ext}`);
-      }
-    }
-  }
+  const cleanupManagedDir = (
+    subdir: string,
+    label: string,
+    preserve = new Set<string>(),
+  ) => {
+    const builtDir = join(buildDir, subdir);
+    const deployedDir = join(destDir, subdir);
+    if (!existsSync(deployedDir)) return;
 
-  // Clean up stale skills
-  const buildSkillDir = join(buildDir, "skills");
-  const destSkillDir = join(destDir, "skills");
-  if (existsSync(buildSkillDir) && existsSync(destSkillDir)) {
-    const builtSkills = new Set(readdirSync(buildSkillDir));
-    const deployedSkills = readdirSync(destSkillDir);
-    for (const skill of deployedSkills) {
-      if (!builtSkills.has(skill)) {
-        const skillPath = join(destSkillDir, skill);
-        rmSync(skillPath, { recursive: true, force: true });
-        console.log(`  removed stale skill: ${skill}`);
+    const builtEntries = existsSync(builtDir)
+      ? new Set(readdirSync(builtDir))
+      : new Set<string>();
+    const deployedEntries = readdirSync(deployedDir);
+
+    for (const entry of deployedEntries) {
+      if (!builtEntries.has(entry) && !preserve.has(entry)) {
+        const entryPath = join(deployedDir, entry);
+        rmSync(entryPath, { recursive: true, force: true });
+        console.log(`  removed stale ${label}: ${entry}`);
       }
     }
-  }
+  };
+
+  cleanupManagedDir("agents", "agent");
+  cleanupManagedDir("extensions", "extension", PRESERVE_IN_EXTENSIONS);
+  cleanupManagedDir("skills", "skill");
 }
 
 /** Get the destination directory for a profile from its manifest */

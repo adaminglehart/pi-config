@@ -2,6 +2,7 @@
   "defaultModel": "openai-codex/gpt-5.5",
   "enabledModels": [
     "openai-codex/gpt-5.5",
+    "openai-codex/gpt-5.3-codex-spark",
     "openrouter/minimax/minimax-m2.5",
     "openrouter/qwen/qwen3-coder",
     "accounts/fireworks/models/minimax-m2p5",
