@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.75.4",
-    "@earendil-works/pi-coding-agent": "^0.75.4",
+    "@earendil-works/pi-coding-agent": "^0.80.0",
     "@earendil-works/pi-tui": "^0.75.4",
     "parallel-web": "^0.4.1",
     "typebox": "^1.1.31",
