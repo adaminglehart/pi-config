@@ -1,8 +1,6 @@
 {
-  "lastChangelogVersion": "0.78.0",
+  "lastChangelogVersion": "0.80.3",
   "packages": [
-    "npm:glimpseui",
-    // "git:github.com/HazAT/pi-interactive-subagents",
     "npm:pi-mcp-adapter",
     "npm:pi-subagents",
     "npm:pi-prompt-template-model",

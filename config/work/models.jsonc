@@ -11,9 +11,21 @@
         {
           "id": "claude-opus-4-8",
           "name": "Claude Opus 4.8",
+          "api": "anthropic-messages",
+          "baseUrl": "http://${LITELLM_PROXY_HOST}:7891",
           "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+          },
           "input": ["text", "image"],
           "contextWindow": 1000000,
+          "compat": {
+            "forceAdaptiveThinking": true,
+          },
         },
         {
           "id": "claude-opus-4-7",
@@ -29,13 +41,6 @@
           "input": ["text", "image"],
           "contextWindow": 1000000,
         },
-        // {
-        //   "id": "claude-opus-4.6-1m",
-        //   "name": "Claude Opus 4.6 1M",
-        //   "reasoning": true,
-        //   "input": ["text", "image"],
-        //   "contextWindow": 1000000,
-        // },
         {
           "id": "claude-sonnet-4-6",
           "name": "Claude Sonnet 4.6",
@@ -43,20 +48,6 @@
           "input": ["text", "image"],
           "contextWindow": 1000000,
         },
-        // {
-        //   "id": "claude-sonnet-4-6-1m",
-        //   "name": "Claude Sonnet 4.6 1M",
-        //   "reasoning": true,
-        //   "input": ["text", "image"],
-        //   "contextWindow": 1000000,
-        // },
-        // {
-        //   "id": "claude-sonnet-4.5",
-        //   "name": "Claude Sonnet 4.5",
-        //   "reasoning": true,
-        //   "input": ["text", "image"],
-        //   "contextWindow": 200000
-        // },
         {
           "id": "claude-4.5-haiku",
           "name": "Claude Haiku 4.5",
