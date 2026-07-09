@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      parallel-web:
+        specifier: ^0.4.1
+        version: 0.4.1
+
+packages:
+
+  parallel-web@0.4.1:
+    resolution: {integrity: sha512-kcBwdJxgT+m2D65P5AQ2EtdbmjrA8djoqRT4wr0WCMYnpIEzadTzwJ9zS2N/BT7wTk5rComkQ/2faSUtgZwWCg==}
+
+snapshots:
+
+  parallel-web@0.4.1: {}

@@ -7,7 +7,7 @@ build/
 
 # Node modules for extensions
 extensions/node_modules/
-extensions/package-lock.json
+extensions/pnpm-lock.yaml
 
 # Local config overrides (machine-specific, not shared)
 *.local.json

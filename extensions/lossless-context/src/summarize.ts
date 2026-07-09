@@ -3,7 +3,7 @@
  * Uses Pi's model registry and completeSimple API.
  */
 
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type { LcmConfig } from "./types.js";
 import {

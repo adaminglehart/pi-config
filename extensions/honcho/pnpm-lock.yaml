@@ -1,0 +1,45 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@honcho-ai/sdk':
+        specifier: ^2.0.1
+        version: 2.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.9.5
+
+packages:
+
+  '@honcho-ai/sdk@2.2.0':
+    resolution: {integrity: sha512-SyygN+BrpUB2fRjhwcYmT+tcEhHrKmbj9nOZLVUFY7M5YBswJ+mZb/CeLpNbRh+QQTU8F8JWY3lQat95c6nwmA==}
+
+  '@types/node@25.9.5':
+    resolution: {integrity: sha512-OScDchr2fwuUmWdf4kZ9h7PcJiYDVInhJizG/biAq3cAvqwYktuy/TYGGdZNMtNTFUP7rnb0NU4TUdm82kt4Rg==}
+
+  undici-types@7.24.6:
+    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
+
+  zod@4.0.0:
+    resolution: {integrity: sha512-9diLdTPc/L7w/5jI4C3gHYNiGHDV9IZYxo1e5LSD8cabi65WVTWWb+g2BGPEpUUCOxR4D+6O5B0AzyMdUAXwrw==}
+
+snapshots:
+
+  '@honcho-ai/sdk@2.2.0':
+    dependencies:
+      zod: 4.0.0
+
+  '@types/node@25.9.5':
+    dependencies:
+      undici-types: 7.24.6
+
+  undici-types@7.24.6: {}
+
+  zod@4.0.0: {}

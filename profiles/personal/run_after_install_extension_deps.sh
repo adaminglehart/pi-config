@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install npm dependencies for pi-personal extensions that have a package.json
+# Install pnpm dependencies for pi-personal extensions that have a package.json
 set -e
 
 EXTENSIONS_DIR="$HOME/.pi-personal/agent/extensions"
@@ -13,6 +13,6 @@ for pkg in "$EXTENSIONS_DIR"/*/package.json; do
   dir="$(dirname "$pkg")"
   if [ ! -d "$dir/node_modules" ] || [ "$pkg" -nt "$dir/node_modules" ]; then
     echo "Installing deps for $(basename "$dir")..."
-    (cd "$dir" && npm install --silent)
+    (cd "$dir" && pnpm install --silent)
   fi
 done

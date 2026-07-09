@@ -156,7 +156,7 @@ function cleanupStaleArtifacts(
 
   // Files to preserve in extensions directory (installed dependencies, not source)
   const PRESERVE_IN_EXTENSIONS = new Set([
-    "package-lock.json",
+    "pnpm-lock.yaml",
     "node_modules",
     "package.json",
     "tsconfig.json",

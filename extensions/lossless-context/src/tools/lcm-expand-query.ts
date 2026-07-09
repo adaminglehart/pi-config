@@ -8,7 +8,7 @@ import type {
   ExtensionAPI,
   ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { RetrievalEngine } from "../retrieval.js";
 import type { LcmConfig } from "../types.js";
 

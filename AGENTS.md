@@ -276,6 +276,62 @@ If an extension has its own `package.json`, deployment may rely on the profile's
 
 For coding profile changes, check whether `profiles/coding/run_after_install_extension_deps.sh` needs to pick up the new extension automatically.
 
+### Package management (pnpm)
+
+**All npm package management in this repo uses pnpm.** Do not introduce `npm`,
+`bun install`, `yarn`, or their lockfiles — there must be no `package-lock.json`,
+`bun.lock`, or `yarn.lock` anywhere. (Bun is still used, but only as the *TypeScript
+script runtime* for `build.ts` and `scripts/*.ts`, which use `Bun.file`/`Bun.env`/
+`Bun.write` — that is unrelated to package management.)
+
+Structure:
+
+- Each package directory (`extensions/` for dev/typecheck deps, and every extension
+  with its own `package.json`) is a **standalone pnpm project**: its own
+  `pnpm-lock.yaml` and its own `pnpm-workspace.yaml`. This is deliberately **not** a
+  single pnpm workspace — extensions are copied and installed independently at deploy
+  time, so each must resolve on its own.
+- Every package's `pnpm-workspace.yaml` contains:
+
+  ```yaml
+  nodeLinker: hoisted
+  dangerouslyAllowAllBuilds: true
+  ```
+
+- Per-extension `pnpm-lock.yaml` and `pnpm-workspace.yaml` are **committed** and copied
+  into the deployed target by `build.ts` (only `node_modules/` is filtered out).
+- The root `extensions/pnpm-lock.yaml` is **gitignored** — it is dev/typecheck-only and
+  is never deployed (the deploy hook only installs the extension subdirs, not the root).
+- Deploy hooks (`profiles/*/run_after_install_extension_deps.sh`) run `pnpm install`
+  per extension dir in the deployed target.
+- `pnpm` is installed via `.mise.toml`; the deploy hook relies on globally-available `pnpm`.
+
+To add/update an extension dependency: edit its `package.json`, then run
+`pnpm install` in that extension's directory (which regenerates its `pnpm-lock.yaml`),
+and commit both.
+
+#### pnpm 11 quirks worth remembering
+
+These bit us during the bun/npm → pnpm migration and drove the setup above:
+
+- **`.npmrc` `node-linker` is ignored.** pnpm 11 reads pnpm-specific settings only from
+  `pnpm-workspace.yaml` (key `nodeLinker: hoisted`), not `.npmrc`. `.npmrc` still works
+  for registry/auth, but not for these settings.
+- **A parent `pnpm-workspace.yaml` hijacks subdir installs.** Running `pnpm install` in a
+  subdirectory walks up to the nearest `pnpm-workspace.yaml` and installs *that* root
+  instead — even when the file has no `packages:` field. Giving each package its own
+  `pnpm-workspace.yaml` keeps it standalone. This is why every extension dir has one.
+- **Ignored build scripts make `pnpm install` exit 1.** Packages with install scripts
+  (e.g. transitive deps of `@earendil-works/pi-ai`, playwright) trigger
+  `ERR_PNPM_IGNORED_BUILDS` and a non-zero exit, which breaks `set -e` deploy hooks.
+  `dangerouslyAllowAllBuilds: true` runs those scripts (matching prior npm behavior) and
+  returns exit 0. `onlyBuiltDependencies: []` does **not** silence it.
+- **`^` ranges re-resolve to the newest in-range on migration.** Switching lockfiles
+  re-resolves caret ranges, which can pull a newer minor than what was previously shipped
+  (e.g. `vscode-languageserver-protocol` `^3.17.5` → `3.18.2`, which broke `lsp`'s types).
+  When a bump is not intended, pin the exact previously-shipped version in `package.json`
+  (`lsp` is pinned to `3.17.5` for this reason).
+
 ### JSON vs JSONC
 
 This repo supports both `.json` and `.jsonc` in key places.

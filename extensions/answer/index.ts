@@ -10,8 +10,8 @@
  * 4. Submits the compiled answers when done
  */
 
+import { complete } from "@earendil-works/pi-ai/compat";
 import {
-  complete,
   type Model,
   type Api,
   type UserMessage,
