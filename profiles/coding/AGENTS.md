@@ -2,13 +2,13 @@
 
 ## Workflow
 
-For any task that seems complex, modifies more than 4 or 5 files or involves architectural decisions:
+For any task that requires complex architectural or design decisions:
 1. Use the `enter_plan_mode` tool with a plan file path (e.g., `plans/<task-name>.md`) to activate planning mode
 2. Explore the codebase and write the plan as markdown checklists in the plan file
 3. Call `plannotator_submit_plan` with the plan file path to submit for user review
 4. Wait for approval, then execute — track progress with `[DONE:n]` markers
 
-For simple single-file changes, proceed directly.
+For straightforward implementation changes, proceed directly.
 
 ## Plan storage
 

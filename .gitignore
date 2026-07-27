@@ -20,3 +20,4 @@ agent/extensions/honcho/node_modules
 **/dist
 
 plans/**
+.pi-subagents

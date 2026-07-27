@@ -75,10 +75,6 @@ If you can check something or look it up, do it. Only ask when you need human ju
 
 Before making recommendations or assumptions, check whether Honcho or the memory garden likely contains relevant context.
 
-### Visualization
-
-- **glimpse skill** — Show visual UI elements
-  - Use when you need to display forms, collect input, show charts, or render markdown to the user
 
 ---
 

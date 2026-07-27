@@ -4,9 +4,12 @@
   "defaultThinkingLevel": "high",
   "enabledModels": [
     "litellm-anthropic/claude-opus-4-8",
-    "litellm-anthropic/claude-opus-4-6",
-    "litellm-anthropic/claude-sonnet-4-6",
+    "litellm-anthropic/claude-opus-4-7",
+    "litellm-anthropic/claude-sonnet-5",
     "litellm-anthropic/claude-4.5-haiku",
+    "litellm-openai/gpt-5.6-sol",
+    "litellm-openai/gpt-5.6-terra",
+    "litellm-openai/gpt-5.6-luna",
     "litellm-openai/gpt-5.5",
     "litellm-google/gemini-3.1-pro",
     "litellm-google/gemini-3-flash",
@@ -14,7 +17,7 @@
   "librarian": {
     "maxTurns": 10,
     "maxSearchResults": 30,
-    "models": "litellm-google/gemini-3-flash:medium,litellm-anthropic/claude-sonnet-4-6:high",
+    "models": "litellm-google/gemini-3-flash:medium,litellm-anthropic/claude-sonnet-5:high",
   },
   "compaction": {
     "provider": "litellm-google",
@@ -28,7 +31,7 @@
     "agentOverrides": {
       "scout": {
         "thinking": "medium",
-        "model": "litellm-anthropic/claude-sonnet-4-6",
+        "model": "litellm-anthropic/claude-sonnet-5",
       },
       "reviewer": {
         "model": "litellm-openai/gpt-5.5",
