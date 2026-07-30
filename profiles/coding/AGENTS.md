@@ -2,7 +2,7 @@
 
 ## Workflow
 
-For any task that requires complex architectural or design decisions:
+For any task that requires complex design or architectural decisions:
 1. Use the `enter_plan_mode` tool with a plan file path (e.g., `plans/<task-name>.md`) to activate planning mode
 2. Explore the codebase and write the plan as markdown checklists in the plan file
 3. Call `plannotator_submit_plan` with the plan file path to submit for user review
@@ -41,7 +41,6 @@ Call this whenever you learn something durable about the user. Key moments:
 
 Write insights as concrete, reusable facts:
 - ✅ "User prefers flat module structures over nested folders"
-- ✅ "User uses Graphite for git branching, not raw git — always use gt create/gt submit"
 - ❌ "User has opinions about code organization" (too vague)
 
 ### `honcho_chat` — Query before assuming

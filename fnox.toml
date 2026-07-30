@@ -19,9 +19,9 @@ recipients = ["age1q6el4a8vtj0uyzt7447m43mp887z28eqvhmfs3a5nl383wxhpf9szjj9jc"]
 type = "1password"
 
 [secrets]
-# WebSearch extension - Parallel Web API
-# Get key at: https://platform.parallel.ai
+# WebSearch extension API keys
 PARALLEL_API_KEY = { provider = "op", value = "op://dotenv/PARALLEL_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBkaDNoYUNERHlyOHdLT0R0WmN2YXBtaDBqblRSbWQ2QkYvYU1NZWIrNlJvCi9iUE0xSlFPRkt6eTFpckQvTWs1V3BQT3Z0eitnNVRDZHVOUnR3VDRTekkKLT4gey1ncmVhc2UgRyYKWWl6STF5T2NsbVQ5RFpYSk9UcmhOMFNRUU4vY1JxRnl5UkpMWmZGeHRsNW95N293ejVxckxZZk9YdHM4TWE4MQphL1FXZCtrV05Bekl3L09aYjhTUlVOcmhIUVBJVHAvZEc5RFJ0aUFMRW1jWWw4Sk5Ma3MKLS0tIEx3cDVCZkNzdVRQV290Y3FmTEhUU1JUMGJIWnZqNTQxSmtUTVhzK3Z1eDAKBr1Dc0T4lPylqi6CYvGFvovKlzev/vHpqLKiVV0C/eHM3GLjMYwhhFGeb24/rADAz1yLK6++nI77eGDz8Hoj1j95NPe4+iBK" } }
+EXA_API_KEY = { provider = "op", value = "op://dotenv/EXA_API_KEY/value", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBwRFVxUk1ZSGFvWHZFelFsVmNvN2VEcVFuNjNNTGFkSzdyR0hBQzIzQVhVCmlQc3lqbEtLcTVDd21jNmtQRHZFVWlNcndtbXNjTURuZ2NGUzMxaVBUOEEKLT4gUC8kVXo8Ty1ncmVhc2UgPQppWFd5TGJpa3VqdWJVT2VXSUUxV21jQXMvODNwWkczWWpSalplUQotLS0gTmptdUcwa2VuTDZyNG5QZnQ0VDJGTHRIcmFHR3E3dVBZVEh3K2o3Q3VlUQqtdVpcrzCGYRNkps0aSmn+8FCPZb9yvOBrK4VhSgO9JxG9JgFXl3MirGchJ6E2K3AkrHorQ6TzfCP9xgjUIo9hC56Zgg==" } }
 
 # Work environment - LiteLLM
 # LITELLM_API_KEY = { provider = "op", value = "op://dotenv/LITELLM_API_KEY/value" }

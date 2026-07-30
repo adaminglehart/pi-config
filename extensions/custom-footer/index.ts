@@ -107,7 +107,7 @@ function getThinkingLabel(level: string): string {
     case "high":
       return "high";
     case "xhigh":
-      return "max";
+      return "xhigh";
     default:
       return level;
   }

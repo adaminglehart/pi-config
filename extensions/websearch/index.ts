@@ -6,11 +6,11 @@
  *
  * Usage:
  * - Copy this file to ~/.pi/agent/extensions/ or your project's .pi/extensions/
- * - Set PARALLEL_API_KEY in your environment for Parallel provider (default)
+ * - Set PARALLEL_API_KEY for the Parallel provider (default) or EXA_API_KEY for Exa
  *
  * Secret management (recommended):
  * - Use fnox for 1Password + age encryption: fnox sync --provider op --force
- * - Or add PARALLEL_API_KEY to .env file
+ * - Or add the provider's API key to .env
  *
  * The tool will be automatically available to the LLM
  */
@@ -39,10 +39,11 @@ const DESCRIPTION = `- Search the web using multiple providers (Parallel Web or 
 
 Provider notes:
   - **Parallel** (default): AI-native search with natural language objectives, optimized excerpts
-  - **Exa AI**: Uses MCP endpoint, supports live crawling and search modes (auto/fast/deep)
+  - **Exa AI**: Uses MCP endpoint with EXA_API_KEY, supports live crawling and search modes (auto/fast/deep)
 
 Usage notes:
   - Set PARALLEL_API_KEY environment variable to use Parallel provider (default)
+  - Set EXA_API_KEY environment variable to use Exa
   - Exa supports live crawling modes: 'fallback' or 'preferred'
   - Exa search types: 'auto' (balanced), 'fast' (quick), 'deep' (comprehensive)
   - Parallel uses natural language objectives for better semantic search

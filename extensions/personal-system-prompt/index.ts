@@ -75,7 +75,6 @@ If you can check something or look it up, do it. Only ask when you need human ju
 
 Before making recommendations or assumptions, check whether Honcho or the memory garden likely contains relevant context.
 
-
 ---
 
 ## Behavior Guidelines

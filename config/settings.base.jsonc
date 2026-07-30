@@ -1,22 +1,10 @@
 {
-  "lastChangelogVersion": "0.82.1",
+  "lastChangelogVersion": "0.83.0",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-subagents",
     "npm:pi-prompt-template-model",
   ],
-  "subagents": {
-    "agentOverrides": {
-      "scout": {
-        "thinking": "medium",
-        "model": "openai-codex/gpt-5.3-codex-spark",
-      },
-      "researcher": {
-        "model": "openai-codex/gpt-5.3-codex-spark",
-        "tools": ["read", "write", "websearch", "webfetch", "intercom"],
-      },
-    },
-  },
   "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],
   "skills": ["~/.agents/skills"],
   "hideThinkingBlock": true,

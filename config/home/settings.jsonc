@@ -1,12 +1,13 @@
 {
-  "defaultModel": "openai-codex/gpt-5.5",
+  "defaultModel": "openai-codex/gpt-5.6-sol",
   "enabledModels": [
+    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-5.6-terra",
+    "openai-codex/gpt-5.6-luna",
     "openai-codex/gpt-5.5",
     "openai-codex/gpt-5.3-codex-spark",
     "openrouter/minimax/minimax-m2.5",
     "openrouter/qwen/qwen3-coder",
-    "accounts/fireworks/models/minimax-m2p5",
-    "accounts/fireworks/models/minimax-m2p7",
     "google/gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview",
   ],
@@ -14,5 +15,24 @@
   "compaction": {
     "provider": "openrouter",
     "model": "google/gemini-3.1-flash-lite-preview",
+  },
+  "lcm": {
+    "summaryProvider": "openai-codex",
+    "summaryModel": "GPT-4o",
+  },
+  "subagents": {
+    "defaultModel": "openai-codex/gpt-5.6-terra",
+    "agentOverrides": {
+      "reviewer": {
+        "model": "openai-codex/gpt-5.6-sol",
+        "thinking": "high",
+      },
+      "scout": {
+        "thinking": "medium",
+      },
+      "researcher": {
+        "tools": ["read", "write", "websearch", "webfetch", "intercom"],
+      },
+    },
   },
 }

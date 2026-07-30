@@ -1,30 +1,5 @@
 {
   "providers": {
-    // "fireworks": {
-    //   "baseUrl": "https://api.fireworks.ai/inference",
-    //   "apiKey": "$FIREWORKS_API_KEY",
-    //   "api": "anthropic-messages",
-    //   "compat": {
-    //     "sendSessionAffinityHeaders": true,
-    //     "supportsEagerToolInputStreaming": false,
-    //     "supportsCacheControlOnTools": false,
-    //     "supportsLongCacheRetention": false,
-    //   },
-    //   "models": [
-    //     {
-    //       "id": "accounts/fireworks/routers/kimi-k2p6-turbo",
-    //       "name": "Kimi 2.6 Turbo",
-    //       "reasoning": true,
-    //       "contextWindow": 256000,
-    //       "cost": {
-    //         "input": 0.95,
-    //         "output": 4,
-    //         "cacheRead": 0.16,
-    //         "cacheWrite": 0,
-    //       },
-    //     },
-    //   ],
-    // },
     "openrouter": {
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "$OPENROUTER_API_KEY",

@@ -19,6 +19,11 @@ export async function searchExa(
 	contextMaxCharacters: number = DEFAULT_CONTEXT_MAX_CHARS,
 	signal?: AbortSignal,
 ): Promise<SearchResult> {
+	const apiKey = process.env.EXA_API_KEY;
+	if (!apiKey) {
+		throw new Error("EXA_API_KEY environment variable is required for Exa search");
+	}
+
 	const searchRequest: ExaSearchRequest = {
 		jsonrpc: "2.0",
 		id: 1,
@@ -51,6 +56,7 @@ export async function searchExa(
 			headers: {
 				accept: "application/json, text/event-stream",
 				"content-type": "application/json",
+				"x-api-key": apiKey,
 			},
 			body: JSON.stringify(searchRequest),
 			signal: abortController.signal,
