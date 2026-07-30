@@ -11,6 +11,7 @@
       "lossless-context",
       // "custom-compaction",
       "custom-startup-info",
+      "herdr-agent-state",
       // "dev-browser",
       // "honcho",
       "hindsight",
