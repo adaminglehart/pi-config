@@ -9,6 +9,7 @@
   "skills": ["~/.agents/skills"],
   "hideThinkingBlock": true,
   "quietStartup": true,
+  "theme": "dark",
   "lcm": {
     "softTokenThreshold": 0.65,
     "hardTokenThreshold": 0.85,
