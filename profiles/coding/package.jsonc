@@ -17,6 +17,7 @@
       "hindsight",
       "lsp",
       "minimal-tools",
+      "model-switch",
       "notify",
       "session-title",
       "subagent",
@@ -26,25 +27,12 @@
       "websearch",
     ],
     "skills": [
+      "herdr",
       "msgvault-api",
       "pi-extension",
       "session-reader",
       "agent-browser",
       "autoreview",
     ],
-    "vars": {
-      "work": {
-        "model.fast": "litellm-google/gemini-3-flash",
-        "model.standard": "litellm-anthropic/claude-sonnet-5",
-        "model.strong": "litellm-openai/gpt-5.5",
-        "model.reviewer": "litellm-openai/gpt-5.5",
-      },
-      "home": {
-        "model.fast": "openai-codex/gpt-5.6-luna",
-        "model.standard": "openai-codex/gpt-5.6-terra",
-        "model.strong": "openai-codex/gpt-5.6-sol",
-        "model.reviewer": "openai-codex/gpt-5.6-sol",
-      },
-    },
   },
 }

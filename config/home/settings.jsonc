@@ -1,5 +1,11 @@
 {
-  "defaultModel": "openai-codex/gpt-5.6-sol",
+  "defaultModel": "{{model.standard}}",
+  "modelAliases": {
+    "fast": "openai-codex/gpt-5.6-luna",
+    "standard": "openai-codex/gpt-5.6-terra",
+    "strong": "openai-codex/gpt-5.6-sol",
+    "reviewer": "openai-codex/gpt-5.6-sol",
+  },
   "enabledModels": [
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
@@ -28,7 +34,7 @@
     "defaultModel": "openai-codex/gpt-5.6-terra",
     "agentOverrides": {
       "reviewer": {
-        "model": "openai-codex/gpt-5.6-sol",
+        "model": "{{model.reviewer}}",
         "thinking": "high",
       },
       "scout": {

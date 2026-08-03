@@ -10,7 +10,7 @@
  * Handles:
  * - Environment detection (work vs home based on hostname)
  * - JSON config merging (base + env overlay for settings/models)
- * - Variable substitution in profile files ({{var.name}} placeholders)
+ * - Variable substitution in profile and extension files ({{var.name}} placeholders)
  *
  * Usage: bun run build.ts <profile>
  *   e.g. bun run build.ts coding
@@ -46,6 +46,20 @@ interface ProfileManifest {
     skills: string[];
     vars?: Record<string, Record<string, string>>;
   };
+}
+
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+interface ModelSettings {
+  defaultProvider?: string;
+  defaultModel?: string;
+  modelAliases?: JsonValue;
 }
 
 function fatal(msg: string): never {
@@ -241,6 +255,91 @@ async function buildMergedConfig(
   return resolveEnvVars(output) + "\n";
 }
 
+/** Read named model aliases from merged settings as build variables. */
+function readModelAliasVars(settingsJson: string): Record<string, string> {
+  const { modelAliases } = JSON.parse(settingsJson) as ModelSettings;
+  if (modelAliases === undefined) {
+    return {};
+  }
+  if (
+    modelAliases === null ||
+    typeof modelAliases !== "object" ||
+    Array.isArray(modelAliases)
+  ) {
+    fatal("Merged settings modelAliases must be an object");
+  }
+
+  const modelVars: Record<string, string> = {};
+  for (const [name, reference] of Object.entries(modelAliases)) {
+    if (!/^\w+$/.test(name) || typeof reference !== "string" || !reference) {
+      fatal(
+        "Merged settings modelAliases must use word-only names and non-empty values",
+      );
+    }
+    if (name === "default") {
+      fatal(
+        'Merged settings modelAliases must not define "default"; use defaultModel instead',
+      );
+    }
+
+    const separator = reference.indexOf("/");
+    if (separator <= 0 || separator >= reference.length - 1) {
+      fatal(
+        `Merged settings modelAliases.${name} must use a provider/model reference`,
+      );
+    }
+    modelVars[`model.${name}`] = reference;
+  }
+
+  return modelVars;
+}
+
+function defaultModelUsesAlias(settingsJson: string): boolean {
+  const { defaultModel } = JSON.parse(settingsJson) as ModelSettings;
+  return /^\{\{model\.\w+\}\}$/.test(defaultModel ?? "");
+}
+
+/** Resolve Pi's configured default model into a provider/model reference. */
+function resolveDefaultModelReference(settingsJson: string): string {
+  const settings = JSON.parse(settingsJson) as ModelSettings;
+  const { defaultProvider, defaultModel } = settings;
+
+  if (!defaultModel) {
+    fatal("Merged settings must define defaultModel");
+  }
+
+  if (defaultProvider) {
+    return `${defaultProvider}/${defaultModel}`;
+  }
+
+  const separator = defaultModel.indexOf("/");
+  if (separator > 0 && separator < defaultModel.length - 1) {
+    return defaultModel;
+  }
+
+  fatal(
+    "Merged settings defaultModel must include its provider when defaultProvider is not defined",
+  );
+}
+
+/** Normalize Pi's generated settings to separate defaultProvider/defaultModel fields. */
+function normalizeDefaultModelSettings(
+  settingsJson: string,
+  defaultFromAlias: boolean,
+): string {
+  const settings = JSON.parse(settingsJson) as ModelSettings;
+  if (defaultFromAlias) {
+    delete settings.defaultProvider;
+  }
+
+  const reference = resolveDefaultModelReference(JSON.stringify(settings));
+  const separator = reference.indexOf("/");
+  settings.defaultProvider = reference.slice(0, separator);
+  settings.defaultModel = reference.slice(separator + 1);
+
+  return JSON.stringify(settings, null, 2) + "\n";
+}
+
 /** Replace ${VAR_NAME} placeholders in text with values from process.env */
 function resolveEnvVars(text: string): string {
   return text.replace(/\$\{(\w+)\}/g, (_match, varName: string) => {
@@ -254,13 +353,20 @@ function resolveEnvVars(text: string): string {
   });
 }
 
-/** Replace {{var.name}} placeholders in text using profile vars for current environment */
-function substituteVars(text: string, vars: Record<string, string>): string {
-  return text.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, key: string) => {
+/** Replace {{var.name}} placeholders in text using build variables for current environment */
+function substituteVars(
+  text: string,
+  vars: Record<string, string>,
+  strict = true,
+): string {
+  return text.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (match, key: string) => {
     if (!(key in vars)) {
-      fatal(
-        `Unknown variable "{{${key}}}" — not defined in profile vars.${environment}`,
-      );
+      if (strict) {
+        fatal(
+          `Unknown variable "{{${key}}}" — not defined in build vars for ${environment}`,
+        );
+      }
+      return match;
     }
     return vars[key];
   });
@@ -284,7 +390,29 @@ async function buildProfile(profileName: string) {
   }
 
   const { extensions, skills, vars } = manifest.pi;
-  const envVars = vars?.[environment] ?? {};
+  const mergedSettingsJson = await buildMergedConfig("settings", profileDir);
+  const profileVars = { ...(vars?.[environment] ?? {}) };
+  const modelVars = readModelAliasVars(mergedSettingsJson);
+
+  for (const key of Object.keys(modelVars)) {
+    if (key in profileVars) {
+      fatal(
+        `Profile var "${key}" is defined by merged settings modelAliases and must not be defined in ${manifestPath}`,
+      );
+    }
+  }
+  if ("model.default" in profileVars) {
+    fatal(
+      `Profile var "model.default" is derived from merged settings and must not be defined in ${manifestPath}`,
+    );
+  }
+
+  const envVars = { ...profileVars, ...modelVars };
+  const settingsJson = normalizeDefaultModelSettings(
+    substituteVars(mergedSettingsJson, envVars),
+    defaultModelUsesAlias(mergedSettingsJson),
+  );
+  envVars["model.default"] = resolveDefaultModelReference(settingsJson);
   const outputDir = join(BUILD_DIR, profileName, "agent");
 
   console.log(`  environment: ${environment}`);
@@ -312,10 +440,13 @@ async function buildProfile(profileName: string) {
     if (source.isFile) {
       const dest = join(extOutputDir, basename(source.path));
       cpSync(source.path, dest);
+      // Extensions may have their own runtime placeholders; replace only known profile vars.
+      await applyVarsToFile(dest, envVars, false);
       console.log(`  ext ${extName} (file)`);
     } else {
       const dest = join(extOutputDir, extName);
       copyDir(source.path, dest);
+      await applyVarsToDir(dest, envVars, false);
       console.log(`  ext ${extName}/`);
     }
   }
@@ -378,7 +509,10 @@ async function buildProfile(profileName: string) {
       continue; // Skip if base file doesn't exist (e.g., mcp.json is optional)
     }
 
-    const configJson = await buildMergedConfig(configName, profileDir);
+    const configJson =
+      configName === "settings"
+        ? settingsJson
+        : await buildMergedConfig(configName, profileDir);
     await Bun.write(join(outputDir, `${configName}.json`), configJson);
     console.log(`  generated ${configName}.json`);
   }
@@ -400,20 +534,28 @@ async function buildProfile(profileName: string) {
 }
 
 /** Apply variable substitution to all files in a directory (recursive) */
-async function applyVarsToDir(dir: string, vars: Record<string, string>) {
+async function applyVarsToDir(
+  dir: string,
+  vars: Record<string, string>,
+  strict = true,
+) {
   const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      await applyVarsToDir(fullPath, vars);
+      await applyVarsToDir(fullPath, vars, strict);
     } else {
-      await applyVarsToFile(fullPath, vars);
+      await applyVarsToFile(fullPath, vars, strict);
     }
   }
 }
 
 /** Apply variable substitution to a single file (only if it contains placeholders) */
-async function applyVarsToFile(filePath: string, vars: Record<string, string>) {
+async function applyVarsToFile(
+  filePath: string,
+  vars: Record<string, string>,
+  strict = true,
+) {
   // Only process text files
   if (!filePath.match(/\.(md|jsonc?|yaml|yml|ts|js|txt|sh|env)$/)) return;
   if (Object.keys(vars).length === 0) return;
@@ -421,7 +563,7 @@ async function applyVarsToFile(filePath: string, vars: Record<string, string>) {
   const text = await Bun.file(filePath).text();
   if (!text.includes("{{")) return;
 
-  const result = substituteVars(text, vars);
+  const result = substituteVars(text, vars, strict);
   await Bun.write(filePath, result);
 }
 
