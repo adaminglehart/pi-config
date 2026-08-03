@@ -16,6 +16,10 @@
     "provider": "openrouter",
     "model": "google/gemini-3.1-flash-lite-preview",
   },
+  "sessionTitle": {
+    "provider": "openai-codex",
+    "model": "gpt-5.6-luna",
+  },
   "lcm": {
     "summaryProvider": "openai-codex",
     "summaryModel": "GPT-4o",
