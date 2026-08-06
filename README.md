@@ -1,184 +1,87 @@
 # Pi Agent Configuration
 
-Profile-based Pi configuration with shared libraries and per-profile customization.
+This repository is the source of truth for the primary Pi agent deployed to
+`~/.pi/agent`. It stages a single agent configuration from root-level sources;
+`profiles/personal/` remains untouched as deferred migration input and is not
+part of the build or deployment pipeline.
 
 ## Structure
 
-```
+```text
 ~/dev/pi-config/
-  ├── .env                 # Local secrets (gitignored, see .env.example)
-  ├── .env.example         # Template for .env
-  ├── .mise.toml           # Tool versions + env loading
-  ├── profiles/            # Agent profiles (coding, personal, etc.)
-  │   ├── coding/
-  │   │   ├── package.json        # Profile manifest (extensions, skills, vars)
-  │   │   ├── config/             # Profile-specific config overrides
-  │   │   │   ├── mcp.json        # MCP servers for this profile
-  │   │   │   ├── mcp.local.json  # Local-only MCP overrides (gitignored)
-  │   │   │   ├── settings.json   # Settings overrides
-  │   │   │   └── models.json     # Model overrides
-  │   │   ├── AGENTS.md           # Profile-specific rules
-  │   │   ├── APPEND_SYSTEM.md    # Profile-specific system prompt
-  │   │   └── agents/             # Profile-specific agent definitions
-  │   └── personal/
-  │       └── ...
-  ├── extensions/          # Shared Pi extensions
-  ├── skills/              # Shared task-specific instruction packages
-  ├── shared/lib/          # Shared library code (_lib/)
-  ├── config/              # Base and environment-specific config
-  │   ├── settings.base.json      # Base settings for all profiles
-  │   ├── models.base.json        # Base models for all profiles
-  │   ├── mcp.base.json           # Base MCP configuration
-  │   ├── home/
-  │   │   ├── settings.json       # Home environment overrides
-  │   │   ├── models.json         # Home models
-  │   │   └── honcho.env          # Home Honcho config
-  │   └── work/
-  │       ├── settings.json       # Work environment overrides
-  │       ├── models.json         # Work models (LiteLLM proxy)
-  │       ├── models.local.json   # Local-only model overrides (gitignored)
-  │       └── honcho.env          # Work Honcho config
-  └── build/               # Build output (gitignored)
-      └── coding/agent/    # Ready to deploy → ~/.pi/agent/
+├── pi.jsonc              # Primary destination and enabled extensions/skills
+├── agent/                 # Primary prompts, agent definitions, deploy hook
+├── config/                # Base and environment-specific JSON configuration
+├── extensions/            # Shared Pi extensions
+├── skills/                # Shared task-specific instruction packages
+├── shared/lib/            # Shared extension code staged as extensions/_lib/
+├── build/agent/           # Generated primary-agent output (gitignored)
+├── build.ts               # Primary build pipeline
+└── Justfile               # Build, deploy, comparison, and cleanup commands
 ```
 
-## Config Merge Order
+Edit source files in this repository, not `~/.pi/agent`.
 
-Configs are merged in this order (later overrides earlier):
+## Primary manifest
 
-1. **Base** (`config/*.base.json`) — shared across all profiles and environments
-2. **Environment** (`config/{home,work}/*.json`) — environment-specific overrides
-3. **Environment local** (`config/{home,work}/*.local.json`) — machine-specific overrides (gitignored)
-4. **Profile** (`profiles/{name}/config/*.json`) — profile-specific overrides
-5. **Profile local** (`profiles/{name}/config/*.local.json`) — machine-specific profile overrides (gitignored)
+`pi.jsonc` declares the sole active agent's deployment destination and its
+extension and skill allowlists. Add an extension or skill to the respective
+source directory first, then explicitly add its name to the appropriate
+allowlist in `pi.jsonc`.
 
-Example: `mcp.json` for coding profile on work machine:
-```
-config/mcp.base.json                   # Base MCP servers
-→ config/work/mcp.json                 # Add work-specific servers
-→ config/work/mcp.local.json           # Add local-only servers (gitignored)
-→ profiles/coding/config/mcp.json      # Add coding-specific servers
-→ profiles/coding/config/mcp.local.json  # Local coding overrides (gitignored)
-```
+## Configuration merge order
 
-This allows you to:
-- Share common config across all profiles (base)
-- Adjust for home vs work environments (environment layer)
-- Add machine-specific tools or secrets without committing them (local layers)
-- Customize per agent profile (profile layer)
+Generated `settings.json`, `models.json`, and `mcp.json` merge later layers
+over earlier ones:
 
-### Environment Variables in Config
+1. **Base** — `config/<name>.base.json(.c)`
+2. **Environment** — `config/<env>/<name>.json(.c)`
+3. **Environment local** — `config/<env>/<name>.local.json(.c)` (gitignored)
 
-JSON config values can reference environment variables using `${VAR_NAME}` syntax.
-These are resolved at build time from your `.env` file (loaded by mise).
+The build detects `home` on `MacBook-Pro.local` and uses `work` elsewhere. To
+inspect another environment without changing the hostname, set
+`PI_BUILD_ENV`, for example `PI_BUILD_ENV=home just build`.
 
-```json
-{
-  "providers": {
-    "my-provider": {
-      "baseUrl": "${MY_LLM_BASE_URL}",
-      "apiKey": "${MY_LLM_API_KEY}"
-    }
-  }
-}
-```
-
-## Environment Detection
-
-Automatically detects environment based on hostname:
-- `Adams-MacBook-Pro.local` → `home`
-- All other hostnames → `work`
-
-Override with: `PI_BUILD_ENV=home just build coding`
+String values using `${VAR_NAME}` are resolved from the build environment.
+Missing variables fail the build. Model aliases from merged settings are also
+substituted into primary agent files.
 
 ## Commands
 
 ```bash
-# Build a single profile
-just build coding
+# Build build/agent/
+just build
 
-# Build all profiles
-just build-all
-
-# Deploy a built profile to ~/.pi/agent/
-just apply-profile coding
-
-# Build and deploy all profiles
+# Build and deploy the primary agent to the destination in pi.jsonc
+just deploy
+# Equivalent build-and-deploy command
 just apply
 
-# Build and deploy a single profile
-just deploy coding
+# Compare build/agent/ with the deployed agent (inspection only)
+just diff
 
-# Show diff between build output and deployed files
-just diff coding
+# Remove primary generated output and managed deployed files
+just clean
 
-# Clean build output and deployed files
-just clean coding
-
-# Generate honcho/.env for current environment
+# Generate honcho/.env for the detected environment
 just honcho-env
 ```
 
-## Editing Files
+Deployment rsyncs the generated output while excluding `node_modules`, then
+runs `agent/run_after_install_extension_deps.sh`. The hook discovers its own
+deployed directory and runs `pnpm install` for each staged extension package.
 
-**Always edit in `~/dev/pi-config/` (the source), not `~/.pi/agent/` (the target).**
-
-After editing, build and deploy:
-```bash
-just deploy coding
-# Or deploy all profiles:
-just apply
-```
-
-## Adding Profile-Specific Config
-
-To customize config for a specific profile (e.g., different MCP servers for coding vs personal):
-
-1. Create `profiles/<profile>/config/<config-name>.json`
-2. Add overrides (will be deep-merged with base + environment)
-3. Rebuild: `just build <profile>`
-
-Example — custom MCP servers for coding profile:
+## Setup on a new machine
 
 ```bash
-# profiles/coding/config/mcp.json
-{
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"]
-    }
-  }
-}
-```
-
-Supported config files:
-- `settings.json` — Pi agent settings
-- `models.json` — Model definitions
-- `mcp.json` — MCP server configuration
-
-## Setup on New Machine
-
-```bash
-# Clone this repo
 git clone <repo-url> ~/dev/pi-config
 cd ~/dev/pi-config
-
-# Install mise (if not already installed)
-# See https://mise.jdx.dev/getting-started.html
-
-# Trust this directory and install tools
 mise trust
 mise install
-
-# Configure environment
 cp .env.example .env
-# Edit .env with your API keys and provider URLs
-
-# Build and deploy all profiles
-just apply
-
-# (Optional) Generate honcho environment and start memory service
-just honcho-env
-cd honcho && docker compose up -d
+# Edit .env with required provider credentials and URLs.
+just deploy
 ```
+
+To use the optional Honcho memory service, run `just honcho-env`, then start it
+from `honcho/` using its documented compose configuration.

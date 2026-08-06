@@ -1,6 +1,4 @@
 {
-  "name": "@pi/profile-coding",
-  "private": true,
   "pi": {
     "destDir": "~/.pi/agent",
     "extensions": [
@@ -8,12 +6,9 @@
       "answer",
       "cost",
       "custom-footer",
-      // "lossless-context",
       "custom-compaction",
       "custom-startup-info",
       "herdr-agent-state",
-      // "dev-browser",
-      // "honcho",
       "hindsight",
       "lsp",
       "minimal-tools",
@@ -24,15 +19,13 @@
       "todos",
       "tokens-per-second",
       "webfetch",
-      "websearch",
+      "websearch"
     ],
     "skills": [
       "herdr",
-      // "msgvault-api",
       "pi-extension",
       "session-reader",
-      "agent-browser",
-      // "autoreview",
-    ],
-  },
+      "agent-browser"
+    ]
+  }
 }

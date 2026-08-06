@@ -39,6 +39,30 @@
             },
           },
         },
+        // {
+        //   "id": "z-ai/glm-5.2",
+        //   "name": "GLM 5.2",
+        //   "reasoning": true,
+        //   "contextWindow": 1048576,
+        //   "cost": {
+        //     "input": 0.76,
+        //     "output": 2.42,
+        //     "cacheRead": 0.14,
+        //     "cacheWrite": 0,
+        //   },
+        // },
+        // {
+        //   "id": "deepseek/deepseek-v4-flash",
+        //   "name": "DeepSeek V4 Flash",
+        //   "reasoning": true,
+        //   "contextWindow": 1048576,
+        //   "cost": {
+        //     "input": 0.14,
+        //     "output": 0.28,
+        //     "cacheRead": 0.028,
+        //     "cacheWrite": 0,
+        //   },
+        // },
       ],
     },
     "llama-server": {

@@ -19,7 +19,7 @@ The helper builds one frozen git change bundle, sends it to external `codex exec
 
 ## Step 1: Resolve the Helper
 
-Resolve `scripts/autoreview` relative to this skill directory before running it. In a deployed coding profile, the path is usually:
+Resolve `scripts/autoreview` relative to this skill directory before running it. In the deployed primary agent, the path is usually:
 
 ```bash
 ~/.pi/agent/skills/autoreview/scripts/autoreview

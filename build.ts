@@ -1,19 +1,11 @@
 #!/usr/bin/env bun
 
 /**
- * Build script for pi-config profiles.
+ * Build the primary Pi agent configuration.
  *
- * Reads a profile's package.json manifest, then copies the right
- * extensions, skills, shared lib, and profile-level files into
- * a build output directory ready for deployment.
- *
- * Handles:
- * - Environment detection (work vs home based on hostname)
- * - JSON config merging (base + env overlay for settings/models)
- * - Variable substitution in profile and extension files ({{var.name}} placeholders)
- *
- * Usage: bun run build.ts <profile>
- *   e.g. bun run build.ts coding
+ * Reads the root pi.jsonc manifest, then stages selected extensions, skills,
+ * shared library files, primary agent files, and merged configuration into
+ * build/agent/ for deployment.
  */
 
 import {
@@ -24,27 +16,27 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { basename, join } from "node:path";
 import { homedir, hostname } from "node:os";
+import { basename, join } from "node:path";
 
 const ROOT = import.meta.dirname;
+const AGENT_DIR = join(ROOT, "agent");
 const EXTENSIONS_DIR = join(ROOT, "extensions");
 const SKILLS_DIR = join(ROOT, "skills");
 const SHARED_LIB_DIR = join(ROOT, "shared", "lib");
-const PROFILES_DIR = join(ROOT, "profiles");
-const BUILD_DIR = join(ROOT, "build");
+const BUILD_DIR = join(ROOT, "build", "agent");
 const CONFIG_DIR = join(ROOT, "config");
+const MANIFEST_PATH = join(ROOT, "pi.jsonc");
 
 const HOME_HOSTNAME = "MacBook-Pro.local";
 const environment =
   Bun.env.PI_BUILD_ENV ?? (hostname() === HOME_HOSTNAME ? "home" : "work");
 
-interface ProfileManifest {
+interface PrimaryManifest {
   pi: {
     destDir: string;
     extensions: string[];
     skills: string[];
-    vars?: Record<string, Record<string, string>>;
   };
 }
 
@@ -62,24 +54,21 @@ interface ModelSettings {
   modelAliases?: JsonValue;
 }
 
-function fatal(msg: string): never {
-  console.error(`error: ${msg}`);
+function fatal(message: string): never {
+  console.error(`error: ${message}`);
   process.exit(1);
 }
 
-/** Parse JSONC (JSON with comments and trailing commas) */
+/** Parse JSONC (JSON with comments and trailing commas). */
 function parseJsonc(text: string): unknown {
   const stripped = text
-    // Remove single-line comments (but not // in URLs like https://)
     .replace(/(?<!:)\/\/.*$/gm, "")
-    // Remove multi-line comments
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    // Remove trailing commas before } or ]
     .replace(/,(\s*[}\]])/g, "$1");
   return JSON.parse(stripped);
 }
 
-/** Read and parse a JSON or JSONC file */
+/** Read and parse a JSON or JSONC file. */
 async function readJson(path: string): Promise<unknown> {
   const text = await Bun.file(path).text();
   return path.endsWith(".jsonc") ? parseJsonc(text) : JSON.parse(text);
@@ -87,41 +76,36 @@ async function readJson(path: string): Promise<unknown> {
 
 /**
  * Find a file that may have a .json or .jsonc extension.
- * Returns the path if found, or null. Prefers .jsonc over .json if both exist.
+ * Returns the path if found, or null. Prefers .jsonc over .json.
  */
 function findJsonFile(pathWithoutExt: string): string | null;
 function findJsonFile(pathWithExt: string, withExt: true): string | null;
 function findJsonFile(path: string, withExt?: boolean): string | null {
   if (withExt) {
-    // Path already has extension — check as-is, then try swapping
     if (existsSync(path)) return path;
-    const alt = path.endsWith(".jsonc")
+    const alternative = path.endsWith(".jsonc")
       ? path.replace(/\.jsonc$/, ".json")
       : path.replace(/\.json$/, ".jsonc");
-    return existsSync(alt) ? alt : null;
+    return existsSync(alternative) ? alternative : null;
   }
-  // Path without extension — try .jsonc first, then .json
+
   const jsonc = `${path}.jsonc`;
   if (existsSync(jsonc)) return jsonc;
   const json = `${path}.json`;
-  if (existsSync(json)) return json;
-  return null;
+  return existsSync(json) ? json : null;
 }
 
-function copyDir(src: string, dest: string) {
-  cpSync(src, dest, {
+function copyDir(source: string, destination: string): void {
+  cpSync(source, destination, {
     recursive: true,
-    filter: (source: string) => !source.includes("node_modules"),
+    filter: (path: string) => !path.includes("node_modules"),
   });
 }
 
-function resolveExtensionSource(name: string): {
-  path: string;
-  isFile: boolean;
-} {
-  const dirPath = join(EXTENSIONS_DIR, name);
-  if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {
-    return { path: dirPath, isFile: false };
+function resolveExtensionSource(name: string): { path: string; isFile: boolean } {
+  const directoryPath = join(EXTENSIONS_DIR, name);
+  if (existsSync(directoryPath) && statSync(directoryPath).isDirectory()) {
+    return { path: directoryPath, isFile: false };
   }
 
   const filePath = join(EXTENSIONS_DIR, `${name}.ts`);
@@ -129,47 +113,41 @@ function resolveExtensionSource(name: string): {
     return { path: filePath, isFile: true };
   }
 
-  fatal(`Extension not found: "${name}" (checked ${dirPath}/ and ${filePath})`);
+  fatal(`Extension not found: "${name}" (checked ${directoryPath}/ and ${filePath})`);
 }
 
-/** Deep merge source into target (mutates target) */
+/** Deep merge source into target (mutates target). */
 function deepMerge(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
 ): Record<string, unknown> {
   for (const key of Object.keys(source)) {
-    const targetVal = target[key];
-    const sourceVal = source[key];
+    const targetValue = target[key];
+    const sourceValue = source[key];
     if (
-      targetVal &&
-      sourceVal &&
-      typeof targetVal === "object" &&
-      typeof sourceVal === "object" &&
-      !Array.isArray(targetVal) &&
-      !Array.isArray(sourceVal)
+      targetValue &&
+      sourceValue &&
+      typeof targetValue === "object" &&
+      typeof sourceValue === "object" &&
+      !Array.isArray(targetValue) &&
+      !Array.isArray(sourceValue)
     ) {
       deepMerge(
-        targetVal as Record<string, unknown>,
-        sourceVal as Record<string, unknown>,
+        targetValue as Record<string, unknown>,
+        sourceValue as Record<string, unknown>,
       );
     } else {
-      target[key] = sourceVal;
+      target[key] = sourceValue;
     }
   }
   return target;
 }
 
-/** Clean up managed destination directories that are not in the build output.
- *  This removes stale agents/extensions/skills when they're removed from the profile. */
-function cleanupStaleArtifacts(
-  buildDir: string,
-  destDir: string,
-  profileName: string,
-): void {
+/** Remove deployed agents, extensions, and skills no longer included in a build. */
+function cleanupStaleArtifacts(buildDir: string, destDir: string): void {
   if (!existsSync(destDir)) return;
 
-  // Files to preserve in extensions directory (installed dependencies, not source)
-  const PRESERVE_IN_EXTENSIONS = new Set([
+  const preserveInExtensions = new Set([
     "pnpm-lock.yaml",
     "node_modules",
     "package.json",
@@ -180,7 +158,7 @@ function cleanupStaleArtifacts(
     subdir: string,
     label: string,
     preserve = new Set<string>(),
-  ) => {
+  ): void => {
     const builtDir = join(buildDir, subdir);
     const deployedDir = join(destDir, subdir);
     if (!existsSync(deployedDir)) return;
@@ -188,79 +166,61 @@ function cleanupStaleArtifacts(
     const builtEntries = existsSync(builtDir)
       ? new Set(readdirSync(builtDir))
       : new Set<string>();
-    const deployedEntries = readdirSync(deployedDir);
 
-    for (const entry of deployedEntries) {
+    for (const entry of readdirSync(deployedDir)) {
       if (!builtEntries.has(entry) && !preserve.has(entry)) {
-        const entryPath = join(deployedDir, entry);
-        rmSync(entryPath, { recursive: true, force: true });
+        rmSync(join(deployedDir, entry), { recursive: true, force: true });
         console.log(`  removed stale ${label}: ${entry}`);
       }
     }
   };
 
   cleanupManagedDir("agents", "agent");
-  cleanupManagedDir("extensions", "extension", PRESERVE_IN_EXTENSIONS);
+  cleanupManagedDir("extensions", "extension", preserveInExtensions);
   cleanupManagedDir("skills", "skill");
 }
 
-/** Get the destination directory for a profile from its manifest */
-async function getProfileDestDir(profileName: string) {
-  const manifestPath = findJsonFile(join(PROFILES_DIR, profileName, "package"));
-  if (!manifestPath) {
-    fatal(`Profile manifest not found: ${profileName}`);
+/** Read the primary deployment destination from the root manifest. */
+async function getPrimaryDestDir(): Promise<string> {
+  if (!existsSync(MANIFEST_PATH)) {
+    fatal(`Primary manifest not found: ${MANIFEST_PATH}`);
   }
 
-  const parsed = (await readJson(manifestPath)) as ProfileManifest;
-  const destDir = parsed.pi?.destDir;
-
+  const manifest = (await readJson(MANIFEST_PATH)) as PrimaryManifest;
+  const destDir = manifest.pi?.destDir;
   if (!destDir) {
-    fatal(`Profile manifest missing pi.destDir: ${profileName}`);
+    fatal(`Primary manifest missing pi.destDir: ${MANIFEST_PATH}`);
   }
 
-  // Expand ~ to home directory
   return destDir.replace(/^~/, homedir());
 }
 
-/** Build a merged JSON config from base + environment + profile overlays */
-async function buildMergedConfig(
-  prefix: string,
-  profileDir: string,
-): Promise<string> {
+/** Build a merged JSON config from base, environment, and environment-local layers. */
+async function buildMergedConfig(prefix: string): Promise<string> {
   const basePath = findJsonFile(join(CONFIG_DIR, `${prefix}.base`));
   if (!basePath) {
     fatal(`Config not found: ${join(CONFIG_DIR, `${prefix}.base.json`)}`);
   }
 
-  // Merge: base → environment → environment.local → profile → profile.local
-  // *.local.json(c) files are gitignored and used for machine-specific overrides
   const base = (await readJson(basePath)) as Record<string, unknown>;
-
   const layerPaths = [
     findJsonFile(join(CONFIG_DIR, environment, prefix)),
     findJsonFile(join(CONFIG_DIR, environment, `${prefix}.local`)),
-    findJsonFile(join(profileDir, "config", prefix)),
-    findJsonFile(join(profileDir, "config", `${prefix}.local`)),
   ];
 
   for (const layerPath of layerPaths) {
     if (layerPath) {
-      const overlay = (await readJson(layerPath)) as Record<string, unknown>;
-      deepMerge(base, overlay);
+      deepMerge(base, (await readJson(layerPath)) as Record<string, unknown>);
     }
   }
 
-  // Resolve ${ENV_VAR} references in string values from process.env
-  const output = JSON.stringify(base, null, 2);
-  return resolveEnvVars(output) + "\n";
+  return `${resolveEnvVars(JSON.stringify(base, null, 2))}\n`;
 }
 
 /** Read named model aliases from merged settings as build variables. */
 function readModelAliasVars(settingsJson: string): Record<string, string> {
   const { modelAliases } = JSON.parse(settingsJson) as ModelSettings;
-  if (modelAliases === undefined) {
-    return {};
-  }
+  if (modelAliases === undefined) return {};
   if (
     modelAliases === null ||
     typeof modelAliases !== "object" ||
@@ -301,13 +261,13 @@ function defaultModelUsesAlias(settingsJson: string): boolean {
 
 /** Resolve Pi's configured default model into a provider/model reference. */
 function resolveDefaultModelReference(settingsJson: string): string {
-  const settings = JSON.parse(settingsJson) as ModelSettings;
-  const { defaultProvider, defaultModel } = settings;
+  const { defaultProvider, defaultModel } = JSON.parse(
+    settingsJson,
+  ) as ModelSettings;
 
   if (!defaultModel) {
     fatal("Merged settings must define defaultModel");
   }
-
   if (defaultProvider) {
     return `${defaultProvider}/${defaultModel}`;
   }
@@ -322,38 +282,36 @@ function resolveDefaultModelReference(settingsJson: string): string {
   );
 }
 
-/** Normalize Pi's generated settings to separate defaultProvider/defaultModel fields. */
+/** Normalize generated settings to separate defaultProvider/defaultModel fields. */
 function normalizeDefaultModelSettings(
   settingsJson: string,
   defaultFromAlias: boolean,
 ): string {
   const settings = JSON.parse(settingsJson) as ModelSettings;
-  if (defaultFromAlias) {
-    delete settings.defaultProvider;
-  }
+  if (defaultFromAlias) delete settings.defaultProvider;
 
   const reference = resolveDefaultModelReference(JSON.stringify(settings));
   const separator = reference.indexOf("/");
   settings.defaultProvider = reference.slice(0, separator);
   settings.defaultModel = reference.slice(separator + 1);
 
-  return JSON.stringify(settings, null, 2) + "\n";
+  return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
-/** Replace ${VAR_NAME} placeholders in text with values from process.env */
+/** Replace ${VAR_NAME} placeholders with values from the build environment. */
 function resolveEnvVars(text: string): string {
-  return text.replace(/\$\{(\w+)\}/g, (_match, varName: string) => {
-    const value = Bun.env[varName];
+  return text.replace(/\$\{(\w+)\}/g, (_match, variableName: string) => {
+    const value = Bun.env[variableName];
     if (value === undefined) {
       fatal(
-        `Environment variable "\${${varName}}" is not set. Add it to your .env file.`,
+        `Environment variable "\${${variableName}}" is not set. Add it to your .env file.`,
       );
     }
     return value;
   });
 }
 
-/** Replace {{var.name}} placeholders in text using build variables for current environment */
+/** Replace {{var.name}} placeholders using build variables for the current environment. */
 function substituteVars(
   text: string,
   vars: Record<string, string>,
@@ -372,175 +330,13 @@ function substituteVars(
   });
 }
 
-async function buildProfile(profileName: string) {
-  const profileDir = join(PROFILES_DIR, profileName);
-  if (!existsSync(profileDir)) {
-    fatal(`Profile not found: ${profileDir}`);
-  }
-
-  const manifestPath = findJsonFile(join(profileDir, "package"));
-  if (!manifestPath) {
-    fatal(`No package.json(c) in profile: ${profileDir}`);
-  }
-
-  const manifest = (await readJson(manifestPath)) as ProfileManifest;
-
-  if (!manifest.pi) {
-    fatal(`package.json missing "pi" field in ${manifestPath}`);
-  }
-
-  const { extensions, skills, vars } = manifest.pi;
-  const mergedSettingsJson = await buildMergedConfig("settings", profileDir);
-  const profileVars = { ...(vars?.[environment] ?? {}) };
-  const modelVars = readModelAliasVars(mergedSettingsJson);
-
-  for (const key of Object.keys(modelVars)) {
-    if (key in profileVars) {
-      fatal(
-        `Profile var "${key}" is defined by merged settings modelAliases and must not be defined in ${manifestPath}`,
-      );
-    }
-  }
-  if ("model.default" in profileVars) {
-    fatal(
-      `Profile var "model.default" is derived from merged settings and must not be defined in ${manifestPath}`,
-    );
-  }
-
-  const envVars = { ...profileVars, ...modelVars };
-  const settingsJson = normalizeDefaultModelSettings(
-    substituteVars(mergedSettingsJson, envVars),
-    defaultModelUsesAlias(mergedSettingsJson),
-  );
-  envVars["model.default"] = resolveDefaultModelReference(settingsJson);
-  const outputDir = join(BUILD_DIR, profileName, "agent");
-
-  console.log(`  environment: ${environment}`);
-  console.log("");
-
-  // Clean output
-  if (existsSync(outputDir)) {
-    rmSync(outputDir, { recursive: true });
-  }
-  mkdirSync(outputDir, { recursive: true });
-
-  // 1. Copy shared lib → extensions/_lib/
-  const libOutputDir = join(outputDir, "extensions", "_lib");
-  if (existsSync(SHARED_LIB_DIR) && readdirSync(SHARED_LIB_DIR).length > 0) {
-    console.log(`  _lib/ → extensions/_lib/`);
-    copyDir(SHARED_LIB_DIR, libOutputDir);
-  }
-
-  // 2. Copy extensions
-  const extOutputDir = join(outputDir, "extensions");
-  mkdirSync(extOutputDir, { recursive: true });
-
-  for (const extName of extensions) {
-    const source = resolveExtensionSource(extName);
-    if (source.isFile) {
-      const dest = join(extOutputDir, basename(source.path));
-      cpSync(source.path, dest);
-      // Extensions may have their own runtime placeholders; replace only known profile vars.
-      await applyVarsToFile(dest, envVars, false);
-      console.log(`  ext ${extName} (file)`);
-    } else {
-      const dest = join(extOutputDir, extName);
-      copyDir(source.path, dest);
-      await applyVarsToDir(dest, envVars, false);
-      console.log(`  ext ${extName}/`);
-    }
-  }
-
-  // 3. Copy extensions root-level dev tooling (package.json, tsconfig.json)
-  for (const devFile of ["package.json", "tsconfig.json"]) {
-    const src = join(EXTENSIONS_DIR, devFile);
-    if (existsSync(src)) {
-      cpSync(src, join(extOutputDir, devFile));
-    }
-  }
-
-  // 4. Copy skills
-  const skillOutputDir = join(outputDir, "skills");
-  mkdirSync(skillOutputDir, { recursive: true });
-
-  for (const skillName of skills) {
-    const src = join(SKILLS_DIR, skillName);
-    if (!existsSync(src)) {
-      fatal(`Skill not found: ${src}`);
-    }
-    const dest = join(skillOutputDir, skillName);
-    copyDir(src, dest);
-    console.log(`  skill ${skillName}/`);
-  }
-
-  // 5. Copy profile-level files with variable substitution
-  const profileFiles = readdirSync(profileDir);
-  for (const item of profileFiles) {
-    if (
-      item === "package.json" ||
-      item === "package.jsonc" ||
-      item === "node_modules" ||
-      item === "config" // config/ is build-time input only; merged output goes to root-level config files
-    )
-      continue;
-
-    const src = join(profileDir, item);
-    const dest = join(outputDir, item);
-
-    if (statSync(src).isDirectory()) {
-      copyDir(src, dest);
-      await applyVarsToDir(dest, envVars);
-      console.log(`  profile ${item}/`);
-    } else {
-      cpSync(src, dest);
-      await applyVarsToFile(dest, envVars);
-      console.log(`  profile ${item}`);
-    }
-  }
-
-  // 6. Generate merged config files (settings.json, models.json, mcp.json, etc.)
-  const configFiles = ["settings", "models", "mcp"];
-  for (const configName of configFiles) {
-    const basePath = findJsonFile(
-      join(CONFIG_DIR, `${configName}.base.json`),
-      true,
-    );
-    if (!existsSync(basePath)) {
-      continue; // Skip if base file doesn't exist (e.g., mcp.json is optional)
-    }
-
-    const configJson =
-      configName === "settings"
-        ? settingsJson
-        : await buildMergedConfig(configName, profileDir);
-    await Bun.write(join(outputDir, `${configName}.json`), configJson);
-    console.log(`  generated ${configName}.json`);
-  }
-
-  // 7. Copy fnox.toml for encrypted secrets (environment-specific if available)
-  const envFnoxPath = join(CONFIG_DIR, environment, "fnox.toml");
-  const baseFnoxPath = join(ROOT, "fnox.toml");
-  const fnoxPath = existsSync(envFnoxPath) ? envFnoxPath : baseFnoxPath;
-  if (existsSync(fnoxPath)) {
-    cpSync(fnoxPath, join(outputDir, "fnox.toml"));
-    console.log(`  copied ${fnoxPath === envFnoxPath ? `${environment}/` : ""}fnox.toml (encrypted secrets)`);
-  }
-
-  // 8. Clean up stale extensions and skills from destination
-  const destDir = await getProfileDestDir(profileName);
-  cleanupStaleArtifacts(outputDir, destDir, profileName);
-
-  console.log(`\n✓ Built profile "${profileName}" → ${outputDir}`);
-}
-
-/** Apply variable substitution to all files in a directory (recursive) */
+/** Apply variable substitution to all text files in a directory. */
 async function applyVarsToDir(
   dir: string,
   vars: Record<string, string>,
   strict = true,
-) {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
+): Promise<void> {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
       await applyVarsToDir(fullPath, vars, strict);
@@ -550,29 +346,136 @@ async function applyVarsToDir(
   }
 }
 
-/** Apply variable substitution to a single file (only if it contains placeholders) */
+/** Apply variable substitution to a single text file. */
 async function applyVarsToFile(
   filePath: string,
   vars: Record<string, string>,
   strict = true,
-) {
-  // Only process text files
+): Promise<void> {
   if (!filePath.match(/\.(md|jsonc?|yaml|yml|ts|js|txt|sh|env)$/)) return;
   if (Object.keys(vars).length === 0) return;
 
   const text = await Bun.file(filePath).text();
   if (!text.includes("{{")) return;
 
-  const result = substituteVars(text, vars, strict);
-  await Bun.write(filePath, result);
+  await Bun.write(filePath, substituteVars(text, vars, strict));
 }
 
-// --- Main ---
+async function buildPrimaryAgent(): Promise<void> {
+  if (!existsSync(MANIFEST_PATH)) {
+    fatal(`Primary manifest not found: ${MANIFEST_PATH}`);
+  }
+  if (!existsSync(AGENT_DIR)) {
+    fatal(`Primary agent source directory not found: ${AGENT_DIR}`);
+  }
 
-const profileName = process.argv[2];
-if (!profileName) {
-  fatal("Usage: bun run build.ts <profile>");
+  const manifest = (await readJson(MANIFEST_PATH)) as PrimaryManifest;
+  if (!manifest.pi) {
+    fatal(`Primary manifest missing "pi" field: ${MANIFEST_PATH}`);
+  }
+
+  const { extensions, skills } = manifest.pi;
+  const mergedSettingsJson = await buildMergedConfig("settings");
+  const buildVars = readModelAliasVars(mergedSettingsJson);
+  const settingsJson = normalizeDefaultModelSettings(
+    substituteVars(mergedSettingsJson, buildVars),
+    defaultModelUsesAlias(mergedSettingsJson),
+  );
+  buildVars["model.default"] = resolveDefaultModelReference(settingsJson);
+  const destDir = await getPrimaryDestDir();
+
+  console.log(`  environment: ${environment}\n`);
+
+  if (existsSync(BUILD_DIR)) {
+    rmSync(BUILD_DIR, { recursive: true });
+  }
+  mkdirSync(BUILD_DIR, { recursive: true });
+
+  const libOutputDir = join(BUILD_DIR, "extensions", "_lib");
+  if (existsSync(SHARED_LIB_DIR) && readdirSync(SHARED_LIB_DIR).length > 0) {
+    console.log("  _lib/ → extensions/_lib/");
+    copyDir(SHARED_LIB_DIR, libOutputDir);
+  }
+
+  const extensionOutputDir = join(BUILD_DIR, "extensions");
+  mkdirSync(extensionOutputDir, { recursive: true });
+  for (const extensionName of extensions) {
+    const source = resolveExtensionSource(extensionName);
+    const destination = join(extensionOutputDir, basename(source.path));
+    if (source.isFile) {
+      cpSync(source.path, destination);
+      await applyVarsToFile(destination, buildVars, false);
+      console.log(`  ext ${extensionName} (file)`);
+    } else {
+      copyDir(source.path, destination);
+      await applyVarsToDir(destination, buildVars, false);
+      console.log(`  ext ${extensionName}/`);
+    }
+  }
+
+  for (const devFile of ["package.json", "tsconfig.json"]) {
+    const source = join(EXTENSIONS_DIR, devFile);
+    if (existsSync(source)) cpSync(source, join(extensionOutputDir, devFile));
+  }
+
+  const skillOutputDir = join(BUILD_DIR, "skills");
+  mkdirSync(skillOutputDir, { recursive: true });
+  for (const skillName of skills) {
+    const source = join(SKILLS_DIR, skillName);
+    if (!existsSync(source)) fatal(`Skill not found: ${source}`);
+    const destination = join(skillOutputDir, skillName);
+    copyDir(source, destination);
+    console.log(`  skill ${skillName}/`);
+  }
+
+  for (const item of readdirSync(AGENT_DIR)) {
+    if (item === "extensions" || item === "skills" || item === "node_modules") {
+      continue;
+    }
+
+    const source = join(AGENT_DIR, item);
+    const destination = join(BUILD_DIR, item);
+    if (statSync(source).isDirectory()) {
+      copyDir(source, destination);
+      await applyVarsToDir(destination, buildVars);
+      console.log(`  agent ${item}/`);
+    } else {
+      cpSync(source, destination);
+      await applyVarsToFile(destination, buildVars);
+      console.log(`  agent ${item}`);
+    }
+  }
+
+  for (const configName of ["settings", "models", "mcp"]) {
+    const basePath = findJsonFile(
+      join(CONFIG_DIR, `${configName}.base.json`),
+      true,
+    );
+    if (!basePath) continue;
+
+    const configJson =
+      configName === "settings"
+        ? settingsJson
+        : await buildMergedConfig(configName);
+    await Bun.write(join(BUILD_DIR, `${configName}.json`), configJson);
+    console.log(`  generated ${configName}.json`);
+  }
+
+  const environmentFnoxPath = join(CONFIG_DIR, environment, "fnox.toml");
+  const baseFnoxPath = join(ROOT, "fnox.toml");
+  const fnoxPath = existsSync(environmentFnoxPath)
+    ? environmentFnoxPath
+    : baseFnoxPath;
+  if (existsSync(fnoxPath)) {
+    cpSync(fnoxPath, join(BUILD_DIR, "fnox.toml"));
+    console.log(
+      `  copied ${fnoxPath === environmentFnoxPath ? `${environment}/` : ""}fnox.toml (encrypted secrets)`,
+    );
+  }
+
+  cleanupStaleArtifacts(BUILD_DIR, destDir);
+  console.log(`\n✓ Built primary agent → ${BUILD_DIR}`);
 }
 
-console.log(`Building profile: ${profileName}\n`);
-await buildProfile(profileName);
+console.log("Building primary Pi agent\n");
+await buildPrimaryAgent();

@@ -2,7 +2,8 @@
 # Install pnpm dependencies for pi extensions that have a package.json
 set -e
 
-EXTENSIONS_DIR="$HOME/.pi/agent/extensions"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXTENSIONS_DIR="$SCRIPT_DIR/extensions"
 
 if [ ! -d "$EXTENSIONS_DIR" ]; then
   exit 0

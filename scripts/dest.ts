@@ -1,32 +1,27 @@
 #!/usr/bin/env bun
-/**
- * Read destDir from a profile's package.json or package.jsonc.
- * Usage: bun scripts/dest.ts <profile>
- */
+/** Read destDir from the root pi.jsonc manifest. */
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
-const profile = process.argv[2];
-if (!profile) {
-  console.error("Usage: bun scripts/dest.ts <profile>");
-  process.exit(1);
-}
-
 const root = join(import.meta.dirname, "..");
-const jsonc = join(root, "profiles", profile, "package.jsonc");
-const json = join(root, "profiles", profile, "package.json");
-const manifest = existsSync(jsonc) ? jsonc : existsSync(json) ? json : null;
+const manifestPath = join(root, "pi.jsonc");
 
-if (!manifest) {
-  console.error(`error: no package.json(c) in profiles/${profile}/`);
+if (!existsSync(manifestPath)) {
+  console.error(`error: primary manifest not found: ${manifestPath}`);
   process.exit(1);
 }
 
-const text = await Bun.file(manifest).text();
+const text = await Bun.file(manifestPath).text();
 const stripped = text
-  .replace(/\/\/.*$/gm, "")
+  .replace(/(?<!:)\/\/.*$/gm, "")
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/,(\s*[}\]])/g, "$1");
+const destDir = JSON.parse(stripped).pi?.destDir;
 
-const destDir = JSON.parse(stripped).pi.destDir.replace("~", process.env.HOME!);
-console.log(destDir);
+if (typeof destDir !== "string" || !destDir) {
+  console.error(`error: primary manifest missing pi.destDir: ${manifestPath}`);
+  process.exit(1);
+}
+
+console.log(destDir.replace(/^~/, homedir()));

@@ -1,75 +1,59 @@
-# Build a single profile
-build profile:
-    bun run build.ts {{ profile }}
+# Build the primary Pi agent configuration
+build:
+    bun run build.ts
 
-# Build all profiles
-build-all:
+# Read destDir from the root pi.jsonc manifest
+_dest:
+    @bun scripts/dest.ts
+
+# Deploy the built primary agent to its destination
+_deploy:
     #!/usr/bin/env bash
     set -euo pipefail
-    for dir in profiles/*/; do
-      profile=$(basename "$dir")
-      just build "$profile"
-    done
-
-# Read destDir from a profile's package.json or package.jsonc
-_dest profile:
-    @bun scripts/dest.ts {{ profile }}
-
-# Deploy a single built profile to its destination
-apply-profile profile:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    DEST=$(just _dest {{ profile }})
-    BUILD="build/{{ profile }}/agent"
+    DEST=$(just _dest)
+    BUILD="build/agent"
     if [ ! -d "$BUILD" ]; then
-      echo "error: build/{{ profile }}/agent/ not found. Run 'just build {{ profile }}' first."
+      echo "error: build/agent/ not found. Run 'just build' first."
       exit 1
     fi
-    echo "Deploying {{ profile }} → $DEST"
+    echo "Deploying primary agent → $DEST"
     mkdir -p "$DEST"
     rsync -a --exclude 'node_modules' "$BUILD/" "$DEST/"
-    # Install extension npm deps
+    # Install extension pnpm dependencies
     if [ -f "$DEST/run_after_install_extension_deps.sh" ]; then
       bash "$DEST/run_after_install_extension_deps.sh"
     fi
-    echo "✓ Deployed {{ profile }} → $DEST"
+    echo "✓ Deployed primary agent → $DEST"
 
-# Build and deploy all profiles
-apply:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    for dir in profiles/*/; do
-      profile=$(basename "$dir")
-      just build "$profile"
-      just apply-profile "$profile"
-    done
+# Build and deploy the primary agent
+apply: (build) _deploy
 
-# Build and deploy a single profile
-deploy profile: (build profile) (apply-profile profile)
+# Build and deploy the primary agent
+deploy: apply
 
 # Show diff between build output and deployed destination
-diff profile:
+diff:
     #!/usr/bin/env bash
     set -euo pipefail
-    DEST=$(just _dest {{ profile }})
-    BUILD="build/{{ profile }}/agent"
+    DEST=$(just _dest)
+    BUILD="build/agent"
     if [ ! -d "$BUILD" ]; then
-      echo "error: build/{{ profile }}/agent/ not found. Run 'just build {{ profile }}' first."
+      echo "error: build/agent/ not found. Run 'just build' first."
       exit 1
     fi
     diff -rq "$BUILD" "$DEST" --exclude node_modules --exclude sessions --exclude auth.json --exclude pi-debug.log --exclude git --exclude status || true
 
-# Clean build output and managed files from destination
-clean profile:
+# Clean build output and managed files from the destination
+clean:
     #!/usr/bin/env bash
     set -euo pipefail
-    DEST=$(just _dest {{ profile }})
-    echo "Cleaning build/{{ profile }}/ and $DEST (excluding sessions, auth.json, git, node_modules)"
-    rm -rf "build/{{ profile }}"
-    for item in agents AGENTS.md APPEND_SYSTEM.md extensions skills settings.json models.json run_after_install_extension_deps.sh .chezmoiignore; do
+    DEST=$(just _dest)
+    echo "Cleaning build/agent/ and $DEST (excluding sessions, auth.json, git, node_modules)"
+    rm -rf "build/agent"
+    for item in agents AGENTS.md APPEND_SYSTEM.md extensions skills settings.json models.json mcp.json fnox.toml run_after_install_extension_deps.sh .chezmoiignore; do
       rm -rf "$DEST/$item"
     done
-    echo "✓ Cleaned {{ profile }}"
+    echo "✓ Cleaned primary agent"
 
 # Import historical Pi JSONL sessions into Hindsight (dry-run by default; pass --write to ingest)
 hindsight-import *args:

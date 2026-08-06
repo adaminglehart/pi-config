@@ -1,390 +1,110 @@
 # AGENTS.md
 
-**Pi-config specific guidelines.**
-
-This repo is the **source of truth** for Adam's Pi agent configuration. It defines shared extensions, shared skills, environment overlays, and per-profile agent builds, then generates deployable agent directories such as `~/.pi/agent`.
-
-## What this repo is
-
-This is a **profile-based Pi configuration repo**, not a normal app/service.
-
-The main workflow is:
-
-1. Edit source files in `~/dev/pi-config`
-2. Build one or more profiles into `build/<profile>/agent/`
-3. Deploy the built output into the profile's configured destination (`~/.pi/agent`, `~/.pi-personal/agent`, etc.)
-
-**Do not edit deployed files directly** in `~/.pi/...` when they are managed here.
-
-## Source of truth vs generated output
-
-Authoritative source directories are:
-
-- `profiles/`
-- `extensions/`
-- `skills/`
-- `config/`
-- `shared/lib/`
-- `scripts/`
-- `build.ts`
-- `Justfile`
-
-Generated or deployed artifacts are:
-
-- `build/`
-- target directories like `~/.pi/agent` and `~/.pi-personal/agent`
-
-When changing Pi config, always update the source repo first, then deploy with the repo's apply flow.
-
-## Deployment
-
-This repo is deployed using the justfile. Always use:
-
-```bash
-cd ~/dev/pi-config && just apply
-```
-
-For a single profile, prefer:
-
-```bash
-cd ~/dev/pi-config && just deploy coding
-```
-
-Do not use chezmoi for this repository.
-
-## Build system
-
-This repo uses:
-
-- **Bun** for build scripts
-- **Just** for build/deploy task entrypoints
-- **mise** for tool installation and loading `.env`
-
-Key files:
-
-- `build.ts` — main profile build pipeline
-- `Justfile` — user-facing build/deploy commands
-- `scripts/dest.ts` — resolves a profile's deployment destination
-- `.mise.toml` — installs Bun and loads `.env`
-
-### Important build behavior
-
-`build.ts` does all of the following:
-
-- reads `profiles/<profile>/package.json` or `package.jsonc`
-- determines the target destination from `pi.destDir`
-- detects environment as `home` or `work`
-- copies selected extensions and skills into `build/<profile>/agent/`
-- copies profile-level files like `AGENTS.md`, `APPEND_SYSTEM.md`, `agents/`, and scripts
-- copies shared library code from `shared/lib/` into `extensions/_lib/`
-- generates merged config files like `settings.json`, `models.json`, and `mcp.json`
-- resolves `${ENV_VAR}` placeholders from `.env`
-- resolves `{{var.name}}` placeholders from profile manifest vars
-- removes stale deployed extensions/skills that were removed from the profile
-
-### Environment detection
-
-By default, the build uses:
-
-- `home` when hostname is `MacBook-Pro.local`
-- `work` for every other hostname
-
-You can override this explicitly:
-
-```bash
-PI_BUILD_ENV=home just build coding
-```
-
-If environment-specific behavior matters, prefer checking `build.ts` over guessing.
-
-## Project structure
-
-### Top level
-
-- `build.ts` — Bun build script for assembling a profile
-- `Justfile` — build/deploy/diff/clean commands
-- `README.md` — human-facing repo documentation
-- `docs/` — additional documentation
-- `.mise.toml` — tool/runtime setup and `.env` loading
-- `.env.example` — template for required environment variables
-
-### `profiles/`
-
-Each directory under `profiles/` defines a deployable Pi profile.
-
-Current profiles include:
-
-- `profiles/coding/`
-- `profiles/personal/`
-
-A profile typically contains:
-
-- `package.json` or `package.jsonc` — manifest with `pi.destDir`, `extensions`, `skills`, optional `vars`
-- `AGENTS.md` — profile-specific working instructions
-- `APPEND_SYSTEM.md` — extra system prompt content
-- `agents/` — profile-local agent definitions
-- `config/` — profile-specific config overlays
-- optional helper scripts such as `run_after_install_extension_deps.sh`
-
-### `extensions/`
-
-Shared Pi extensions live here.
-
-This repo supports both:
-
-- **directory-based extensions** like `extensions/dev-browser/`
-- **single-file extensions** like `extensions/websearch.ts`
-
-`extensions/package.json` and `extensions/tsconfig.json` are the shared dev/typecheck setup for extension development, and are also copied into build output where needed.
-
-When modifying or adding an extension:
-
-1. put it under `extensions/`
-2. add it to the relevant profile manifest under `pi.extensions`
-3. deploy the profile
-
-### `skills/`
-
-Shared task-specific skills live here.
-
-When adding a skill:
-
-1. create `skills/<name>/`
-2. add its `SKILL.md` and any supporting files
-3. add the skill name to the relevant profile manifest under `pi.skills`
-4. deploy the profile
-
-### `config/`
-
-This holds shared and environment-specific config layers.
-
-Main files/directories:
-
-- `config/settings.base.json`
-- `config/models.base.json`
-- `config/mcp.base.json`
-- `config/home/`
-- `config/work/`
-- `config/honcho.env.base`
-
-Use this directory for config shared across profiles or specific to `home` vs `work`.
-
-### `shared/lib/`
-
-Shared extension helper code lives here. During build it is copied to:
-
-```text
-build/<profile>/agent/extensions/_lib/
-```
-
-Use this for code intentionally shared across multiple extensions.
-
-### `build/`
-
-This is generated output only.
-
-Each build lands in:
-
-```text
-build/<profile>/agent/
-```
-
-Do not hand-edit files here unless you're debugging the build itself.
-
-### `honcho/`
-
-Support code for the Honcho memory service lives here. This is related project infrastructure, not the main Pi profile source tree.
-
-## Configuration layering and merge order
-
-Generated config files are merged in this order:
+## Repository model
+
+`~/dev/pi-config` is the source of truth for one primary Pi agent. The primary
+manifest is `pi.jsonc`; primary runtime sources are in `agent/`; and generated
+output is `build/agent/`. The manifest declares the deployment destination,
+currently `~/.pi/agent`, and the enabled extension and skill allowlists.
+
+`profiles/personal/` is deferred migration input. Leave it untouched: it is
+not an active profile and is not read by the primary build or deployment
+pipeline.
+
+Do not edit `~/.pi/agent` directly when it is managed by this repository. Edit
+source files, build, then use the Justfile deploy flow when deployment is
+requested.
+
+## Source and generated locations
+
+Authoritative source:
+
+- `pi.jsonc` — primary destination plus extension/skill selection
+- `agent/` — `AGENTS.md`, `APPEND_SYSTEM.md`, agent definitions, deploy hook
+- `extensions/` and `skills/` — shared selectable components
+- `config/` — base and environment-specific generated config layers
+- `shared/lib/` — code staged to `extensions/_lib/`
+- `build.ts`, `scripts/`, and `Justfile` — build and deployment pipeline
+
+Generated or deployed output:
+
+- `build/agent/`
+- `~/.pi/agent` (or the root manifest's `pi.destDir`)
+
+Never hand-edit generated output. Do not delete unfamiliar ignored/runtime
+contents from `agent/`; the primary builder deliberately excludes its runtime
+`extensions/`, `skills/`, and `node_modules` directories.
+
+## Build behavior
+
+`build.ts` has no profile argument. It:
+
+- reads root `pi.jsonc`
+- detects `home` on `MacBook-Pro.local` and `work` otherwise (override with
+  `PI_BUILD_ENV`)
+- copies only manifest-selected extensions and skills to `build/agent/`
+- stages `shared/lib/` as `extensions/_lib/` and root extension development
+  tooling (`package.json`, `tsconfig.json`)
+- copies primary files from `agent/`, excluding runtime dependency directories
+- merges and writes `settings.json`, `models.json`, and `mcp.json`
+- resolves `${ENV_VAR}` values and model-alias placeholders
+- stages environment-specific `fnox.toml` when present
+- removes stale deployed agents, extensions, and skills before deployment
+
+Generated config uses only these layers, with later layers overriding earlier
+ones:
 
 1. `config/<name>.base.json(.c)`
 2. `config/<env>/<name>.json(.c)`
 3. `config/<env>/<name>.local.json(.c)`
-4. `profiles/<profile>/config/<name>.json(.c)`
-5. `profiles/<profile>/config/<name>.local.json(.c)`
 
-Later layers override earlier layers.
+`*.local.json` and `*.local.jsonc` are gitignored machine-specific overrides.
+Missing `${ENV_VAR}` values fail the build.
 
-Examples of supported generated config files:
+## Commands
 
-- `settings.json`
-- `models.json`
-- `mcp.json`
+```bash
+just build              # Generate build/agent/
+just deploy             # Build and deploy the primary agent
+just apply              # Equivalent build-and-deploy command
+just diff               # Inspect build/agent/ against its destination
+just clean              # Remove generated output and managed deployed files
+just honcho-env         # Generate honcho/.env for the active environment
+```
 
-### Local overrides
+The deploy flow uses `scripts/dest.ts` to read root `pi.jsonc`, rsyncs
+`build/agent/` excluding `node_modules`, and runs
+`agent/run_after_install_extension_deps.sh`. The hook locates `extensions/`
+relative to its deployed location and runs `pnpm install` in every extension
+with a `package.json`.
 
-`*.local.json` and `*.local.jsonc` are machine-specific and gitignored. Use them for:
+## Extension dependencies
 
-- secrets
-- local paths
-- internal-only MCP servers
-- machine-specific model/provider overrides
+All npm package management uses **pnpm**. Do not introduce npm, Bun install,
+yarn, or their lockfiles. Each extension that has a `package.json` is a
+standalone pnpm project with committed `pnpm-lock.yaml` and
+`pnpm-workspace.yaml`; these files are copied into generated output. The root
+`extensions/pnpm-lock.yaml` is development-only, gitignored, and not deployed.
 
-Do not commit local override files.
+Every extension package's `pnpm-workspace.yaml` must include:
 
-### Environment variables in config
+```yaml
+nodeLinker: hoisted
+dangerouslyAllowAllBuilds: true
+```
 
-Config JSON can use `${VAR_NAME}` placeholders. These are resolved at build time from `.env`.
-
-If a referenced variable is missing, the build should fail instead of silently continuing.
-
-## Profile manifest conventions
-
-Profile manifests live at:
-
-- `profiles/<profile>/package.json`
-- or `profiles/<profile>/package.jsonc`
-
-Use the `pi` block for Pi-specific config such as:
-
-- `destDir`
-- `extensions`
-- `skills`
-- `vars`
-
-### `vars`
-
-`pi.vars` is environment-scoped and used for `{{var.name}}` substitution in copied profile files.
-
-That is appropriate for values like profile-level model aliases or environment-specific prompt substitutions.
-
-## Editing conventions
-
-### General
-
-- Edit the source repo, not deployed output
-- Prefer the smallest change that matches existing structure
-- Keep profile-specific behavior inside the relevant profile when possible
-- Put shared behavior in `extensions/`, `skills/`, `config/`, or `shared/lib/` only when it is actually shared
-- Re-read files before editing if there may have been manual changes
-
-### Where changes should go
-
-- shared extension logic → `extensions/`
-- shared skill instructions → `skills/`
-- shared config defaults → `config/*.base.json`
-- home/work-specific config → `config/home/` or `config/work/`
-- profile-only config or agent behavior → `profiles/<profile>/`
-- shared extension helper code → `shared/lib/`
-- build pipeline changes → `build.ts`, `scripts/`, or `Justfile`
-
-### Extensions and dependencies
-
-If an extension has its own `package.json`, deployment may rely on the profile's `run_after_install_extension_deps.sh` hook to install extension dependencies in the deployed target.
-
-For coding profile changes, check whether `profiles/coding/run_after_install_extension_deps.sh` needs to pick up the new extension automatically.
-
-### Package management (pnpm)
-
-**All npm package management in this repo uses pnpm.** Do not introduce `npm`,
-`bun install`, `yarn`, or their lockfiles — there must be no `package-lock.json`,
-`bun.lock`, or `yarn.lock` anywhere. (Bun is still used, but only as the *TypeScript
-script runtime* for `build.ts` and `scripts/*.ts`, which use `Bun.file`/`Bun.env`/
-`Bun.write` — that is unrelated to package management.)
-
-Structure:
-
-- Each package directory (`extensions/` for dev/typecheck deps, and every extension
-  with its own `package.json`) is a **standalone pnpm project**: its own
-  `pnpm-lock.yaml` and its own `pnpm-workspace.yaml`. This is deliberately **not** a
-  single pnpm workspace — extensions are copied and installed independently at deploy
-  time, so each must resolve on its own.
-- Every package's `pnpm-workspace.yaml` contains:
-
-  ```yaml
-  nodeLinker: hoisted
-  dangerouslyAllowAllBuilds: true
-  ```
-
-- Per-extension `pnpm-lock.yaml` and `pnpm-workspace.yaml` are **committed** and copied
-  into the deployed target by `build.ts` (only `node_modules/` is filtered out).
-- The root `extensions/pnpm-lock.yaml` is **gitignored** — it is dev/typecheck-only and
-  is never deployed (the deploy hook only installs the extension subdirs, not the root).
-- Deploy hooks (`profiles/*/run_after_install_extension_deps.sh`) run `pnpm install`
-  per extension dir in the deployed target.
-- `pnpm` is installed via `.mise.toml`; the deploy hook relies on globally-available `pnpm`.
-
-To add/update an extension dependency: edit its `package.json`, then run
-`pnpm install` in that extension's directory (which regenerates its `pnpm-lock.yaml`),
-and commit both.
-
-#### pnpm 11 quirks worth remembering
-
-These bit us during the bun/npm → pnpm migration and drove the setup above:
-
-- **`.npmrc` `node-linker` is ignored.** pnpm 11 reads pnpm-specific settings only from
-  `pnpm-workspace.yaml` (key `nodeLinker: hoisted`), not `.npmrc`. `.npmrc` still works
-  for registry/auth, but not for these settings.
-- **A parent `pnpm-workspace.yaml` hijacks subdir installs.** Running `pnpm install` in a
-  subdirectory walks up to the nearest `pnpm-workspace.yaml` and installs *that* root
-  instead — even when the file has no `packages:` field. Giving each package its own
-  `pnpm-workspace.yaml` keeps it standalone. This is why every extension dir has one.
-- **Ignored build scripts make `pnpm install` exit 1.** Packages with install scripts
-  (e.g. transitive deps of `@earendil-works/pi-ai`, playwright) trigger
-  `ERR_PNPM_IGNORED_BUILDS` and a non-zero exit, which breaks `set -e` deploy hooks.
-  `dangerouslyAllowAllBuilds: true` runs those scripts (matching prior npm behavior) and
-  returns exit 0. `onlyBuiltDependencies: []` does **not** silence it.
-- **`^` ranges re-resolve to the newest in-range on migration.** Switching lockfiles
-  re-resolves caret ranges, which can pull a newer minor than what was previously shipped
-  (e.g. `vscode-languageserver-protocol` `^3.17.5` → `3.18.2`, which broke `lsp`'s types).
-  When a bump is not intended, pin the exact previously-shipped version in `package.json`
-  (`lsp` is pinned to `3.17.5` for this reason).
-
-### JSON vs JSONC
-
-This repo supports both `.json` and `.jsonc` in key places.
-
-- Prefer existing file style
-- Use `.jsonc` when comments or trailing commas are useful and already part of the pattern
-- Do not switch formats gratuitously
+When adding or updating an extension dependency, edit that extension's
+`package.json`, run `pnpm install` in its directory, and commit its lockfile.
 
 ## Verification
 
-After making changes, verify with the narrowest appropriate command.
+Use the narrowest non-destructive check appropriate to the change:
 
-Common commands:
+- prompts, agent definitions, and skills: `just build`
+- manifest or config changes: `just build`, then `just diff` when inspection
+  against the destination is requested
+- extension changes: `just build` and the extension's typecheck when relevant
+- deployment pipeline changes: inspect `just --list` and build output; run
+  `just deploy` only when deployment is explicitly requested
 
-```bash
-# Build one profile
-just build coding
-
-# Deploy one profile
-just deploy coding
-
-# Deploy all profiles
-just apply
-
-# Compare built output with deployed destination
-just diff coding
-
-# Clean generated output and managed deployed files for one profile
-just clean coding
-```
-
-### Recommended verification by change type
-
-- `AGENTS.md`, prompts, skills only: usually `just build <profile>` is enough
-- profile manifest/config changes: `just build <profile>` and often `just diff <profile>`
-- extension changes: `just build <profile>` and, if relevant, typecheck extension code
-- deployment behavior changes: `just deploy <profile>` and inspect deployed output
-
-If you claim a build or deploy worked, run the actual command and show the result.
-
-## Model configuration
-
-Models are generated from layered config files and written into the built profile output.
-
-The coding profile currently uses environment-specific profile vars for model aliases, and base/environment/profile config layering for `models.json`.
-
-The `openai-codex` provider is built-in and uses OAuth authentication stored in `auth.json` outside this repo. Use `/login openai-codex` when authentication is needed.
-
-## Quick rules for future agents
-
-- This repo is a **generator** for Pi agent directories
-- `~/dev/pi-config` is the source of truth
-- `build/` and `~/.pi*` are outputs, not the place to make lasting edits
-- Use `just apply` to roll out changes
-- Put shared things in shared directories and profile-specific things in `profiles/<profile>/`
-- Respect config layering instead of hardcoding environment-specific values
+Do not claim a build or deploy succeeded without running that command.

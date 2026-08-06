@@ -229,28 +229,6 @@ function renderSessionIdSegment(ctx: FooterContext): string {
   return `${ansi.fg(colors.sep)}[${ansi.reset}${ansi.fg(colors.text)}${shortId}${ansi.reset}${ansi.fg(colors.sep)}]${ansi.reset}`;
 }
 
-function renderProfileSegment(): string {
-  const agentDir = process.env.PI_CODING_AGENT_DIR || "~/.pi/agent";
-  let profile = "coding"; // default
-  let color = colors.accent; // Pink for coding
-
-  if (agentDir.includes("pi-personal")) {
-    profile = "personal";
-    color = colors.output; // Green for personal
-  }
-
-  return `${ansi.fg(color)}${profile}${ansi.reset}`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Profile detection
-// ═══════════════════════════════════════════════════════════════════════════
-
-function isPersonalProfile(): boolean {
-  const agentDir = process.env.PI_CODING_AGENT_DIR || "~/.pi/agent";
-  return agentDir.includes("pi-personal");
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Main footer builder
 // ═══════════════════════════════════════════════════════════════════════════
@@ -265,7 +243,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Scene box inner width (subtract 2 for left/right borders)
   const sceneInnerWidth = mainWidth - 2;
 
-  // Line 1 Content: dir/branch (left), model/thinking/cost (center), profile/session (right)
+  // Line 1 Content: dir/branch (left), model/thinking/cost (center), session (right)
   const line1LeftSegments: string[] = [];
   const dirSeg = renderDirectorySegment(ctx);
   const branchSeg = renderBranchSegment(ctx);
@@ -283,9 +261,7 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   if (contextSeg) line1CenterSegments.push(contextSeg);
   const line1Center = line1CenterSegments.join(separator);
 
-  const profileSeg = renderProfileSegment();
-  const sessionIdSeg = renderSessionIdSegment(ctx);
-  const line1Right = [profileSeg, sessionIdSeg].filter(Boolean).join(separator);
+  const line1Right = renderSessionIdSegment(ctx);
 
   // Calculate layout with gaps around center
   const line1LeftWidth = visibleWidth(line1Left);
@@ -340,9 +316,8 @@ function buildFooter(ctx: FooterContext, width: number): string[] {
   // Info Line 2 (centered)
   resultLines.push(truncateToWidth(line2Padded, width));
 
-  // Scene content — skip animation in subagent processes and personal profile
-  // (personal profile uses void extension for theatrical particle animation instead)
-  if (!isSubagent() && !isPersonalProfile()) {
+  // Scene content — skip animation in subagent processes.
+  if (!isSubagent()) {
     // Use cached render to avoid recomputing on every TUI
     // render pass (the cache only refreshes on our own animation tick)
     const sceneLines = getSceneCache(sceneInnerWidth, ctx.contextPercent || 0);
@@ -443,13 +418,6 @@ export default function customFooter(pi: ExtensionAPI) {
   pi.registerCommand("footer-scene", {
     description: "Cycle footer scene",
     handler: async (_args, ctx) => {
-      if (isPersonalProfile()) {
-        ctx.ui.notify(
-          "Scene cycling not available in personal profile (void extension active)",
-          "warning",
-        );
-        return;
-      }
       const scene = cycleScene();
       ctx.ui.notify(`Scene: ${scene}`, "info");
       tuiRef?.requestRender();
@@ -459,13 +427,6 @@ export default function customFooter(pi: ExtensionAPI) {
   pi.registerCommand("fish", {
     description: "Interact with the current scene",
     handler: async (_args, ctx) => {
-      if (isPersonalProfile()) {
-        ctx.ui.notify(
-          "Scene interaction not available in personal profile (void extension active)",
-          "warning",
-        );
-        return;
-      }
       const scene = getActiveScene();
       if (scene.onCommand) {
         scene.onCommand(ctx);

@@ -171,7 +171,7 @@ Options:
 Examples:
   bun scripts/import-sessions-to-hindsight.ts --limit 5
   bun scripts/import-sessions-to-hindsight.ts --project pi-config --write
-  bun scripts/import-sessions-to-hindsight.ts --sessions-dir ~/.pi-personal/agent/sessions --write
+  bun scripts/import-sessions-to-hindsight.ts --sessions-dir /path/to/agent/sessions --write
 `);
 }
 
