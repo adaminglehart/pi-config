@@ -5,7 +5,12 @@
 import { describe, it, beforeEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { DatabaseSync } from "node:sqlite";
-import { setupTestDb, createStores, addMessages } from "./helpers.js";
+import {
+  setupTestDb,
+  createStores,
+  addMessages,
+  addTestMessage,
+} from "./helpers.js";
 
 describe("ContextItemsStore", () => {
   let db: DatabaseSync;
@@ -196,19 +201,19 @@ describe("SummaryStore", () => {
 
   describe("isMessageSummarized", () => {
     it("returns false when message has no summary", () => {
-      const msg = conversationStore.addMessage(conversationId, "user", "hi", 10);
+      const msg = addTestMessage(conversationStore, conversationId, "user", "hi", 10);
       assert.equal(summaryStore.isMessageSummarized(msg.id), false);
     });
 
     it("returns true after message is covered by a leaf summary", () => {
-      const msg = conversationStore.addMessage(conversationId, "user", "hi", 10);
+      const msg = addTestMessage(conversationStore, conversationId, "user", "hi", 10);
       summaryStore.createLeafSummary(conversationId, "summary", 5, [msg.id]);
       assert.equal(summaryStore.isMessageSummarized(msg.id), true);
     });
 
     it("returns false for a different message not in any summary", () => {
-      const msg1 = conversationStore.addMessage(conversationId, "user", "hi", 10);
-      const msg2 = conversationStore.addMessage(conversationId, "assistant", "hello", 10);
+      const msg1 = addTestMessage(conversationStore, conversationId, "user", "hi", 10);
+      const msg2 = addTestMessage(conversationStore, conversationId, "assistant", "hello", 10);
       summaryStore.createLeafSummary(conversationId, "summary", 5, [msg1.id]);
       assert.equal(summaryStore.isMessageSummarized(msg2.id), false);
     });

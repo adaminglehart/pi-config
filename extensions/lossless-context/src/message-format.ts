@@ -1,22 +1,15 @@
-/**
- * Format helpers for converting between stored DB records and Pi-compatible messages.
- */
-
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { decodeStoredMessage } from "./message-codec.js";
 import type { MessageRecord, SummaryRecord } from "./types.js";
 
-/**
- * Format a summary as an XML-wrapped block for injection into LLM context.
- */
 export function formatSummaryBlock(summary: SummaryRecord): string {
   return `<summary id="${summary.id}" kind="${summary.kind}" depth="${summary.depth}">\n${summary.content}\n</summary>`;
 }
 
-/**
- * Wrap one or more summary blocks into a context injection message.
- */
+/** Wrap summaries in a valid synthetic user message for provider context. */
 export function formatSummariesAsMessage(
   summaries: SummaryRecord[],
-): { role: string; content: Array<{ type: string; text: string }> } {
+): AgentMessage {
   const blocks = summaries.map(formatSummaryBlock).join("\n\n");
   return {
     role: "user",
@@ -26,37 +19,13 @@ export function formatSummariesAsMessage(
         text: `[Historical Context — Compressed Summaries]\n\n${blocks}`,
       },
     ],
+    timestamp: 0,
   };
 }
 
-/**
- * Convert a stored message record back into a Pi-compatible LLM message.
- */
+/** Decode exact canonical data, or an explicitly marked legacy wrapper. */
 export function formatStoredMessageAsLlmMessage(
   message: MessageRecord,
-): { role: string; content: string | Array<{ type: string; text: string }> } {
-  // Try to parse content as JSON array (content blocks)
-  if (message.content.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(message.content) as Array<{ type: string; text: string }>;
-      if (Array.isArray(parsed)) {
-        return { role: mapRole(message.role), content: parsed };
-      }
-    } catch {
-      // Not valid JSON array, treat as plain text
-    }
-  }
-
-  return {
-    role: mapRole(message.role),
-    content: [{ type: "text", text: message.content }],
-  };
-}
-
-/**
- * Map stored DB role to Pi message role.
- */
-function mapRole(role: string): string {
-  if (role === "tool" || role === "toolResult") return "user";
-  return role;
+): AgentMessage {
+  return decodeStoredMessage(message).message;
 }

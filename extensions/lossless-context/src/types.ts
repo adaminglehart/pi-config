@@ -1,30 +1,44 @@
-/**
- * Core type definitions for the Lossless Context Management system.
- * Ported from lossless-claw with strong typing throughout.
- */
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
-// Summary types
 export type SummaryKind = "leaf" | "condensed";
+export type CanonicalSessionEntryType = "message" | "custom_message";
 
-// Database record types
 export interface ConversationRecord {
   id: string;
   session_key: string;
   created_at: string;
   updated_at: string;
-  active: number; // SQLite boolean (0 or 1)
+  active: number;
 }
 
 export interface MessageRecord {
   id: string;
   conversation_id: string;
   seq: number;
-  role: string; // 'user' | 'assistant' | 'tool'
-  content: string; // JSON string
+  session_entry_id: string | null;
+  session_parent_entry_id: string | null;
+  session_entry_type: CanonicalSessionEntryType | null;
+  role: string;
+  canonical_json: string | null;
+  search_text: string;
   token_count: number;
+  /** Retained only as unindexed v1 metadata. Canonical inserts set null. */
   identity_hash: string | null;
   created_at: string;
 }
+
+export type DecodedStoredMessage =
+  | {
+      kind: "canonical";
+      record: MessageRecord;
+      message: AgentMessage;
+    }
+  | {
+      kind: "legacy";
+      record: MessageRecord;
+      message: AgentMessage;
+      originalRole: string;
+    };
 
 export interface SummaryRecord {
   id: string;
@@ -33,7 +47,7 @@ export interface SummaryRecord {
   depth: number;
   content: string;
   token_count: number;
-  metadata: string; // JSON string
+  metadata: string;
   created_at: string;
 }
 
@@ -67,53 +81,37 @@ export interface LargeFileRecord {
   created_at: string;
 }
 
-// Configuration
 export interface LcmConfig extends Record<string, unknown> {
-  // Context assembly
   contextThreshold: number;
   freshTailCount: number;
   freshTailMaxTokens: number;
-
-  // Soft/hard threshold model for background compaction
   softTokenThreshold: number;
   hardTokenThreshold: number;
   backgroundCompaction: boolean;
-
-  // Compaction fanout
   leafMinFanout: number;
   condensedMinFanout: number;
   condensedMinFanoutHard: number;
   incrementalMaxDepth: number;
-
-  // Token targets
   leafChunkTokens: number;
   leafTargetTokens: number;
   condensedTargetTokens: number;
   maxExpandTokens: number;
   largeFileTokenThreshold: number;
-
-  // Model config
   summaryProvider: string;
   summaryModel: string;
   expansionProvider: string;
   expansionModel: string;
-
-  // Database
   dbPath: string;
-
-  // Feature flags
   enabled: boolean;
   summaryTimeoutMs: number;
 }
 
-// Metadata types
 export interface SummaryMetadata {
   file_ids?: string[];
   aggressive?: boolean;
   [key: string]: unknown;
 }
 
-// Tool input/output types (for Phase 5)
 export interface GrepInput {
   query: string;
   mode: "regex" | "full_text";

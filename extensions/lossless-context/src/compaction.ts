@@ -220,7 +220,10 @@ export class CompactionEngine {
 
       // Serialize messages
       const serialized = serializeMessagesForSummary(
-        messages.map((m) => ({ role: m.role, content: m.content })),
+        messages.map((message) => ({
+          role: message.role,
+          content: message.search_text,
+        })),
       );
 
       // Call LLM to summarize

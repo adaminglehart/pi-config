@@ -2,11 +2,18 @@
  * Tests for ContextAssembler.
  */
 
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, it, beforeEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { DatabaseSync } from "node:sqlite";
 import { ContextAssembler } from "../assembler.js";
-import { setupTestDb, createStores, addMessages, makeConfig } from "./helpers.js";
+import {
+  setupTestDb,
+  createStores,
+  addMessages,
+  addTestMessage,
+  makeConfig,
+} from "./helpers.js";
 import type { LcmConfig } from "../types.js";
 
 describe("ContextAssembler", () => {
@@ -90,7 +97,13 @@ describe("ContextAssembler", () => {
     it("a single large message caps the fresh tail at 1 message", () => {
       // Add 5 normal messages, then 1 huge one
       addMessages(conversationStore, conversationId, 5, 100);
-      conversationStore.addMessage(conversationId, "user", "big message", 50000);
+      addTestMessage(
+        conversationStore,
+        conversationId,
+        "user",
+        "big message",
+        50000,
+      );
 
       const assembler = makeAssembler({
         freshTailCount: 10,
@@ -162,6 +175,99 @@ describe("ContextAssembler", () => {
       // Budget is tiny — summary should not fit
       const result = assembler.assembleSummariesOnly(conversationId, 100);
       assert.deepEqual(result, []);
+    });
+  });
+
+  describe("canonical fidelity and sequence safety", () => {
+    const toolCallMessage: AgentMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "toolCall",
+          id: "assembler-call",
+          name: "read",
+          arguments: { path: "/tmp/exact" },
+        },
+      ],
+      api: "anthropic-messages",
+      provider: "anthropic",
+      model: "test-model",
+      usage: {
+        input: 1,
+        output: 2,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 3,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "toolUse",
+      timestamp: 10,
+    };
+    const resultMessage: AgentMessage = {
+      role: "toolResult",
+      toolCallId: "assembler-call",
+      toolName: "read",
+      content: [{ type: "text", text: "exact result" }],
+      details: { exact: true },
+      isError: false,
+      timestamp: 11,
+    };
+
+    it("reconstructs exact canonical tool call and result payloads", () => {
+      for (const [entryId, message] of [
+        ["assembler-assistant", toolCallMessage],
+        ["assembler-result", resultMessage],
+      ] as const) {
+        conversationStore.addMessage({
+          conversationId,
+          sessionEntryId: entryId,
+          sessionParentEntryId: null,
+          sessionEntryType: "message",
+          message,
+        });
+      }
+
+      const assembled = makeAssembler({ freshTailCount: 10 }).assemble(
+        conversationId,
+        100000,
+      );
+      assert.equal(assembled.valid, true);
+      if (assembled.valid) {
+        assert.deepEqual(assembled.messages, [toolCallMessage, resultMessage]);
+      }
+    });
+
+    it("reports invalid instead of emitting an orphan result", () => {
+      const assistant = conversationStore.addMessage({
+        conversationId,
+        sessionEntryId: "assistant-to-summarize",
+        sessionParentEntryId: null,
+        sessionEntryType: "message",
+        message: toolCallMessage,
+      }).message;
+      conversationStore.addMessage({
+        conversationId,
+        sessionEntryId: "remaining-result",
+        sessionParentEntryId: "assistant-to-summarize",
+        sessionEntryType: "message",
+        message: resultMessage,
+      });
+      const summary = summaryStore.createLeafSummary(
+        conversationId,
+        "assistant call was summarized",
+        5,
+        [assistant.id],
+      );
+      contextItemsStore.replaceContextItems(conversationId, [0], [
+        { itemType: "summary", summaryId: summary.id },
+      ]);
+
+      const assembled = makeAssembler({ freshTailCount: 10 }).assemble(
+        conversationId,
+        100000,
+      );
+      assert.equal(assembled.valid, false);
+      assert.deepEqual(assembled.messages, []);
     });
   });
 

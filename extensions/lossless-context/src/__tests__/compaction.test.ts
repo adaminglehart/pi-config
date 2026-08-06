@@ -3,6 +3,7 @@
  * Uses the injectable `summarizeFn` dep for mocking instead of module-level mocks.
  */
 
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, it, beforeEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { DatabaseSync } from "node:sqlite";
@@ -129,6 +130,37 @@ describe("CompactionEngine", () => {
       assert.equal(messageItems.length, 2);
       assert.equal(messageItems[0].message_id, msgs[4].id);
       assert.equal(messageItems[1].message_id, msgs[5].id);
+    });
+
+    it("serializes search_text rather than canonical JSON metadata", async () => {
+      const projectedMessage: AgentMessage = {
+        role: "custom",
+        customType: "projection-fixture",
+        content: "PROJECTED_SUMMARY_TEXT",
+        display: true,
+        details: { secret: "CANONICAL_ONLY_SECRET" },
+        timestamp: 1,
+      };
+      conversationStore.addMessage({
+        conversationId,
+        sessionEntryId: "projection-entry",
+        sessionParentEntryId: null,
+        sessionEntryType: "message",
+        message: projectedMessage,
+      });
+      addMessages(conversationStore, conversationId, 2, 50);
+
+      await makeEngine({
+        freshTailCount: 1,
+        freshTailMaxTokens: 100000,
+        leafMinFanout: 2,
+        leafChunkTokens: 1000,
+        incrementalMaxDepth: 0,
+      }).runCompaction(conversationId);
+
+      const leafInput = summarizeCalls.find((call) => call.kind === "leaf")?.content;
+      assert.match(leafInput ?? "", /PROJECTED_SUMMARY_TEXT/);
+      assert.doesNotMatch(leafInput ?? "", /CANONICAL_ONLY_SECRET/);
     });
 
     it("skips already-summarized messages in leaf pass", async () => {

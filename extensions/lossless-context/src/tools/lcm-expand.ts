@@ -50,7 +50,15 @@ export function registerExpandTool(
 
       for (const item of result.items) {
         if (item.type === "message") {
-          lines.push(`\n### [${item.role}] Message ${item.id}`);
+          const fidelity = item.canonical ? "canonical" : "legacy";
+          lines.push(
+            `\n### [${item.role}] Message ${item.id} (${fidelity})`,
+          );
+          if (item.sessionEntryId) {
+            lines.push(
+              `Session entry: ${item.sessionEntryId} (${item.sessionEntryType ?? "unknown"}), parent: ${item.sessionParentEntryId ?? "root"}`,
+            );
+          }
           lines.push(item.content);
         } else {
           lines.push(`\n### [${item.kind} d${item.depth}] Summary ${item.id}`);

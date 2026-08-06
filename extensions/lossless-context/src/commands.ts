@@ -324,14 +324,14 @@ async function handleContext(
   const allSummaries = summaryStore.getAllSummaries(conv.id);
 
   let injectedText = "(none — no summaries to inject)";
-  if (summaryMessages.length > 0) {
-    const msg = summaryMessages[0];
-    if (typeof msg.content === "string") {
-      injectedText = msg.content;
-    } else if (Array.isArray(msg.content)) {
-      injectedText = msg.content
-        .filter((b) => b.type === "text")
-        .map((b) => b.text)
+  if (summaryMessages[0]?.role === "user") {
+    const content = summaryMessages[0].content;
+    if (typeof content === "string") {
+      injectedText = content;
+    } else {
+      injectedText = content
+        .filter((block) => block.type === "text")
+        .map((block) => block.text)
         .join("\n");
     }
   }

@@ -1,9 +1,8 @@
 import type {
   ExtensionAPI,
+  ExtensionContext,
   ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { appendFileSync } from "node:fs";
 import { loadLcmConfig } from "./src/config.js";
 import { LcmDatabase } from "./src/db/connection.js";
 import { ConversationStore } from "./src/store/conversation-store.js";
@@ -18,11 +17,11 @@ import { registerExpandTool } from "./src/tools/lcm-expand.js";
 import { registerExpandQueryTool } from "./src/tools/lcm-expand-query.js";
 import { registerCommands } from "./src/commands.js";
 import { sessionKeyFromFile } from "./src/session-key.js";
+import { decideContextReplacement } from "./src/context-replacement.js";
 import {
-  extractTextContent,
-  computeIdentityHash,
-} from "./src/message-utils.js";
-import { estimateTokens } from "./src/tokens.js";
+  SessionMessageSynchronizer,
+  type SynchronizationResult,
+} from "./src/session-message-synchronizer.js";
 import type { ConversationRecord } from "./src/types.js";
 import { LargeFileStore } from "./src/large-files.js";
 import { IntegrityChecker } from "./src/integrity.js";
@@ -55,6 +54,7 @@ export default function (pi: ExtensionAPI) {
   let retrievalEngine: RetrievalEngine | undefined;
   let largeFileStore: LargeFileStore | undefined;
   let integrityChecker: IntegrityChecker | undefined;
+  let messageSynchronizer: SessionMessageSynchronizer | undefined;
   let conversation: ConversationRecord | undefined;
   let isCompacting = false;
   let lastTurnHadToolUse = false;
@@ -77,64 +77,23 @@ export default function (pi: ExtensionAPI) {
     return lastKnownContextTokens;
   }
 
-  /**
-   * Return only the suffix of Pi messages that LCM has not persisted yet.
-   * The context hook fires before the current user turn is always available in
-   * LCM's DB, so replacing Pi's message array with only assembled DB context
-   * can accidentally drop the live prompt. Keep just the new tail, not the full
-   * Pi history.
-   */
-  function extractAgentMessageText(message: AgentMessage): string {
-    if (!("content" in message)) return "";
-
-    const { content } = message;
-    if (typeof content === "string") return content;
-    if (!Array.isArray(content)) return "";
-
-    const parts: string[] = [];
-    for (const block of content) {
-      if (block.type === "text") {
-        parts.push(block.text);
-      } else if (block.type === "toolCall") {
-        parts.push(`[tool: ${block.name}]`);
-      }
-    }
-    return parts.join("\n");
-  }
-
-  function getUnstoredEventTail(messages: AgentMessage[]): AgentMessage[] {
-    if (!conversationStore || !conversation) return [];
-
-    const storedHashes = new Set(
-      conversationStore
-        .getMessages(conversation.id)
-        .map((message) => message.identity_hash)
-        .filter(
-          (hash): hash is string => typeof hash === "string" && hash.length > 0,
-        ),
-    );
-
-    const tail: AgentMessage[] = [];
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const message = messages[i] as AgentMessage | undefined;
-      if (!message) continue;
-
-      const content = extractAgentMessageText(message);
-      if (!content || content.trim().length === 0) continue;
-
-      const hash = computeIdentityHash(message.role, content);
-      if (storedHashes.has(hash)) break;
-      tail.unshift(message);
-    }
-
-    return tail;
-  }
-
   const LCM_LOG = "/tmp/lcm-debug.log";
   function lcmLog(_msg: string): void {
     // no-op — remove the line below to re-enable debug logging to /tmp/lcm-debug.log
     void _msg;
     void LCM_LOG;
+  }
+
+  function synchronizeCurrentSession(
+    ctx: Pick<ExtensionContext, "sessionManager">,
+  ): SynchronizationResult | undefined {
+    if (!messageSynchronizer) return undefined;
+    try {
+      return messageSynchronizer.syncNewEntries(ctx.sessionManager);
+    } catch (error) {
+      console.error("LCM session message synchronization error:", error);
+      return undefined;
+    }
   }
 
   /**
@@ -221,6 +180,11 @@ export default function (pi: ExtensionAPI) {
       const sessionKey = sessionKeyFromFile(sessionFile);
       lcmLog(`[SESSION] file=${sessionFile}, key=${sessionKey}`);
       conversation = conversationStore.getOrCreateConversation(sessionKey);
+      messageSynchronizer = new SessionMessageSynchronizer(
+        conversationStore,
+        conversation.id,
+        ctx.sessionManager.getEntries(),
+      );
 
       // Initialize compaction engine
       compactionEngine = new CompactionEngine({
@@ -258,42 +222,11 @@ export default function (pi: ExtensionAPI) {
   });
 
   /**
-   * Message end: Persist every message to SQLite.
+   * Pi assigns stable entry IDs only after message_end handlers return. Record
+   * pending work here; later safe hooks ingest the authoritative session entry.
    */
-  pi.on("message_end", async (event, _ctx) => {
-    if (!conversationStore || !conversation) {
-      return;
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const msg = event.message as any;
-
-      // Extract text content from message
-      const content = extractTextContent(msg);
-
-      // Skip empty/whitespace-only messages
-      if (!content || content.trim().length === 0) {
-        return;
-      }
-
-      // Compute identity hash for deduplication
-      const hash = computeIdentityHash(msg.role, content);
-
-      // Estimate token count
-      const tokens = estimateTokens(content);
-
-      // Persist message (also creates context_item and updates FTS5)
-      conversationStore.addMessage(
-        conversation.id,
-        msg.role,
-        content,
-        tokens,
-        hash,
-      );
-    } catch (error) {
-      console.error("LCM message_end error:", error);
-    }
+  pi.on("message_end", async (event) => {
+    messageSynchronizer?.noteFinalizedMessage(event.message);
   });
 
   /**
@@ -302,12 +235,19 @@ export default function (pi: ExtensionAPI) {
    * Also triggers background compaction if soft threshold is exceeded.
    */
   pi.on("turn_end", async (event, ctx) => {
-    // If the turn produced tool results, the agent was actively working
-    lastTurnHadToolUse = event.toolResults.length > 0;
+    const synchronization = synchronizeCurrentSession(ctx);
 
-    // Trigger background compaction check after turn completes
+    // If the turn produced tool results, the agent was actively working.
+    lastTurnHadToolUse = event.toolResults.length > 0;
+    if (!synchronization?.safeForContextReplacement) return;
+
+    // Trigger background compaction check after authoritative entries are stored.
     lcmLog("[DEBUG] turn_end fired");
     maybeStartBackgroundCompaction(ctx);
+  });
+
+  pi.on("agent_end", async (_event, ctx) => {
+    synchronizeCurrentSession(ctx);
   });
 
   /**
@@ -335,12 +275,15 @@ export default function (pi: ExtensionAPI) {
    * Context assembly: Replace Pi's full history with summaries + fresh tail.
    * This reduces context usage by dropping old messages that have been compacted.
    */
-  pi.on("context", async (event, ctx) => {
+  pi.on("context", async (_event, ctx) => {
+    // Synchronization precedes every guard. The decision helper below fails open
+    // when work remains pending or synchronization failed.
+    const synchronization = synchronizeCurrentSession(ctx);
     if (!assembler || !conversation || !summaryStore || isCompacting) return;
 
     // Track context window and usage for threshold calculations
     lastKnownContextWindow = ctx.model?.contextWindow ?? 200000;
-    const contextUsage = (ctx as any).getContextUsage?.();
+    const contextUsage = ctx.getContextUsage();
     if (contextUsage) {
       lastKnownContextTokens = contextUsage.tokens ?? lastKnownContextTokens;
       lastKnownContextPercent = contextUsage.percent ?? lastKnownContextPercent;
@@ -360,18 +303,21 @@ export default function (pi: ExtensionAPI) {
       // Get properly assembled context: summaries + fresh tail (budget-aware)
       const assembled = assembler.assemble(conversation.id, tokenBudget);
 
-      if (assembled.messages.length > 0) {
-        const unstoredTail = getUnstoredEventTail(
-          event.messages as AgentMessage[],
-        );
-        lcmLog(
-          `[CONTEXT] assembled ${assembled.messages.length} messages (${assembled.totalTokens} tokens), ${assembled.summaryCount} summaries, ${assembled.messageCount} fresh messages, ${unstoredTail.length} unstored tail messages`,
-        );
-        // Return LCM-assembled context plus the current not-yet-persisted turn.
-        return {
-          messages: [...assembled.messages, ...unstoredTail] as AgentMessage[],
-        };
+      const replacement = decideContextReplacement(
+        synchronization,
+        assembled,
+      );
+      if (!replacement) {
+        if (!assembled.valid) {
+          lcmLog(`[CONTEXT] unsafe assembled sequence: ${assembled.reason}`);
+        }
+        return;
       }
+
+      lcmLog(
+        `[CONTEXT] assembled ${assembled.messages.length} messages (${assembled.totalTokens} tokens), ${assembled.summaryCount} summaries, ${assembled.messageCount} fresh messages`,
+      );
+      return replacement;
     } catch (error) {
       console.error("LCM context error:", error);
     }
@@ -497,8 +443,9 @@ export default function (pi: ExtensionAPI) {
   /**
    * Session shutdown: Clean up resources.
    */
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, ctx) => {
     try {
+      synchronizeCurrentSession(ctx);
       database?.close();
     } catch (error) {
       console.error("LCM session_shutdown error:", error);
@@ -512,6 +459,7 @@ export default function (pi: ExtensionAPI) {
       retrievalEngine = undefined;
       largeFileStore = undefined;
       integrityChecker = undefined;
+      messageSynchronizer = undefined;
       conversation = undefined;
       isCompacting = false;
       lastTurnHadToolUse = false;

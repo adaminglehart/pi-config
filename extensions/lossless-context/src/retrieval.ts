@@ -1,11 +1,7 @@
-/**
- * Retrieval engine for Phase 5: Tools for searching and drilling into historical context.
- * Provides grep, describe, and expand operations over the summary DAG.
- */
-
+import { decodeStoredMessage } from "./message-codec.js";
 import type { ConversationStore } from "./store/conversation-store.js";
 import type { SummaryStore } from "./store/summary-store.js";
-import type { MessageRecord, SummaryRecord } from "./types.js";
+import type { SummaryRecord } from "./types.js";
 
 export interface GrepResult {
   messages: Array<{
@@ -31,30 +27,36 @@ export interface DescribeResult {
   sourceMessageIds: string[];
 }
 
+export interface ExpandedMessageItem {
+  type: "message";
+  id: string;
+  role: string;
+  content: string;
+  canonical: boolean;
+  sessionEntryId: string | null;
+  sessionParentEntryId: string | null;
+  sessionEntryType: string | null;
+}
+
+export interface ExpandedSummaryItem {
+  type: "summary";
+  id: string;
+  content: string;
+  kind: string;
+  depth: number;
+}
+
 export interface ExpandResult {
-  items: Array<{
-    type: "message" | "summary";
-    id: string;
-    content: string;
-    role?: string;
-    kind?: string;
-    depth?: number;
-  }>;
+  items: Array<ExpandedMessageItem | ExpandedSummaryItem>;
   totalTokens: number;
 }
 
-/**
- * RetrievalEngine provides the core logic for tools.
- */
 export class RetrievalEngine {
   constructor(
-    private conversationStore: ConversationStore,
-    private summaryStore: SummaryStore,
+    private readonly conversationStore: ConversationStore,
+    private readonly summaryStore: SummaryStore,
   ) {}
 
-  /**
-   * Search across messages and summaries with optional scope filtering.
-   */
   grep(
     query: string,
     conversationId: string,
@@ -62,7 +64,6 @@ export class RetrievalEngine {
     limit: number,
   ): GrepResult {
     const result: GrepResult = { messages: [], summaries: [] };
-
     if (scope === "messages" || scope === "both") {
       result.messages = this.conversationStore.searchMessages(
         query,
@@ -70,32 +71,23 @@ export class RetrievalEngine {
         limit,
       );
     }
-
     if (scope === "summaries" || scope === "both") {
-      const summaries = this.summaryStore.searchSummaries(
-        query,
-        conversationId,
-        limit,
-      );
-      result.summaries = summaries.map((s) => ({
-        id: s.id,
-        kind: s.kind,
-        depth: s.depth,
-        snippet: s.content.slice(0, 200),
-        created_at: s.created_at,
-      }));
+      result.summaries = this.summaryStore
+        .searchSummaries(query, conversationId, limit)
+        .map((summary) => ({
+          id: summary.id,
+          kind: summary.kind,
+          depth: summary.depth,
+          snippet: summary.content.slice(0, 200),
+          created_at: summary.created_at,
+        }));
     }
-
     return result;
   }
 
-  /**
-   * Get full metadata and lineage for a specific summary.
-   */
   describe(summaryId: string): DescribeResult | undefined {
     const summary = this.summaryStore.getSummary(summaryId);
     if (!summary) return undefined;
-
     return {
       summary,
       parentIds: this.summaryStore.getSummaryParentIds(summaryId),
@@ -107,38 +99,40 @@ export class RetrievalEngine {
     };
   }
 
-  /**
-   * Drill into a summary to recover original detail.
-   * For leaf summaries: returns source messages.
-   * For condensed summaries: returns child summaries.
-   */
   expand(summaryId: string, maxTokens: number): ExpandResult | undefined {
     const summary = this.summaryStore.getSummary(summaryId);
     if (!summary) return undefined;
 
     const items: ExpandResult["items"] = [];
     let totalTokens = 0;
-
     if (summary.kind === "leaf") {
-      // Expand leaf → show source messages
-      const messageIds = this.summaryStore.getSummaryMessageIds(summaryId);
-      for (const msgId of messageIds) {
+      for (const messageId of this.summaryStore.getSummaryMessageIds(summaryId)) {
         if (totalTokens >= maxTokens) break;
-        const msg = this.conversationStore.getMessageById(msgId);
-        if (msg) {
-          items.push({
-            type: "message",
-            id: msg.id,
-            content: msg.content,
-            role: msg.role,
-          });
-          totalTokens += msg.token_count;
-        }
+        const record = this.conversationStore.getMessageById(messageId);
+        if (!record) continue;
+
+        const decoded = decodeStoredMessage(record);
+        const content =
+          decoded.kind === "canonical"
+            ? `Canonical Pi AgentMessage:\n${JSON.stringify(decoded.message, null, 2)}`
+            : `Legacy projection (not an exact original ${decoded.originalRole} message):\n${record.search_text}`;
+        items.push({
+          type: "message",
+          id: record.id,
+          role:
+            decoded.kind === "canonical"
+              ? decoded.message.role
+              : decoded.originalRole,
+          content,
+          canonical: decoded.kind === "canonical",
+          sessionEntryId: record.session_entry_id,
+          sessionParentEntryId: record.session_parent_entry_id,
+          sessionEntryType: record.session_entry_type,
+        });
+        totalTokens += record.token_count;
       }
     } else {
-      // Expand condensed → show child summaries
-      const children = this.summaryStore.getSummaryChildren(summaryId);
-      for (const child of children) {
+      for (const child of this.summaryStore.getSummaryChildren(summaryId)) {
         if (totalTokens >= maxTokens) break;
         items.push({
           type: "summary",
@@ -150,7 +144,6 @@ export class RetrievalEngine {
         totalTokens += child.token_count;
       }
     }
-
     return { items, totalTokens };
   }
 }

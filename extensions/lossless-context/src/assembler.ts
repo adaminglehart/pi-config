@@ -1,22 +1,46 @@
-import type { ContextItemRecord, MessageRecord, SummaryRecord, LcmConfig } from "./types.js";
-import { ConversationStore } from "./store/conversation-store.js";
-import { SummaryStore } from "./store/summary-store.js";
-import { ContextItemsStore } from "./store/context-items-store.js";
-import { formatSummariesAsMessage, formatStoredMessageAsLlmMessage } from "./message-format.js";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import {
+  formatStoredMessageAsLlmMessage,
+  formatSummariesAsMessage,
+} from "./message-format.js";
+import { validateMessageSequence } from "./message-sequence.js";
+import type { ContextItemsStore } from "./store/context-items-store.js";
+import type { ConversationStore } from "./store/conversation-store.js";
+import type { SummaryStore } from "./store/summary-store.js";
+import type {
+  ContextItemRecord,
+  LcmConfig,
+  MessageRecord,
+  SummaryRecord,
+} from "./types.js";
 
-export interface AssembledContext {
-  messages: Array<{ role: string; content: string | Array<{ type: string; text: string }> }>;
+interface AssembledContextBase {
   totalTokens: number;
   summaryCount: number;
   messageCount: number;
 }
 
-interface ResolvedItem {
-  item: ContextItemRecord;
-  kind: "message" | "summary";
-  record: MessageRecord | SummaryRecord;
-  tokens: number;
-}
+export type AssembledContext =
+  | (AssembledContextBase & { valid: true; messages: AgentMessage[] })
+  | (AssembledContextBase & {
+      valid: false;
+      messages: [];
+      reason: string;
+    });
+
+type ResolvedItem =
+  | {
+      item: ContextItemRecord;
+      kind: "message";
+      record: MessageRecord;
+      tokens: number;
+    }
+  | {
+      item: ContextItemRecord;
+      kind: "summary";
+      record: SummaryRecord;
+      tokens: number;
+    };
 
 export interface AssemblerDeps {
   conversationStore: ConversationStore;
@@ -25,99 +49,90 @@ export interface AssemblerDeps {
   config: LcmConfig;
 }
 
+const EMPTY_CONTEXT: AssembledContext = {
+  valid: true,
+  messages: [],
+  totalTokens: 0,
+  summaryCount: 0,
+  messageCount: 0,
+};
+
 export class ContextAssembler {
-  constructor(private deps: AssemblerDeps) {}
+  constructor(private readonly deps: AssemblerDeps) {}
 
   assemble(conversationId: string, tokenBudget: number): AssembledContext {
     const items = this.deps.contextItemsStore.getContextItems(conversationId);
-    if (items.length === 0) {
-      return { messages: [], totalTokens: 0, summaryCount: 0, messageCount: 0 };
-    }
+    if (items.length === 0) return EMPTY_CONTEXT;
 
-    // Resolve all items to their content
     const resolved = this.resolveItems(items);
-    if (resolved.length === 0) {
-      return { messages: [], totalTokens: 0, summaryCount: 0, messageCount: 0 };
-    }
+    if (resolved.length === 0) return EMPTY_CONTEXT;
 
-    // Split fresh tail (last freshTailCount message items)
     const { evictable, freshTail } = this.splitFreshTail(resolved);
-
-    // Budget-aware selection
-    const effectiveBudget = Math.floor(tokenBudget * this.deps.config.contextThreshold);
-    const selected = this.selectWithinBudget(evictable, freshTail, effectiveBudget);
-
-    // Build output messages
+    const effectiveBudget = Math.floor(
+      tokenBudget * this.deps.config.contextThreshold,
+    );
+    const selected = this.selectWithinBudget(
+      evictable,
+      freshTail,
+      effectiveBudget,
+    );
     return this.buildMessages(selected);
   }
 
-  /**
-   * Assemble only the summary prefix messages (no raw messages from DB).
-   * Used by the context hook to prepend summaries to Pi's native message list,
-   * which always includes the current (not-yet-stored) user message.
-   */
   assembleSummariesOnly(
     conversationId: string,
     tokenBudget: number,
-  ): Array<{ role: string; content: string | Array<{ type: string; text: string }> }> {
+  ): AgentMessage[] {
     const items = this.deps.contextItemsStore.getContextItems(conversationId);
-    if (items.length === 0) return [];
-
     const resolved = this.resolveItems(items);
-    if (resolved.length === 0) return [];
-
-    // Only keep summary items that are outside the fresh tail
     const { evictable } = this.splitFreshTail(resolved);
-    const summaryItems = evictable.filter((item) => item.kind === "summary");
-    if (summaryItems.length === 0) return [];
+    const summaries = evictable.filter(
+      (item): item is Extract<ResolvedItem, { kind: "summary" }> =>
+        item.kind === "summary",
+    );
 
-    // Budget: reserve space for Pi's native messages (rough heuristic: use half budget for summaries)
-    const summaryBudget = Math.floor(tokenBudget * this.deps.config.contextThreshold * 0.5);
-    const selected: ResolvedItem[] = [];
+    const budget = Math.floor(
+      tokenBudget * this.deps.config.contextThreshold * 0.5,
+    );
+    const selected: SummaryRecord[] = [];
     let usedTokens = 0;
-    // Add newest-first within budget
-    for (let i = summaryItems.length - 1; i >= 0; i--) {
-      const item = summaryItems[i];
-      if (usedTokens + item.tokens <= summaryBudget) {
-        selected.unshift(item);
+    for (let index = summaries.length - 1; index >= 0; index--) {
+      const item = summaries[index];
+      if (usedTokens + item.tokens <= budget) {
+        selected.unshift(item.record);
         usedTokens += item.tokens;
       }
     }
-
-    if (selected.length === 0) return [];
-
-    // Group consecutive summaries into formatted messages
-    const messages: Array<{ role: string; content: string | Array<{ type: string; text: string }> }> = [];
-    const pendingSummaries: SummaryRecord[] = [];
-
-    for (const item of selected) {
-      pendingSummaries.push(item.record as SummaryRecord);
-    }
-
-    if (pendingSummaries.length > 0) {
-      messages.push(formatSummariesAsMessage(pendingSummaries));
-    }
-
-    return messages;
+    return selected.length === 0 ? [] : [formatSummariesAsMessage(selected)];
   }
 
   private resolveItems(items: ContextItemRecord[]): ResolvedItem[] {
     const resolved: ResolvedItem[] = [];
-
     for (const item of items) {
       if (item.item_type === "message" && item.message_id) {
-        const msg = this.deps.conversationStore.getMessageById(item.message_id);
-        if (msg) {
-          resolved.push({ item, kind: "message", record: msg, tokens: msg.token_count });
+        const record = this.deps.conversationStore.getMessageById(
+          item.message_id,
+        );
+        if (record) {
+          resolved.push({
+            item,
+            kind: "message",
+            record,
+            tokens: record.token_count,
+          });
         }
       } else if (item.item_type === "summary" && item.summary_id) {
-        const summary = this.deps.summaryStore.getSummary(item.summary_id);
-        if (summary) {
-          resolved.push({ item, kind: "summary", record: summary, tokens: summary.token_count });
+        const record = this.deps.summaryStore.getSummary(item.summary_id);
+        if (record) {
+          resolved.push({
+            item,
+            kind: "summary",
+            record,
+            tokens: record.token_count,
+          });
         }
       }
     }
-
     return resolved;
   }
 
@@ -125,27 +140,22 @@ export class ContextAssembler {
     evictable: ResolvedItem[];
     freshTail: ResolvedItem[];
   } {
-    const freshTailCount = this.deps.config.freshTailCount;
-    const freshTailMaxTokens = this.deps.config.freshTailMaxTokens;
     const freshTail: ResolvedItem[] = [];
     const evictable: ResolvedItem[] = [];
-
-    // Walk backwards, count message-type items for fresh tail.
-    // Summaries always go to evictable — they're not native messages
-    // and should always be available for injection as the historical prefix.
-    // Fresh tail is bounded by both message count AND token budget.
     let messagesSeen = 0;
     let freshTailTokens = 0;
-    for (let i = resolved.length - 1; i >= 0; i--) {
-      const item = resolved[i];
+
+    for (let index = resolved.length - 1; index >= 0; index--) {
+      const item = resolved[index];
       if (item.kind === "summary") {
         evictable.unshift(item);
         continue;
       }
+
       messagesSeen++;
       if (
-        messagesSeen <= freshTailCount &&
-        freshTailTokens + item.tokens <= freshTailMaxTokens
+        messagesSeen <= this.deps.config.freshTailCount &&
+        freshTailTokens + item.tokens <= this.deps.config.freshTailMaxTokens
       ) {
         freshTail.unshift(item);
         freshTailTokens += item.tokens;
@@ -153,7 +163,6 @@ export class ContextAssembler {
         evictable.unshift(item);
       }
     }
-
     return { evictable, freshTail };
   }
 
@@ -162,54 +171,62 @@ export class ContextAssembler {
     freshTail: ResolvedItem[],
     budget: number,
   ): ResolvedItem[] {
-    // Fresh tail is always included
     let usedTokens = freshTail.reduce((sum, item) => sum + item.tokens, 0);
-
-    // Add evictable items newest-first until budget
     const selected: ResolvedItem[] = [];
-    for (let i = evictable.length - 1; i >= 0; i--) {
-      const item = evictable[i];
+
+    for (let index = evictable.length - 1; index >= 0; index--) {
+      const item = evictable[index];
       if (usedTokens + item.tokens <= budget) {
         selected.unshift(item);
         usedTokens += item.tokens;
       }
     }
-
-    // Combine: selected evictable + fresh tail (preserving order)
     return [...selected, ...freshTail];
   }
 
   private buildMessages(selected: ResolvedItem[]): AssembledContext {
-    const messages: Array<{ role: string; content: string | Array<{ type: string; text: string }> }> = [];
+    const output: AgentMessage[] = [];
+    let pendingSummaries: SummaryRecord[] = [];
     let totalTokens = 0;
     let summaryCount = 0;
     let messageCount = 0;
 
-    // Group consecutive summaries together
-    let pendingSummaries: SummaryRecord[] = [];
-
-    const flushSummaries = () => {
-      if (pendingSummaries.length > 0) {
-        messages.push(formatSummariesAsMessage(pendingSummaries));
-        summaryCount += pendingSummaries.length;
-        pendingSummaries = [];
-      }
+    const flushSummaries = (): void => {
+      if (pendingSummaries.length === 0) return;
+      output.push(formatSummariesAsMessage(pendingSummaries));
+      summaryCount += pendingSummaries.length;
+      pendingSummaries = [];
     };
 
     for (const item of selected) {
+      totalTokens += item.tokens;
       if (item.kind === "summary") {
-        pendingSummaries.push(item.record as SummaryRecord);
-        totalTokens += item.tokens;
+        pendingSummaries.push(item.record);
       } else {
         flushSummaries();
-        messages.push(formatStoredMessageAsLlmMessage(item.record as MessageRecord));
-        totalTokens += item.tokens;
+        output.push(formatStoredMessageAsLlmMessage(item.record));
         messageCount++;
       }
     }
-
     flushSummaries();
 
-    return { messages, totalTokens, summaryCount, messageCount };
+    const sequence = validateMessageSequence(output);
+    if (!sequence.valid) {
+      return {
+        valid: false,
+        messages: [],
+        reason: sequence.reason,
+        totalTokens,
+        summaryCount,
+        messageCount,
+      };
+    }
+    return {
+      valid: true,
+      messages: output,
+      totalTokens,
+      summaryCount,
+      messageCount,
+    };
   }
 }

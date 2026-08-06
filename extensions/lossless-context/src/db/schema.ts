@@ -46,8 +46,12 @@ export const messages = sqliteTable(
       .notNull()
       .references(() => conversations.id),
     seq: integer("seq").notNull(),
+    session_entry_id: text("session_entry_id"),
+    session_parent_entry_id: text("session_parent_entry_id"),
+    session_entry_type: text("session_entry_type"),
     role: text("role").notNull(),
-    content: text("content").notNull(),
+    canonical_json: text("canonical_json"),
+    search_text: text("search_text").notNull(),
     token_count: integer("token_count").notNull().default(0),
     identity_hash: text("identity_hash"),
     created_at: text("created_at")
@@ -56,7 +60,9 @@ export const messages = sqliteTable(
   },
   (t) => [
     index("idx_messages_conversation_seq").on(t.conversation_id, t.seq),
-    index("idx_messages_identity_hash").on(t.identity_hash),
+    uniqueIndex("idx_messages_conversation_session_entry")
+      .on(t.conversation_id, t.session_entry_id)
+      .where(sql`${t.session_entry_id} IS NOT NULL`),
   ],
 );
 

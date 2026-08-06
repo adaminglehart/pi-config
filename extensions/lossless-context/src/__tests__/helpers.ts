@@ -1,30 +1,25 @@
-/**
- * Shared test helpers for lossless-context tests.
- */
-
-import { DatabaseSync } from "node:sqlite";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { randomUUID } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { LcmDatabase, type DrizzleDB } from "../db/connection.js";
 import { ConversationStore } from "../store/conversation-store.js";
-import { SummaryStore } from "../store/summary-store.js";
 import { ContextItemsStore } from "../store/context-items-store.js";
-import type { LcmConfig } from "../types.js";
+import { SummaryStore } from "../store/summary-store.js";
+import type { LcmConfig, MessageRecord } from "../types.js";
 
-/**
- * Create an in-memory LcmDatabase with all tables ready.
- */
 export function setupTestDb(): {
   db: DatabaseSync;
   drizzleDb: DrizzleDB;
   hasFts5: boolean;
 } {
   const lcmDb = new LcmDatabase(":memory:");
-  return { db: lcmDb.db, drizzleDb: lcmDb.drizzle, hasFts5: lcmDb.hasFts5 };
+  return {
+    db: lcmDb.db,
+    drizzleDb: lcmDb.drizzle,
+    hasFts5: lcmDb.hasFts5,
+  };
 }
 
-/**
- * Default test config with small values for testing.
- */
 export function makeConfig(overrides: Partial<LcmConfig> = {}): LcmConfig {
   return {
     contextThreshold: 0.75,
@@ -53,9 +48,6 @@ export function makeConfig(overrides: Partial<LcmConfig> = {}): LcmConfig {
   };
 }
 
-/**
- * Create all three stores sharing a single test db.
- */
 export function createStores(
   drizzleDb: DrizzleDB,
   db: DatabaseSync,
@@ -68,32 +60,84 @@ export function createStores(
   };
 }
 
-/**
- * Add N messages to a conversation, returning their records.
- */
+export function makeUserMessage(
+  content: string,
+  timestamp = 1,
+): AgentMessage {
+  return { role: "user", content, timestamp };
+}
+
+export function makeAssistantMessage(
+  text: string,
+  timestamp = 1,
+): AgentMessage {
+  return {
+    role: "assistant",
+    content: [{ type: "text", text }],
+    api: "anthropic-messages",
+    provider: "anthropic",
+    model: "test-model",
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "stop",
+    timestamp,
+  };
+}
+
+export function addTestMessage(
+  conversationStore: ConversationStore,
+  conversationId: string,
+  role: "user" | "assistant",
+  text: string,
+  desiredTokens?: number,
+  sessionEntryId = randomUUID(),
+): MessageRecord {
+  const targetLength = desiredTokens === undefined ? undefined : desiredTokens * 4;
+  const content =
+    targetLength === undefined
+      ? text
+      : text.slice(0, targetLength).padEnd(targetLength, "x");
+  const message =
+    role === "user"
+      ? makeUserMessage(content)
+      : makeAssistantMessage(content);
+  return conversationStore.addMessage({
+    conversationId,
+    sessionEntryId,
+    sessionParentEntryId: null,
+    sessionEntryType: "message",
+    message,
+  }).message;
+}
+
 export function addMessages(
   conversationStore: ConversationStore,
   conversationId: string,
   count: number,
   tokensEach = 100,
-): ReturnType<ConversationStore["addMessage"]>[] {
-  const messages: ReturnType<ConversationStore["addMessage"]>[] = [];
-  for (let i = 0; i < count; i++) {
-    messages.push(
-      conversationStore.addMessage(
+): MessageRecord[] {
+  const records: MessageRecord[] = [];
+  for (let index = 0; index < count; index++) {
+    records.push(
+      addTestMessage(
+        conversationStore,
         conversationId,
-        i % 2 === 0 ? "user" : "assistant",
-        JSON.stringify(`message ${i}`),
+        index % 2 === 0 ? "user" : "assistant",
+        `message ${index}`,
         tokensEach,
+        `fixture-entry-${conversationId}-${index}-${randomUUID()}`,
       ),
     );
   }
-  return messages;
+  return records;
 }
 
-/**
- * Stub ModelRegistry for testing.
- */
 export function makeModelRegistry() {
   return {
     find: () => ({ id: "test-model", provider: "test" }),

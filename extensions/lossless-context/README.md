@@ -6,7 +6,7 @@ Adapted from [lossless-claw](https://github.com/martian-engineering/lossless-cla
 
 ## How it works
 
-1. **Every message is persisted** to a SQLite database on each `message_end` event
+1. **Every post-startup message-bearing Pi session entry is persisted canonically** to SQLite. `message_end` records pending work; later safe hooks ingest Pi's finalized `message` and `custom_message` entries with their stable entry provenance
 2. **Soft threshold (background compaction)**: When active context tokens exceed `softTokenThreshold` (default 65%) of the model's context window, LCM starts compaction in the background between turns
 3. **Hard threshold (blocking compaction)**: If tokens exceed `hardTokenThreshold` (default 85%), LCM blocks in `session_before_compact` to ensure context fits. If background compaction already completed, this may return immediately
 4. **The compaction engine** summarizes older messages into leaf summaries, then condenses those into higher-level summaries — forming a DAG (directed acyclic graph)
@@ -19,14 +19,17 @@ Pi's default compaction is cancelled — LCM handles everything.
 
 ```
 index.ts (entry point)
-├── Events: session_start, message_end, turn_end, context,
+├── Events: session_start, message_end, context, turn_end, agent_end,
 │           session_before_compact, tool_result, session_shutdown
 ├── Tools: lcm_grep, lcm_describe, lcm_expand, lcm_expand_query
 └── Commands: /lcm, /lcm backup, /lcm doctor, /lcm rotate
 
 src/
 ├── Core
-│   ├── assembler.ts          Context assembly (summaries + messages → LLM context)
+│   ├── assembler.ts          Canonical context assembly with sequence validation
+│   ├── message-codec.ts      Canonical JSON, validation, projection, legacy wrappers
+│   ├── message-sequence.ts   Provider tool-call/result sequence safety gate
+│   ├── session-message-synchronizer.ts  Authoritative Pi entry ingestion
 │   ├── compaction.ts         Leaf passes, condensed passes, threshold triggers
 │   ├── summarize.ts          LLM calls for summarization
 │   ├── summarize-prompts.ts  Depth-aware prompt templates
@@ -56,21 +59,30 @@ src/
 │   ├── config.ts             Settings from Pi's settings.json (lcm namespace)
 │   ├── types.ts              All TypeScript type definitions
 │   ├── tokens.ts             Token estimation (chars / 3.5)
-│   ├── session-key.ts        cwd → session key mapping
-│   ├── message-utils.ts      Extract text from Pi's message formats
-│   └── message-format.ts     Convert DB records ↔ Pi-compatible messages
+│   ├── session-key.ts        session file → conversation key mapping
+│   └── message-format.ts     Canonical/legacy records → Pi messages
 ```
 
 ## Data flow
 
-### Per-message persistence
+### Canonical message persistence
 ```
-message_end event
-  → extractTextContent(message)
-  → computeIdentityHash(role, content)
-  → estimateTokens(content)
-  → conversationStore.addMessage()  // also creates context_item + FTS5 index
+session_start
+  → mark existing session entry IDs seen (no historical import in Plan 1)
+
+message_end(user | assistant | toolResult)
+  → increment pending-finalized count only; do not cache or write the payload
+
+context / turn_end / agent_end / session_shutdown
+  → scan newly appended Pi session entries in append order
+  → message: use entry.message exactly
+  → custom_message: use Pi's sessionEntryToContextMessages() projection
+  → store canonical AgentMessage JSON + stable entry ID/parent/type
+  → derive separate search_text and Pi AgentMessage token estimate
+  → create context_item and index only search_text
 ```
+
+`(conversation_id, session_entry_id)` is the idempotency key. Local message UUIDs remain stable for summary, context, and large-file links. Equal payloads in different Pi entries remain distinct.
 
 ### Background compaction (soft threshold)
 ```
@@ -97,12 +109,15 @@ session_before_compact hook (Pi triggers this when context needs pruning)
 ### Context assembly (before each LLM call)
 ```
 context event
+  → synchronize authoritative new session entries before every guard
+  → fail open to Pi-native context while finalized entries are pending/failed
   → Get all context_items ordered by ordinal
-  → Resolve each → message record or summary record
+  → Resolve canonical rows exactly; wrap migrated legacy rows explicitly as legacy
   → Split: evictable prefix | protected fresh tail (last N messages)
   → Budget-aware selection: add evictable items newest-first until budget
-  → Group consecutive summaries into single injection messages
-  → Return assembled messages[]
+  → Group consecutive summaries into valid injected user messages
+  → validate tool-call/result sequencing; fail open when unsafe
+  → Return AgentMessage[] only when safe
 ```
 
 ## DAG structure
@@ -196,13 +211,19 @@ Uses **`node:sqlite`** (built-in to Node.js 22+) with:
 
 ### Tables
 - `conversations` — session-to-conversation mapping
-- `messages` — all raw messages with role, content, tokens, identity hash
+- `messages` — local message identity, Pi entry provenance, canonical JSON, searchable projection, and tokens
 - `summaries` — leaf and condensed summaries with depth and metadata
 - `summary_messages` — leaf → source messages (DAG edges)
 - `summary_parents` — condensed → child summaries (DAG edges)
 - `context_items` — ordered "active" context (pointers to messages or summaries)
 - `large_files` — externalized large tool outputs
 - `messages_fts` / `summaries_fts` — FTS5 virtual tables
+
+Canonical rows have non-null `canonical_json`, `session_entry_id`, and provenance. `search_text` is deterministic, human-readable, excludes image base64 and arbitrary metadata, and is the only message field used by grep, snippets, and leaf-summary prompts. Databases created before schema v2 are migrated transactionally: old `content` becomes `search_text`, existing local IDs and DAG links are preserved, and the old rows remain visibly **legacy projections** (`canonical_json IS NULL`) until a later reconciliation plan.
+
+### Plan 1 lifecycle limits
+
+This release intentionally synchronizes only entries appended after the extension's `session_start`. It does not yet import or reconcile historical JSONL entries, model active `/tree` branches, inherit parent-session history on fork, or handle resume/new-session rotation semantics. Those are Plan 2 responsibilities; canonical storage here must not be interpreted as proof of historical branch/fork/bootstrap correctness.
 
 ## Dependencies
 
@@ -215,6 +236,8 @@ No npm dependencies required. Uses:
 - `typebox` — tool parameter schemas
 
 ## Adapted from lossless-claw
+
+lossless-claw uses normalized message parts because it bridges multiple host protocols. This Pi-specific extension instead preserves Pi's public `AgentMessage` JSON representation, avoiding a second evolving parts protocol while retaining a separate search projection.
 
 Key differences from the original OpenClaw plugin:
 - **Event-driven** — uses Pi's extension events instead of OpenClaw's ContextEngine interface
