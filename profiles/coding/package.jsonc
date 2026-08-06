@@ -28,11 +28,11 @@
     ],
     "skills": [
       "herdr",
-      "msgvault-api",
+      // "msgvault-api",
       "pi-extension",
       "session-reader",
       "agent-browser",
-      "autoreview",
+      // "autoreview",
     ],
   },
 }

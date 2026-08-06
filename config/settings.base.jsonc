@@ -4,6 +4,7 @@
     "npm:pi-mcp-adapter",
     "npm:pi-subagents",
     "npm:pi-prompt-template-model",
+    "git:github.com/earendil-works/pi-review"
   ],
   "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],
   "skills": ["~/.agents/skills"],
