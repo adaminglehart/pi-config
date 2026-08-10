@@ -18,6 +18,9 @@ requested.
 After making changes in this repository, always run `just apply` so the
 primary agent is rebuilt and deployed. Do not leave changes unapplied unless explicitly told to.
 
+Unless explicitly told otherwise, make changes directly on `main`. Do not
+create or push feature branches for repository changes unless explicitly requested.
+
 ## Source and generated locations
 
 Authoritative source:
