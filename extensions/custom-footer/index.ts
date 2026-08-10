@@ -89,6 +89,8 @@ function getThinkingEmoji(level: string): string {
       return "◓";
     case "xhigh":
       return "●";
+    case "max":
+      return "◉";
     default:
       return "○";
   }
@@ -512,7 +514,7 @@ export default function customFooter(pi: ExtensionAPI) {
         };
       },
     );
-    if (!isSubagent() && !isPersonalProfile()) startAnimation(tuiRef);
+    if (!isSubagent()) startAnimation(tuiRef);
   }
 
   pi.on("session_start", async (_event, ctx) => {

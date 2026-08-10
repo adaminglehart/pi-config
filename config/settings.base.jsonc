@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.83.0",
+  "lastChangelogVersion": "0.84.1",
   "packages": [
     "npm:pi-mcp-adapter",
     "npm:pi-subagents",
@@ -16,4 +16,5 @@
     "hardTokenThreshold": 0.85,
     "backgroundCompaction": true,
   },
+  "tuiMode": "fullscreen"
 }

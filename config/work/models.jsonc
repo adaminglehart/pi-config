@@ -9,6 +9,25 @@
       },
       "models": [
         {
+          "id": "claude-opus-5",
+          "name": "Claude Opus 5",
+          "api": "anthropic-messages",
+          "baseUrl": "http://${LITELLM_PROXY_HOST}:7891",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+          },
+          "input": ["text", "image"],
+          "contextWindow": 1000000,
+          "compat": {
+            "forceAdaptiveThinking": true,
+          },
+        },
+        {
           "id": "claude-opus-4-8",
           "name": "Claude Opus 4.8",
           "api": "anthropic-messages",
@@ -78,6 +97,10 @@
           "id": "gpt-5.6-sol",
           "name": "GPT-5.6 Sol",
           "reasoning": true,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+          },
           "input": ["text", "image"],
           "contextWindow": 1050000,
         },
@@ -85,6 +108,10 @@
           "id": "gpt-5.6-terra",
           "name": "GPT-5.6 Terra",
           "reasoning": true,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+          },
           "input": ["text", "image"],
           "contextWindow": 1050000,
         },
@@ -92,6 +119,10 @@
           "id": "gpt-5.6-luna",
           "name": "GPT-5.6 Luna",
           "reasoning": true,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+          },
           "input": ["text", "image"],
           "contextWindow": 1050000,
         },
@@ -185,11 +216,14 @@
           "contextWindow": 1000000,
         },
         {
-          "id": "kimi-k2-5",
-          "name": "Kimi K2.5",
+          "id": "kimi-k2-6",
+          "name": "Kimi K2.6",
           "reasoning": true,
           "input": ["text", "image"],
           "contextWindow": 262144,
+          "compat": {
+            "supportsReasoningEffort": false,
+          },
         },
         {
           "id": "qwen3-coder-480b-a35b",

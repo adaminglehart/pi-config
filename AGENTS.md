@@ -15,6 +15,9 @@ Do not edit `~/.pi/agent` directly when it is managed by this repository. Edit
 source files, build, then use the Justfile deploy flow when deployment is
 requested.
 
+After making changes in this repository, always run `just apply` so the
+primary agent is rebuilt and deployed. Do not leave changes unapplied unless explicitly told to.
+
 ## Source and generated locations
 
 Authoritative source:
