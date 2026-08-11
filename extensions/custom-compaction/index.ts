@@ -52,6 +52,13 @@ export default function (pi: ExtensionAPI) {
       "info",
     );
 
+    // Pi 0.84's runtime compact path accepts ProviderHeaders, but its
+    // published helper declaration still exposes the pre-0.84 string-only
+    // shape. Preserve null deletion markers across that declaration gap.
+    const compactionHeaders = auth.headers as
+      | Record<string, string>
+      | undefined;
+
     try {
       // Use pi's built-in compact() function with our custom model
       // This reuses ALL of pi's built-in logic:
@@ -65,7 +72,7 @@ export default function (pi: ExtensionAPI) {
         preparation,
         model,
         auth.apiKey,
-        auth.headers,
+        compactionHeaders,
         customInstructions,
         signal,
       );

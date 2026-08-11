@@ -7,9 +7,9 @@
     "postinstall": "rm -f node_modules/.bin/pi node_modules/.bin/pi-ai"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.80.3",
-    "@earendil-works/pi-coding-agent": "^0.80.3",
-    "@earendil-works/pi-tui": "^0.80.3",
+    "@earendil-works/pi-ai": "^0.84.1",
+    "@earendil-works/pi-coding-agent": "^0.84.1",
+    "@earendil-works/pi-tui": "^0.84.1",
     "parallel-web": "^0.4.1",
     "tsx": "4.20.6",
     "typebox": "^1.1.31",
