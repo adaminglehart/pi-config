@@ -27,6 +27,7 @@ const SHARED_LIB_DIR = join(ROOT, "shared", "lib");
 const BUILD_DIR = join(ROOT, "build", "agent");
 const CONFIG_DIR = join(ROOT, "config");
 const MANIFEST_PATH = join(ROOT, "pi.jsonc");
+const UI_SH_SKILLS_PATH = join(CONFIG_DIR, "ui-sh-skills.json");
 
 const HOME_HOSTNAME = "MacBook-Pro.local";
 const environment =
@@ -38,6 +39,10 @@ interface PrimaryManifest {
     extensions: string[];
     skills: string[];
   };
+}
+
+interface UiShSkillsManifest {
+  skills: string[];
 }
 
 type JsonValue =
@@ -72,6 +77,33 @@ function parseJsonc(text: string): unknown {
 async function readJson(path: string): Promise<unknown> {
   const text = await Bun.file(path).text();
   return path.endsWith(".jsonc") ? parseJsonc(text) : JSON.parse(text);
+}
+
+/** Read the checked-in list of skills managed by ui.sh. */
+async function readUiShSkills(): Promise<string[]> {
+  if (!existsSync(UI_SH_SKILLS_PATH)) {
+    fatal(`ui.sh skills manifest not found: ${UI_SH_SKILLS_PATH}`);
+  }
+
+  const manifest = (await readJson(UI_SH_SKILLS_PATH)) as UiShSkillsManifest;
+  if (!Array.isArray(manifest.skills)) {
+    fatal(`Invalid ui.sh skills manifest: ${UI_SH_SKILLS_PATH}`);
+  }
+
+  for (const skillName of manifest.skills) {
+    if (
+      typeof skillName !== "string" ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName)
+    ) {
+      fatal(`Invalid ui.sh skill name: ${skillName}`);
+    }
+  }
+
+  if (new Set(manifest.skills).size !== manifest.skills.length) {
+    fatal(`Duplicate skill in ui.sh skills manifest: ${UI_SH_SKILLS_PATH}`);
+  }
+
+  return manifest.skills;
 }
 
 /**
@@ -375,6 +407,12 @@ async function buildPrimaryAgent(): Promise<void> {
   }
 
   const { extensions, skills } = manifest.pi;
+  const uiShSkills = await readUiShSkills();
+  const selectedSkills = [...skills, ...uiShSkills];
+  if (new Set(selectedSkills).size !== selectedSkills.length) {
+    fatal("A skill is selected by both pi.jsonc and config/ui-sh-skills.json");
+  }
+
   const mergedSettingsJson = await buildMergedConfig("settings");
   const buildVars = readModelAliasVars(mergedSettingsJson);
   const settingsJson = normalizeDefaultModelSettings(
@@ -420,7 +458,7 @@ async function buildPrimaryAgent(): Promise<void> {
 
   const skillOutputDir = join(BUILD_DIR, "skills");
   mkdirSync(skillOutputDir, { recursive: true });
-  for (const skillName of skills) {
+  for (const skillName of selectedSkills) {
     const source = join(SKILLS_DIR, skillName);
     if (!existsSync(source)) fatal(`Skill not found: ${source}`);
     const destination = join(skillOutputDir, skillName);

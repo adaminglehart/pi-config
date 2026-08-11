@@ -29,6 +29,12 @@ extension and skill allowlists. Add an extension or skill to the respective
 source directory first, then explicitly add its name to the appropriate
 allowlist in `pi.jsonc`.
 
+ui.sh skills are the exception. `just update-ui-skills` downloads every skill
+available to `UIDOTSH_TOKEN` into `skills/` and updates
+`config/ui-sh-skills.json`. The build adds that checked-in list to the primary
+skill allowlist. Updating is explicit so normal builds stay offline and do not
+change reviewed skill content.
+
 ## Configuration merge order
 
 Generated `settings.json`, `models.json`, and `mcp.json` merge later layers
@@ -49,6 +55,9 @@ substituted into primary agent files.
 ## Commands
 
 ```bash
+# Download all current ui.sh skills through the fnox-managed token
+just update-ui-skills
+
 # Build build/agent/
 just build
 

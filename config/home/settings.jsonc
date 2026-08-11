@@ -19,6 +19,7 @@
     "openrouter/deepseek/deepseek-v4-flash",
     "google/gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview",
+    "llama-server/muse-glimmer-30b",
   ],
   "defaultThinkingLevel": "high",
   "compaction": {

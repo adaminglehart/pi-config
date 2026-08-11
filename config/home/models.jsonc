@@ -76,6 +76,12 @@
           "reasoning": true,
           "contextWindow": 163840,
         },
+        {
+          "id": "muse-glimmer-30b",
+          "name": "Muse Glimmer 30B",
+          "reasoning": true,
+          "contextWindow": 131072,
+        },
       ],
     },
   },

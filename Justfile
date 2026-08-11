@@ -2,6 +2,10 @@
 build:
     bun run build.ts
 
+# Download all current ui.sh skills into the repository
+update-ui-skills:
+    fnox exec -- bun run scripts/update-ui-skills.ts
+
 # Read destDir from the root pi.jsonc manifest
 _dest:
     @bun scripts/dest.ts

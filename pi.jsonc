@@ -10,6 +10,7 @@
       "custom-startup-info",
       "herdr-agent-state",
       "hindsight",
+      // "honcho",
       "lsp",
       "minimal-tools",
       "model-switch",

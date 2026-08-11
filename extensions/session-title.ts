@@ -82,26 +82,27 @@ async function generateSessionTitle(
     throw new Error(`authentication for ${provider}/${modelId} failed`);
   }
 
-  const response = await completeSimple(
-    model,
-    {
-      systemPrompt: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Create a title for this JSON-encoded source message:\n${JSON.stringify(prompt.slice(0, MAX_PROMPT_LENGTH))}`,
-          timestamp: Date.now(),
-        },
-      ],
-    },
-    {
-      apiKey: auth.apiKey,
-      headers: auth.headers,
-      maxTokens: 64,
-      temperature: 0,
-      signal,
-    },
-  );
+  const context = {
+    systemPrompt: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user" as const,
+        content: `Create a title for this JSON-encoded source message:\n${JSON.stringify(prompt.slice(0, MAX_PROMPT_LENGTH))}`,
+        timestamp: Date.now(),
+      },
+    ],
+  };
+  const options = {
+    apiKey: auth.apiKey,
+    headers: auth.headers,
+    maxTokens: 64,
+    signal,
+  };
+
+  const response = await completeSimple(model, context, options);
+  if (response.stopReason === "error") {
+    throw new Error(response.errorMessage || "title model request failed");
+  }
 
   const title = sanitizeGeneratedTitle(
     response.content
@@ -109,7 +110,6 @@ async function generateSessionTitle(
       .map((block) => block.text)
       .join(" "),
   );
-
   if (!title) {
     throw new Error("model returned an empty title");
   }
