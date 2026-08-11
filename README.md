@@ -10,13 +10,15 @@ part of the build or deployment pipeline.
 ```text
 ~/dev/pi-config/
 ├── pi.jsonc              # Primary destination and enabled extensions/skills
-├── agent/                 # Primary prompts, agent definitions, deploy hook
+├── agent/                 # Global AGENTS.md prompt, agent definitions, deploy hook
 ├── config/                # Base and environment-specific JSON configuration
 ├── extensions/            # Shared Pi extensions
 ├── skills/                # Shared task-specific instruction packages
 ├── shared/lib/            # Shared extension code staged as extensions/_lib/
 ├── build/agent/           # Generated primary-agent output (gitignored)
 ├── build.ts               # Primary build pipeline
+├── package.json           # Build-tool dependencies
+├── tsconfig.json          # Build-tool typecheck configuration
 └── Justfile               # Build, deploy, comparison, and cleanup commands
 ```
 
@@ -30,10 +32,9 @@ source directory first, then explicitly add its name to the appropriate
 allowlist in `pi.jsonc`.
 
 ui.sh skills are the exception. `just update-ui-skills` downloads every skill
-available to `UIDOTSH_TOKEN` into `skills/` and updates
-`config/ui-sh-skills.json`. The build adds that checked-in list to the primary
-skill allowlist. Updating is explicit so normal builds stay offline and do not
-change reviewed skill content.
+available to `UIDOTSH_TOKEN` into `skills/` and updates the checked-in
+`pi.uiShSkills` list in `pi.jsonc`. Updating is explicit so normal builds stay
+offline and do not change reviewed skill content.
 
 ## Configuration merge order
 
@@ -58,19 +59,25 @@ substituted into primary agent files.
 # Download all current ui.sh skills through the fnox-managed token
 just update-ui-skills
 
+# Typecheck build tooling and extensions
+just check
+
 # Build build/agent/
 just build
 
 # Build and deploy the primary agent to the destination in pi.jsonc
-just deploy
-# Equivalent build-and-deploy command
 just apply
+# Alias of `just apply`
+just deploy
 
 # Compare build/agent/ with the deployed agent (inspection only)
 just diff
 
 # Remove primary generated output and managed deployed files
 just clean
+
+# Import historical session JSONL into Hindsight (dry run; pass --write to ingest)
+just hindsight-import
 
 # Generate honcho/.env for the detected environment
 just honcho-env

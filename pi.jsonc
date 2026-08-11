@@ -4,10 +4,12 @@
     "extensions": [
       "animations",
       "answer",
+      "btw",
       "cost",
       "custom-footer",
       "custom-compaction",
-      "custom-startup-info",
+      // "custom-startup-info",
+      "goal",
       "herdr-agent-state",
       "hindsight",
       // "honcho",
@@ -15,10 +17,14 @@
       "minimal-tools",
       "model-switch",
       "notify",
+      "session-breakdown",
       "session-title",
+      // npm:pi-subagents reads extensions/subagent/config.json directly; this
+      // allowlist entry deploys that config-only directory.
       "subagent",
       "todos",
       "tokens-per-second",
+      "unified-edit",
       "webfetch",
       "websearch"
     ],
@@ -27,6 +33,17 @@
       "pi-extension",
       "session-reader",
       "agent-browser"
+    ],
+    "uiShSkills": [
+      "add-dark-mode",
+      "brand-kit",
+      "canonicalize-tailwind",
+      "componentize",
+      "dark-mode-image",
+      "design",
+      "ideas",
+      "make-responsive",
+      "markup-from-image"
     ]
   }
 }

@@ -9,10 +9,11 @@ import {
   statSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { applyEdits, modify } from "jsonc-parser";
+import { MANIFEST_PATH, readManifest } from "./manifest.ts";
 
 const ROOT = join(import.meta.dirname, "..");
 const SKILLS_DIR = join(ROOT, "skills");
-const MANIFEST_PATH = join(ROOT, "config", "ui-sh-skills.json");
 const API_URL = "https://ui.sh/api/skills";
 
 interface SkillSummary {
@@ -28,10 +29,6 @@ interface Skill {
   name: string;
   description: string;
   files: Record<string, string>;
-}
-
-interface UiShSkillsManifest {
-  skills: string[];
 }
 
 function fatal(message: string): never {
@@ -76,19 +73,6 @@ async function fetchJson<T>(url: string, token: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function readPreviousManifest(): Promise<UiShSkillsManifest> {
-  if (!existsSync(MANIFEST_PATH)) return { skills: [] };
-  const manifest = (await Bun.file(MANIFEST_PATH).json()) as UiShSkillsManifest;
-  if (!Array.isArray(manifest.skills)) {
-    fatal(`Invalid ui.sh skills manifest: ${MANIFEST_PATH}`);
-  }
-  for (const name of manifest.skills) validateSkillName(name);
-  if (new Set(manifest.skills).size !== manifest.skills.length) {
-    fatal(`Duplicate skill in ui.sh skills manifest: ${MANIFEST_PATH}`);
-  }
-  return manifest;
-}
-
 const token = Bun.env.UIDOTSH_TOKEN;
 if (!token) {
   fatal("UIDOTSH_TOKEN is not set; run this command through fnox");
@@ -105,8 +89,13 @@ if (new Set(names).size !== names.length) {
   fatal("ui.sh returned duplicate skill names");
 }
 
-const previousManifest = await readPreviousManifest();
-const previousNames = new Set(previousManifest.skills);
+const manifest = await readManifest();
+const overlap = names.filter((name) => manifest.pi.skills.includes(name));
+if (overlap.length > 0) {
+  fatal(`ui.sh skills overlap pi.skills: ${overlap.join(", ")}`);
+}
+const previousNames = new Set(manifest.pi.uiShSkills);
+const manifestText = await Bun.file(MANIFEST_PATH).text();
 mkdirSync(SKILLS_DIR, { recursive: true });
 const stagingRoot = mkdtempSync(join(SKILLS_DIR, ".ui-sh-staging-"));
 
@@ -156,7 +145,7 @@ try {
   const manifestTempPath = `${MANIFEST_PATH}.tmp`;
 
   try {
-    for (const name of previousManifest.skills) {
+    for (const name of manifest.pi.uiShSkills) {
       const destination = join(SKILLS_DIR, name);
       if (!existsSync(destination)) continue;
       renameSync(destination, join(backupRoot, name));
@@ -169,11 +158,17 @@ try {
       console.log(`  updated ${name}/`);
     }
 
-    const manifest: UiShSkillsManifest = { skills: names };
-    await Bun.write(
-      manifestTempPath,
-      `${JSON.stringify(manifest, null, 2)}\n`,
+    const updatedManifest = applyEdits(
+      manifestText,
+      modify(manifestText, ["pi", "uiShSkills"], names, {
+        formattingOptions: {
+          insertSpaces: true,
+          tabSize: 2,
+          eol: "\n",
+        },
+      }),
     );
+    await Bun.write(manifestTempPath, updatedManifest);
     renameSync(manifestTempPath, MANIFEST_PATH);
   } catch (error) {
     rmSync(manifestTempPath, { force: true });

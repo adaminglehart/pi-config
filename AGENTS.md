@@ -25,12 +25,14 @@ create or push feature branches for repository changes unless explicitly request
 
 Authoritative source:
 
-- `pi.jsonc` — primary destination plus extension/skill selection
-- `agent/` — `AGENTS.md`, `APPEND_SYSTEM.md`, agent definitions, deploy hook
+- `pi.jsonc` — primary destination plus extension/skill selection; its
+  `pi.uiShSkills` list is owned by `just update-ui-skills`
+- `agent/` — `AGENTS.md` (the global agent prompt), agent definitions, deploy hook
 - `extensions/` and `skills/` — shared selectable components
 - `config/` — base and environment-specific generated config layers
 - `shared/lib/` — code staged to `extensions/_lib/`
-- `build.ts`, `scripts/`, and `Justfile` — build and deployment pipeline
+- `build.ts`, `scripts/`, `package.json`, `tsconfig.json`, and `Justfile` — build,
+  typecheck, and deployment pipeline
 
 Generated or deployed output:
 
@@ -43,38 +45,40 @@ contents from `agent/`; the primary builder deliberately excludes its runtime
 
 ## Build behavior
 
-`build.ts` has no profile argument. It:
+`README.md` documents the structure, the config merge order, and the commands.
+Read it instead of duplicating that detail here. The invariants an agent must
+not break:
 
-- reads root `pi.jsonc`
-- detects `home` on `MacBook-Pro.local` and `work` otherwise (override with
-  `PI_BUILD_ENV`)
-- copies only manifest-selected extensions and skills to `build/agent/`
-- stages `shared/lib/` as `extensions/_lib/` and root extension development
-  tooling (`package.json`, `tsconfig.json`)
-- copies primary files from `agent/`, excluding runtime dependency directories
-- merges and writes `settings.json`, `models.json`, and `mcp.json`
-- resolves `${ENV_VAR}` values and model-alias placeholders
-- stages environment-specific `fnox.toml` when present
-- removes stale deployed agents, extensions, and skills before deployment
-
-Generated config uses only these layers, with later layers overriding earlier
-ones:
-
-1. `config/<name>.base.json(.c)`
-2. `config/<env>/<name>.json(.c)`
-3. `config/<env>/<name>.local.json(.c)`
-
-`*.local.json` and `*.local.jsonc` are gitignored machine-specific overrides.
-Missing `${ENV_VAR}` values fail the build.
+- `build.ts` takes no profile argument. Environment is `home` on
+  `MacBook-Pro.local` and `work` everywhere else. Override with `PI_BUILD_ENV`.
+- An extension or skill is deployed **only** when its name is in `pi.jsonc`
+  under `pi.extensions`, `pi.skills`, or `pi.uiShSkills`. Adding the source
+  directory alone does nothing.
+- Generated config merges three layers, later over earlier:
+  `config/<name>.base.json(.c)`, `config/<env>/<name>.json(.c)`, then
+  `config/<env>/<name>.local.json(.c)`. The `*.local.*` layers are gitignored
+  machine-specific overrides.
+- Missing `${ENV_VAR}` values fail the build. Add them to `.env`.
+- `just build` writes only to `build/agent/`. The deploy step removes stale
+  managed destination paths before it copies the new build.
+- `scripts/managed-destination.ts` temporarily includes legacy profile-era
+  paths (`build`, `build.ts`, `config`, `docs`, `Justfile`, `README.md`,
+  `APPEND_SYSTEM.md`, and `.chezmoiignore`). After one successful `just apply`
+  on every configured machine, remove those entries so future Pi runtime paths
+  cannot collide with old cleanup names.
 
 ## Commands
 
 ```bash
+just check              # Typecheck build tooling and extensions
 just build              # Generate build/agent/
-just deploy             # Build and deploy the primary agent
-just apply              # Equivalent build-and-deploy command
+just apply              # Build and deploy the primary agent
+just deploy             # Alias of `just apply`
 just diff               # Inspect build/agent/ against its destination
 just clean              # Remove generated output and managed deployed files
+just update-ui-skills   # Download current ui.sh skills and refresh their allowlist
+just hindsight-import   # Import historical session JSONL into Hindsight (dry run
+                        # by default; pass --write to ingest)
 just honcho-env         # Generate honcho/.env for the active environment
 ```
 

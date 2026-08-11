@@ -12,7 +12,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import {
   createBashTool,
-  createEditTool,
   createFindTool,
   createGrepTool,
   createLsTool,
@@ -45,18 +44,6 @@ const WriteParams = Type.Object({
   path: Type.String(),
   content: Type.String(),
 });
-
-const EditParams = Type.Object({
-  path: Type.String(),
-  oldText: Type.String(),
-  newText: Type.String(),
-});
-
-// The underlying edit tool expects this format at runtime
-interface EditInternalParams {
-  path: string;
-  edits: Array<{ oldText: string; newText: string }>;
-}
 
 const FindParams = Type.Object({
   pattern: Type.String(),
@@ -357,77 +344,6 @@ export default function (pi: ExtensionAPI) {
       const text = getTextContent(result);
       if (text) return new Text(`\n${theme.fg("error", text)}`, 0, 0);
       return new Text("", 0, 0);
-    },
-  });
-
-  // Edit Tool
-  pi.registerTool({
-    name: "edit",
-    label: "edit",
-    description: "Edit a file by replacing exact text.",
-    promptSnippet: "Edit a file by replacing exact text",
-    promptGuidelines: [
-      "Use edit for precise text replacements in existing files.",
-      "The oldText must match exactly, including whitespace and indentation.",
-      "Read the file first to ensure you have the correct text to replace.",
-    ],
-    parameters: EditParams,
-
-    async execute(
-      toolCallId,
-      params: Static<typeof EditParams>,
-      signal,
-      onUpdate,
-      ctx,
-    ) {
-      const tool = createEditTool(ctx.cwd);
-      const transformedParams: EditInternalParams = {
-        path: params.path,
-        edits: [
-          {
-            oldText: params.oldText,
-            newText: params.newText,
-          },
-        ],
-      };
-      return tool.execute(
-        toolCallId,
-        transformedParams as any,
-        signal,
-        onUpdate,
-      );
-    },
-
-    renderCall(args: Static<typeof EditParams>, theme) {
-      const path = shortenPath(args.path || "...");
-      return new Text(
-        ` ${theme.fg("dim", "✎")} ${theme.fg("toolTitle", "edit")} ${theme.fg("accent", path)}`,
-        0,
-        0,
-      );
-    },
-
-    renderResult(result, { expanded }, theme, context) {
-      if (!expanded) {
-        const text = getTextContent(result);
-        const isError = text.includes("Error");
-        if (isError) return new Text(` ${theme.fg("error", "✗")}`, 0, 0);
-        const args = context.args as Static<typeof EditParams>;
-        const oldLines = args?.oldText?.split("\n").length || 0;
-        const newLines = args?.newText?.split("\n").length || 0;
-        const delta = newLines - oldLines;
-        const info =
-          delta !== 0
-            ? ` ${theme.fg("muted", `(${delta > 0 ? "+" : ""}${delta} lines)`)}`
-            : "";
-        return new Text(` ${theme.fg("success", "✓")}${info}`, 0, 0);
-      }
-      const text = getTextContent(result);
-      if (text.includes("Error"))
-        return new Text(`\n${theme.fg("error", text)}`, 0, 0);
-      return text
-        ? new Text(`\n${theme.fg("toolOutput", text)}`, 0, 0)
-        : new Text("", 0, 0);
     },
   });
 

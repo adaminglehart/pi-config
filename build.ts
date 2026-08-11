@@ -16,121 +16,77 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
-import { homedir, hostname } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, sep } from "node:path";
+import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
+import { resolveBuildEnvironment } from "./scripts/env.ts";
+import {
+  isJsonObject,
+  type JsonObject,
+  type JsonValue,
+  readManifest,
+} from "./scripts/manifest.ts";
 
 const ROOT = import.meta.dirname;
 const AGENT_DIR = join(ROOT, "agent");
 const EXTENSIONS_DIR = join(ROOT, "extensions");
 const SKILLS_DIR = join(ROOT, "skills");
 const SHARED_LIB_DIR = join(ROOT, "shared", "lib");
-const BUILD_DIR = join(ROOT, "build", "agent");
+const BUILD_ROOT = join(ROOT, "build");
+const BUILD_DIR = join(BUILD_ROOT, "agent");
 const CONFIG_DIR = join(ROOT, "config");
-const MANIFEST_PATH = join(ROOT, "pi.jsonc");
-const UI_SH_SKILLS_PATH = join(CONFIG_DIR, "ui-sh-skills.json");
 
-const HOME_HOSTNAME = "MacBook-Pro.local";
-const environment =
-  Bun.env.PI_BUILD_ENV ?? (hostname() === HOME_HOSTNAME ? "home" : "work");
+const environment = resolveBuildEnvironment();
 
-interface PrimaryManifest {
-  pi: {
-    destDir: string;
-    extensions: string[];
-    skills: string[];
-  };
-}
-
-interface UiShSkillsManifest {
-  skills: string[];
-}
-
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
-interface ModelSettings {
+type ModelSettings = JsonObject & {
   defaultProvider?: string;
   defaultModel?: string;
-  modelAliases?: JsonValue;
-}
+  modelAliases?: Record<string, string>;
+};
 
 function fatal(message: string): never {
   console.error(`error: ${message}`);
   process.exit(1);
 }
 
-/** Parse JSONC (JSON with comments and trailing commas). */
-function parseJsonc(text: string): unknown {
-  const stripped = text
-    .replace(/(?<!:)\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/,(\s*[}\]])/g, "$1");
-  return JSON.parse(stripped);
-}
-
 /** Read and parse a JSON or JSONC file. */
-async function readJson(path: string): Promise<unknown> {
+async function readJson(path: string): Promise<JsonValue> {
   const text = await Bun.file(path).text();
-  return path.endsWith(".jsonc") ? parseJsonc(text) : JSON.parse(text);
+  if (!path.endsWith(".jsonc")) return JSON.parse(text);
+
+  const errors: ParseError[] = [];
+  const value: JsonValue = parse(text, errors, { allowTrailingComma: true });
+  const firstError = errors[0];
+  if (firstError) {
+    fatal(
+      `Invalid JSONC in ${path} at offset ${firstError.offset}: ${printParseErrorCode(firstError.error)}`,
+    );
+  }
+  return value;
 }
 
-/** Read the checked-in list of skills managed by ui.sh. */
-async function readUiShSkills(): Promise<string[]> {
-  if (!existsSync(UI_SH_SKILLS_PATH)) {
-    fatal(`ui.sh skills manifest not found: ${UI_SH_SKILLS_PATH}`);
+async function readJsonObject(path: string): Promise<JsonObject> {
+  const value = await readJson(path);
+  if (!isJsonObject(value)) {
+    fatal(`Config must contain a JSON object: ${path}`);
   }
-
-  const manifest = (await readJson(UI_SH_SKILLS_PATH)) as UiShSkillsManifest;
-  if (!Array.isArray(manifest.skills)) {
-    fatal(`Invalid ui.sh skills manifest: ${UI_SH_SKILLS_PATH}`);
-  }
-
-  for (const skillName of manifest.skills) {
-    if (
-      typeof skillName !== "string" ||
-      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName)
-    ) {
-      fatal(`Invalid ui.sh skill name: ${skillName}`);
-    }
-  }
-
-  if (new Set(manifest.skills).size !== manifest.skills.length) {
-    fatal(`Duplicate skill in ui.sh skills manifest: ${UI_SH_SKILLS_PATH}`);
-  }
-
-  return manifest.skills;
+  return value;
 }
 
 /**
  * Find a file that may have a .json or .jsonc extension.
  * Returns the path if found, or null. Prefers .jsonc over .json.
  */
-function findJsonFile(pathWithoutExt: string): string | null;
-function findJsonFile(pathWithExt: string, withExt: true): string | null;
-function findJsonFile(path: string, withExt?: boolean): string | null {
-  if (withExt) {
-    if (existsSync(path)) return path;
-    const alternative = path.endsWith(".jsonc")
-      ? path.replace(/\.jsonc$/, ".json")
-      : path.replace(/\.json$/, ".jsonc");
-    return existsSync(alternative) ? alternative : null;
-  }
-
-  const jsonc = `${path}.jsonc`;
+function findJsonFile(pathWithoutExt: string): string | null {
+  const jsonc = `${pathWithoutExt}.jsonc`;
   if (existsSync(jsonc)) return jsonc;
-  const json = `${path}.json`;
+  const json = `${pathWithoutExt}.json`;
   return existsSync(json) ? json : null;
 }
 
 function copyDir(source: string, destination: string): void {
   cpSync(source, destination, {
     recursive: true,
-    filter: (path: string) => !path.includes("node_modules"),
+    filter: (path: string) => !path.split(sep).includes("node_modules"),
   });
 }
 
@@ -149,25 +105,12 @@ function resolveExtensionSource(name: string): { path: string; isFile: boolean }
 }
 
 /** Deep merge source into target (mutates target). */
-function deepMerge(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-): Record<string, unknown> {
+function deepMerge(target: JsonObject, source: JsonObject): JsonObject {
   for (const key of Object.keys(source)) {
     const targetValue = target[key];
     const sourceValue = source[key];
-    if (
-      targetValue &&
-      sourceValue &&
-      typeof targetValue === "object" &&
-      typeof sourceValue === "object" &&
-      !Array.isArray(targetValue) &&
-      !Array.isArray(sourceValue)
-    ) {
-      deepMerge(
-        targetValue as Record<string, unknown>,
-        sourceValue as Record<string, unknown>,
-      );
+    if (isJsonObject(targetValue) && isJsonObject(sourceValue)) {
+      deepMerge(targetValue, sourceValue);
     } else {
       target[key] = sourceValue;
     }
@@ -175,66 +118,12 @@ function deepMerge(
   return target;
 }
 
-/** Remove deployed agents, extensions, and skills no longer included in a build. */
-function cleanupStaleArtifacts(buildDir: string, destDir: string): void {
-  if (!existsSync(destDir)) return;
-
-  const preserveInExtensions = new Set([
-    "pnpm-lock.yaml",
-    "node_modules",
-    "package.json",
-    "tsconfig.json",
-  ]);
-
-  const cleanupManagedDir = (
-    subdir: string,
-    label: string,
-    preserve = new Set<string>(),
-  ): void => {
-    const builtDir = join(buildDir, subdir);
-    const deployedDir = join(destDir, subdir);
-    if (!existsSync(deployedDir)) return;
-
-    const builtEntries = existsSync(builtDir)
-      ? new Set(readdirSync(builtDir))
-      : new Set<string>();
-
-    for (const entry of readdirSync(deployedDir)) {
-      if (!builtEntries.has(entry) && !preserve.has(entry)) {
-        rmSync(join(deployedDir, entry), { recursive: true, force: true });
-        console.log(`  removed stale ${label}: ${entry}`);
-      }
-    }
-  };
-
-  cleanupManagedDir("agents", "agent");
-  cleanupManagedDir("extensions", "extension", preserveInExtensions);
-  cleanupManagedDir("skills", "skill");
-}
-
-/** Read the primary deployment destination from the root manifest. */
-async function getPrimaryDestDir(): Promise<string> {
-  if (!existsSync(MANIFEST_PATH)) {
-    fatal(`Primary manifest not found: ${MANIFEST_PATH}`);
-  }
-
-  const manifest = (await readJson(MANIFEST_PATH)) as PrimaryManifest;
-  const destDir = manifest.pi?.destDir;
-  if (!destDir) {
-    fatal(`Primary manifest missing pi.destDir: ${MANIFEST_PATH}`);
-  }
-
-  return destDir.replace(/^~/, homedir());
-}
-
 /** Build a merged JSON config from base, environment, and environment-local layers. */
-async function buildMergedConfig(prefix: string): Promise<string> {
-  const basePath = findJsonFile(join(CONFIG_DIR, `${prefix}.base`));
-  if (!basePath) {
-    fatal(`Config not found: ${join(CONFIG_DIR, `${prefix}.base.json`)}`);
-  }
-
-  const base = (await readJson(basePath)) as Record<string, unknown>;
+async function buildMergedConfig(
+  prefix: string,
+  basePath: string,
+): Promise<JsonObject> {
+  const base = await readJsonObject(basePath);
   const layerPaths = [
     findJsonFile(join(CONFIG_DIR, environment, prefix)),
     findJsonFile(join(CONFIG_DIR, environment, `${prefix}.local`)),
@@ -242,60 +131,76 @@ async function buildMergedConfig(prefix: string): Promise<string> {
 
   for (const layerPath of layerPaths) {
     if (layerPath) {
-      deepMerge(base, (await readJson(layerPath)) as Record<string, unknown>);
+      deepMerge(base, await readJsonObject(layerPath));
     }
   }
 
-  return `${resolveEnvVars(JSON.stringify(base, null, 2))}\n`;
+  return resolveEnvVarsInJsonObject(base);
 }
 
-/** Read named model aliases from merged settings as build variables. */
-function readModelAliasVars(settingsJson: string): Record<string, string> {
-  const { modelAliases } = JSON.parse(settingsJson) as ModelSettings;
-  if (modelAliases === undefined) return {};
-  if (
-    modelAliases === null ||
-    typeof modelAliases !== "object" ||
-    Array.isArray(modelAliases)
-  ) {
+function parseModelSettings(value: JsonObject): ModelSettings {
+  const defaultProvider = value.defaultProvider;
+  const defaultModel = value.defaultModel;
+  const modelAliases = value.modelAliases;
+
+  if (defaultProvider !== undefined && typeof defaultProvider !== "string") {
+    fatal("Merged settings defaultProvider must be a string");
+  }
+  if (defaultModel !== undefined && typeof defaultModel !== "string") {
+    fatal("Merged settings defaultModel must be a string");
+  }
+  if (modelAliases !== undefined && !isJsonObject(modelAliases)) {
     fatal("Merged settings modelAliases must be an object");
   }
 
-  const modelVars: Record<string, string> = {};
-  for (const [name, reference] of Object.entries(modelAliases)) {
-    if (!/^\w+$/.test(name) || typeof reference !== "string" || !reference) {
-      fatal(
-        "Merged settings modelAliases must use word-only names and non-empty values",
-      );
-    }
-    if (name === "default") {
-      fatal(
-        'Merged settings modelAliases must not define "default"; use defaultModel instead',
-      );
-    }
+  const validatedAliases: Record<string, string> = {};
+  if (modelAliases) {
+    for (const [name, reference] of Object.entries(modelAliases)) {
+      if (!/^\w+$/.test(name) || typeof reference !== "string" || !reference) {
+        fatal(
+          "Merged settings modelAliases must use word-only names and non-empty values",
+        );
+      }
+      if (name === "default") {
+        fatal(
+          'Merged settings modelAliases must not define "default"; use defaultModel instead',
+        );
+      }
 
-    const separator = reference.indexOf("/");
-    if (separator <= 0 || separator >= reference.length - 1) {
-      fatal(
-        `Merged settings modelAliases.${name} must use a provider/model reference`,
-      );
+      const separator = reference.indexOf("/");
+      if (separator <= 0 || separator >= reference.length - 1) {
+        fatal(
+          `Merged settings modelAliases.${name} must use a provider/model reference`,
+        );
+      }
+      validatedAliases[name] = reference;
     }
-    modelVars[`model.${name}`] = reference;
   }
 
+  return {
+    ...value,
+    ...(defaultProvider === undefined ? {} : { defaultProvider }),
+    ...(defaultModel === undefined ? {} : { defaultModel }),
+    ...(modelAliases === undefined ? {} : { modelAliases: validatedAliases }),
+  };
+}
+
+/** Read named model aliases from merged settings as build variables. */
+function readModelAliasVars(settings: ModelSettings): Record<string, string> {
+  const modelVars: Record<string, string> = {};
+  for (const [name, reference] of Object.entries(settings.modelAliases ?? {})) {
+    modelVars[`model.${name}`] = reference;
+  }
   return modelVars;
 }
 
-function defaultModelUsesAlias(settingsJson: string): boolean {
-  const { defaultModel } = JSON.parse(settingsJson) as ModelSettings;
-  return /^\{\{model\.\w+\}\}$/.test(defaultModel ?? "");
+function defaultModelUsesAlias(settings: ModelSettings): boolean {
+  return /^\{\{model\.\w+\}\}$/.test(settings.defaultModel ?? "");
 }
 
 /** Resolve Pi's configured default model into a provider/model reference. */
-function resolveDefaultModelReference(settingsJson: string): string {
-  const { defaultProvider, defaultModel } = JSON.parse(
-    settingsJson,
-  ) as ModelSettings;
+function resolveDefaultModelReference(settings: ModelSettings): string {
+  const { defaultProvider, defaultModel } = settings;
 
   if (!defaultModel) {
     fatal("Merged settings must define defaultModel");
@@ -316,18 +221,17 @@ function resolveDefaultModelReference(settingsJson: string): string {
 
 /** Normalize generated settings to separate defaultProvider/defaultModel fields. */
 function normalizeDefaultModelSettings(
-  settingsJson: string,
+  settings: ModelSettings,
   defaultFromAlias: boolean,
-): string {
-  const settings = JSON.parse(settingsJson) as ModelSettings;
+): ModelSettings {
   if (defaultFromAlias) delete settings.defaultProvider;
 
-  const reference = resolveDefaultModelReference(JSON.stringify(settings));
+  const reference = resolveDefaultModelReference(settings);
   const separator = reference.indexOf("/");
   settings.defaultProvider = reference.slice(0, separator);
   settings.defaultModel = reference.slice(separator + 1);
 
-  return `${JSON.stringify(settings, null, 2)}\n`;
+  return settings;
 }
 
 /** Replace ${VAR_NAME} placeholders with values from the build environment. */
@@ -341,6 +245,22 @@ function resolveEnvVars(text: string): string {
     }
     return value;
   });
+}
+
+function resolveEnvVarsInJson(value: JsonValue): JsonValue {
+  if (typeof value === "string") return resolveEnvVars(value);
+  if (Array.isArray(value)) return value.map(resolveEnvVarsInJson);
+  if (isJsonObject(value)) return resolveEnvVarsInJsonObject(value);
+  return value;
+}
+
+function resolveEnvVarsInJsonObject(value: JsonObject): JsonObject {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      resolveEnvVarsInJson(entry),
+    ]),
+  );
 }
 
 /** Replace {{var.name}} placeholders using build variables for the current environment. */
@@ -360,6 +280,30 @@ function substituteVars(
     }
     return vars[key];
   });
+}
+
+function substituteVarsInJson(
+  value: JsonValue,
+  vars: Record<string, string>,
+): JsonValue {
+  if (typeof value === "string") return substituteVars(value, vars);
+  if (Array.isArray(value)) {
+    return value.map((entry) => substituteVarsInJson(entry, vars));
+  }
+  if (isJsonObject(value)) return substituteVarsInJsonObject(value, vars);
+  return value;
+}
+
+function substituteVarsInJsonObject(
+  value: JsonObject,
+  vars: Record<string, string>,
+): JsonObject {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      substituteVarsInJson(entry, vars),
+    ]),
+  );
 }
 
 /** Apply variable substitution to all text files in a directory. */
@@ -394,38 +338,35 @@ async function applyVarsToFile(
 }
 
 async function buildPrimaryAgent(): Promise<void> {
-  if (!existsSync(MANIFEST_PATH)) {
-    fatal(`Primary manifest not found: ${MANIFEST_PATH}`);
-  }
   if (!existsSync(AGENT_DIR)) {
     fatal(`Primary agent source directory not found: ${AGENT_DIR}`);
   }
 
-  const manifest = (await readJson(MANIFEST_PATH)) as PrimaryManifest;
-  if (!manifest.pi) {
-    fatal(`Primary manifest missing "pi" field: ${MANIFEST_PATH}`);
-  }
-
-  const { extensions, skills } = manifest.pi;
-  const uiShSkills = await readUiShSkills();
+  const manifest = await readManifest();
+  const { extensions, skills, uiShSkills } = manifest.pi;
   const selectedSkills = [...skills, ...uiShSkills];
   if (new Set(selectedSkills).size !== selectedSkills.length) {
-    fatal("A skill is selected by both pi.jsonc and config/ui-sh-skills.json");
+    fatal("A skill is selected by both pi.skills and pi.uiShSkills");
   }
 
-  const mergedSettingsJson = await buildMergedConfig("settings");
-  const buildVars = readModelAliasVars(mergedSettingsJson);
-  const settingsJson = normalizeDefaultModelSettings(
-    substituteVars(mergedSettingsJson, buildVars),
-    defaultModelUsesAlias(mergedSettingsJson),
+  const settingsBasePath = findJsonFile(join(CONFIG_DIR, "settings.base"));
+  if (!settingsBasePath) {
+    fatal(`Config not found: ${join(CONFIG_DIR, "settings.base.json")}`);
+  }
+  const mergedSettings = parseModelSettings(
+    await buildMergedConfig("settings", settingsBasePath),
   );
-  buildVars["model.default"] = resolveDefaultModelReference(settingsJson);
-  const destDir = await getPrimaryDestDir();
+  const buildVars = readModelAliasVars(mergedSettings);
+  const settings = normalizeDefaultModelSettings(
+    parseModelSettings(substituteVarsInJsonObject(mergedSettings, buildVars)),
+    defaultModelUsesAlias(mergedSettings),
+  );
+  buildVars["model.default"] = resolveDefaultModelReference(settings);
 
   console.log(`  environment: ${environment}\n`);
 
-  if (existsSync(BUILD_DIR)) {
-    rmSync(BUILD_DIR, { recursive: true });
+  if (existsSync(BUILD_ROOT)) {
+    rmSync(BUILD_ROOT, { recursive: true });
   }
   mkdirSync(BUILD_DIR, { recursive: true });
 
@@ -440,6 +381,8 @@ async function buildPrimaryAgent(): Promise<void> {
   for (const extensionName of extensions) {
     const source = resolveExtensionSource(extensionName);
     const destination = join(extensionOutputDir, basename(source.path));
+    // Extension source can contain literal {{...}} syntax, so leave unknown
+    // build placeholders unchanged instead of failing the build.
     if (source.isFile) {
       cpSync(source.path, destination);
       await applyVarsToFile(destination, buildVars, false);
@@ -458,6 +401,8 @@ async function buildPrimaryAgent(): Promise<void> {
 
   const skillOutputDir = join(BUILD_DIR, "skills");
   mkdirSync(skillOutputDir, { recursive: true });
+  // Skills are copied without build substitution so their literal {{...}}
+  // examples and templates remain unchanged.
   for (const skillName of selectedSkills) {
     const source = join(SKILLS_DIR, skillName);
     if (!existsSync(source)) fatal(`Skill not found: ${source}`);
@@ -466,6 +411,8 @@ async function buildPrimaryAgent(): Promise<void> {
     console.log(`  skill ${skillName}/`);
   }
 
+  // Agent prompt files only use declared build placeholders, so unknown ones
+  // are configuration errors and remain strict.
   for (const item of readdirSync(AGENT_DIR)) {
     if (item === "extensions" || item === "skills" || item === "node_modules") {
       continue;
@@ -484,18 +431,21 @@ async function buildPrimaryAgent(): Promise<void> {
     }
   }
 
-  for (const configName of ["settings", "models", "mcp"]) {
-    const basePath = findJsonFile(
-      join(CONFIG_DIR, `${configName}.base.json`),
-      true,
-    );
+  await Bun.write(
+    join(BUILD_DIR, "settings.json"),
+    `${JSON.stringify(settings, null, 2)}\n`,
+  );
+  console.log("  generated settings.json");
+
+  for (const configName of ["models", "mcp"]) {
+    const basePath = findJsonFile(join(CONFIG_DIR, `${configName}.base`));
     if (!basePath) continue;
 
-    const configJson =
-      configName === "settings"
-        ? settingsJson
-        : await buildMergedConfig(configName);
-    await Bun.write(join(BUILD_DIR, `${configName}.json`), configJson);
+    const config = await buildMergedConfig(configName, basePath);
+    await Bun.write(
+      join(BUILD_DIR, `${configName}.json`),
+      `${JSON.stringify(config, null, 2)}\n`,
+    );
     console.log(`  generated ${configName}.json`);
   }
 
@@ -511,7 +461,6 @@ async function buildPrimaryAgent(): Promise<void> {
     );
   }
 
-  cleanupStaleArtifacts(BUILD_DIR, destDir);
   console.log(`\n✓ Built primary agent → ${BUILD_DIR}`);
 }
 

@@ -1,0 +1,12 @@
+{
+  "name": "pi-config-build",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}
