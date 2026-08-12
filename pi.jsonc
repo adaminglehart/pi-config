@@ -3,7 +3,7 @@
     "destDir": "~/.pi/agent",
     "extensions": [
       "animations",
-      "answer",
+      "question",
       "btw",
       "cost",
       "custom-footer",
@@ -11,12 +11,12 @@
       // "custom-startup-info",
       "goal",
       "herdr-agent-state",
-      "hindsight",
-      // "honcho",
+      "honcho",
       "lsp",
       "minimal-tools",
       "model-switch",
       "notify",
+      "prompt-reminders",
       "session-breakdown",
       "session-title",
       // npm:pi-subagents reads extensions/subagent/config.json directly; this

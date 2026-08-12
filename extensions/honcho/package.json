@@ -3,14 +3,18 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@honcho-ai/sdk": "^2.0.1"
+    "@honcho-ai/sdk": "2.3.0"
   },
   "pi": {
     "extensions": [
       "./index.ts"
     ]
   },
+  "scripts": {
+    "test": "tsx --test *.test.ts"
+  },
   "devDependencies": {
-    "@types/node": "^25.5.0"
+    "@types/node": "^25.5.0",
+    "tsx": "^4.20.6"
   }
 }

@@ -16,5 +16,25 @@
     "hardTokenThreshold": 0.85,
     "backgroundCompaction": true,
   },
-  "tuiMode": "fullscreen"
+  "tuiMode": "fullscreen",
+  "honcho": {
+    "baseUrl": "https://honcho.inglehart.io",
+    "workspace": "pi",
+    "userPeer": "adam",
+    "aiPeer": "pi",
+    "enabled": true,
+    "injectContext": true,
+    "storeMessages": true,
+    "injectInSubagents": false,
+    "storeInSubagents": false,
+    "contextTokens": 4000,
+    "refreshInterval": 5,
+    "maxMessageChars": 12000,
+    "searchResults": 10,
+    "sdkTimeoutMs": 10000,
+    "sdkMaxRetries": 1,
+    "contextDeadlineMs": 1000,
+    "shutdownDeadlineMs": 2000,
+    "reconnectBackoffMs": 2000
+  }
 }
