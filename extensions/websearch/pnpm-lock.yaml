@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       parallel-web:
-        specifier: ^0.4.1
-        version: 0.4.1
+        specifier: ^0.5.0
+        version: 0.5.0
 
 packages:
 
-  parallel-web@0.4.1:
-    resolution: {integrity: sha512-kcBwdJxgT+m2D65P5AQ2EtdbmjrA8djoqRT4wr0WCMYnpIEzadTzwJ9zS2N/BT7wTk5rComkQ/2faSUtgZwWCg==}
+  parallel-web@0.5.0:
+    resolution: {integrity: sha512-p3JR9ENwbXtQJFTn4rWrraYKzHISkG2lwoRmVQceEqepgMtpuE6v/BEMi4yAmGum6ejK2F4DDKLkcqeFxnqztg==}
 
 snapshots:
 
-  parallel-web@0.4.1: {}
+  parallel-web@0.5.0: {}
