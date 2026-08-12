@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "parallel-web": "^0.4.1"
+    "parallel-web": "^0.5.0"
   }
 }
