@@ -11,7 +11,7 @@
     "@earendil-works/pi-coding-agent": "^0.84.1",
     "@earendil-works/pi-tui": "^0.84.1",
     "parallel-web": "^0.4.1",
-    "tsx": "4.20.6",
+    "tsx": "4.23.12",
     "typebox": "^1.1.31",
     "typescript": "5.8.2",
     "vscode-languageserver-protocol": "3.17.5"
