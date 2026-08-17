@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@vectorize-io/hindsight-client": "^0.7.2"
+    "@vectorize-io/hindsight-client": "^0.9.0"
   },
   "pi": {
     "extensions": [
