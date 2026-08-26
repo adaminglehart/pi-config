@@ -19,6 +19,7 @@ import {
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { type Static, Type } from "typebox";
+import { requestDesktopNotification } from "./_lib/desktop-notification.js";
 
 const QuestionKindSchema = StringEnum(["single", "multiple", "text"] as const);
 
@@ -284,6 +285,12 @@ export default function question(pi: ExtensionAPI) {
     if (ctx.mode !== "tui") {
       throw new Error("question requires interactive TUI mode");
     }
+    requestDesktopNotification(pi, {
+      title: "π Question",
+      body: questions.length === 1
+        ? "Pi is waiting for your answer"
+        : "Pi is waiting for your answers",
+    });
 
     return ctx.ui.custom<QuestionDetails>((tui, theme, _keybindings, done) => {
         let currentIndex = 0;

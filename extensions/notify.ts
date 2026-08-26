@@ -1,8 +1,8 @@
 /**
  * macOS Desktop Notification Extension for Pi
  *
- * Sends a native macOS notification when the agent finishes and is waiting for input,
- * but ONLY when the terminal does not have focus.
+ * Sends native macOS notifications when Pi has fully settled or when another
+ * extension requests one, but ONLY when the terminal does not have focus.
  *
  * Uses osascript - works through tmux, zellij, ssh, and any terminal setup.
  */
@@ -10,6 +10,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { execSync } from "child_process";
+import {
+  DESKTOP_NOTIFICATION_REQUEST_EVENT,
+  type DesktopNotificationRequest,
+} from "./_lib/desktop-notification.js";
 import { isSubagent } from "./_lib/env.js";
 
 /**
@@ -47,6 +51,12 @@ const notify = (title: string, body: string): void => {
     execSync(`osascript -e '${script}'`, { timeout: 1000 });
   } catch {
     // Ignore notification failures
+  }
+};
+
+const notifyIfUnfocused = ({ title, body }: DesktopNotificationRequest): void => {
+  if (!isTerminalFocused()) {
+    notify(title, body);
   }
 };
 
@@ -130,14 +140,18 @@ export default function (pi: ExtensionAPI) {
     return;
   }
 
-  pi.on("agent_end", async (event) => {
-    // Only notify if terminal is NOT focused (user is doing something else)
-    if (isTerminalFocused()) {
-      return;
-    }
+  let settledAssistantText: string | null = null;
 
-    const lastText = extractLastAssistantText(event.messages ?? []);
-    const { title, body } = formatNotification(lastText);
-    notify(title, body);
+  pi.events.on(DESKTOP_NOTIFICATION_REQUEST_EVENT, (data) => {
+    notifyIfUnfocused(data as DesktopNotificationRequest);
+  });
+
+  pi.on("agent_end", async (event) => {
+    settledAssistantText = extractLastAssistantText(event.messages ?? []);
+  });
+
+  pi.on("agent_settled", async () => {
+    notifyIfUnfocused(formatNotification(settledAssistantText));
+    settledAssistantText = null;
   });
 }

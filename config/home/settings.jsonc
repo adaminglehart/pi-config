@@ -1,4 +1,7 @@
 {
+  "honcho": {
+    "baseUrl": "https://honcho.inglehart.io",
+  },
   "defaultModel": "{{model.standard}}",
   "modelAliases": {
     "fast": "openai-codex/gpt-5.6-luna",

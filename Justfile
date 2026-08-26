@@ -25,14 +25,23 @@ _deploy:
       echo "error: build/agent/ is incomplete (settings.json is missing). Run 'just build' first."
       exit 1
     fi
+    # Install dependencies under the repository, where work-machine execution
+    # policy is less restrictive than it is under the deployment destination.
+    if [ -f "$BUILD/run_after_install_extension_deps.sh" ]; then
+      bash "$BUILD/run_after_install_extension_deps.sh"
+    fi
     echo "Deploying primary agent → $DEST"
     mkdir -p "$DEST"
     bun scripts/managed-destination.ts reconcile "$BUILD" "$DEST"
     rsync -a --exclude 'node_modules' "$BUILD/" "$DEST/"
-    # Install extension pnpm dependencies
-    if [ -f "$DEST/run_after_install_extension_deps.sh" ]; then
-      bash "$DEST/run_after_install_extension_deps.sh"
-    fi
+    # Copy each complete production dependency tree without running it in DEST.
+    for modules in "$BUILD"/extensions/*/node_modules; do
+      [ -d "$modules" ] || continue
+      extension=$(basename "$(dirname "$modules")")
+      destination_modules="$DEST/extensions/$extension/node_modules"
+      mkdir -p "$destination_modules"
+      rsync -a --delete "$modules/" "$destination_modules/"
+    done
     echo "✓ Deployed primary agent → $DEST"
 
 # Build and deploy the primary agent

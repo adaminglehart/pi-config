@@ -83,9 +83,11 @@ just hindsight-import
 just honcho-env
 ```
 
-Deployment rsyncs the generated output while excluding `node_modules`, then
-runs `agent/run_after_install_extension_deps.sh`. The hook discovers its own
-deployed directory and runs `pnpm install` for each staged extension package.
+Deployment runs `agent/run_after_install_extension_deps.sh` in the generated
+build under this repository. The hook installs only production dependencies
+for each staged extension package. Deployment then syncs each complete
+`node_modules` tree to the agent directory without running package install
+scripts there.
 
 ## Setup on a new machine
 

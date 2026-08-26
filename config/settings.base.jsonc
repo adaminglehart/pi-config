@@ -18,7 +18,6 @@
   },
   "tuiMode": "fullscreen",
   "honcho": {
-    "baseUrl": "https://honcho.inglehart.io",
     "workspace": "pi",
     "userPeer": "adam",
     "aiPeer": "pi",

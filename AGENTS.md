@@ -82,11 +82,12 @@ just hindsight-import   # Import historical session JSONL into Hindsight (dry ru
 just honcho-env         # Generate honcho/.env for the active environment
 ```
 
-The deploy flow uses `scripts/dest.ts` to read root `pi.jsonc`, rsyncs
-`build/agent/` excluding `node_modules`, and runs
-`agent/run_after_install_extension_deps.sh`. The hook locates `extensions/`
-relative to its deployed location and runs `pnpm install` in every extension
-with a `package.json`.
+The deploy flow uses `scripts/dest.ts` to read root `pi.jsonc`. It runs
+`agent/run_after_install_extension_deps.sh` in `build/agent/` so production
+dependencies install under the repository instead of the deployment
+destination. It then rsyncs the generated files and each complete extension
+`node_modules` tree to the destination without running package install scripts
+there.
 
 ## Extension dependencies
 
