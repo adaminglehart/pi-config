@@ -37,7 +37,7 @@ Row edit script format:
 +insert row text
 -delete row text
 
-Every non-header line must be clearly marked: file headers use [path], operations use @, inserted content rows use +, deleted content rows use -. To insert or delete a real line that starts with +, -, or @, add the row marker first (for example ++literal plus, --literal minus, +@decorator). In @REPLACE, unified-diff style context rows starting with a single space are allowed and are used to locate a contiguous hunk; use @@ inside @REPLACE to separate multiple hunks.
+Every non-header line must be clearly marked: file headers use [path], operations use @, inserted content rows use +, deleted content rows use -. To insert or delete a real line that starts with +, -, or @, add the row marker first (for example ++literal plus, --literal minus, +@decorator). Each @INS.BEFORE or @INS.AFTER operation accepts exactly one contiguous - anchor block and one contiguous + insert block; use a separate operation for each insertion. Each @REPLACE hunk must contain at least one + or - row; context-only hunks are invalid. In @REPLACE, unified-diff style context rows starting with a single space are allowed and are used to locate a contiguous hunk; use @@ inside @REPLACE to separate multiple hunks.
 
 Supported row operations:
 @INS.PRE N       insert following + rows before 1-based line N
@@ -73,10 +73,13 @@ const TOOL_PROMPT_GUIDELINES = [
 	"For edit row scripts, start each file section with [path/to/file], then use operation lines like @REPLACE, @INS.PRE N, @INS.POST N, @INS.BEFORE, @INS.AFTER, @DEL N-M, or @APPEND.",
 	"For edit row scripts, every content row must have a marker: use + for inserted rows and - for deleted rows. To insert a literal line that starts with +, -, or @, keep the + row marker and put the literal character after it.",
 	"Do not add unnecessary context lines to row scripts; only include the - rows needed to uniquely locate a replacement or insertion anchor and the + rows to insert.",
-	"In @REPLACE, space-prefixed context rows are supported for unified-diff style hunks and context-anchored insertions; use @@ inside @REPLACE to separate multiple context hunks.",
+	"In @REPLACE, space-prefixed context rows are supported for unified-diff style hunks and context-anchored insertions; every hunk must contain at least one + or - row, because context-only hunks are invalid; use @@ inside @REPLACE to separate multiple context hunks.",
 	"Prefer @REPLACE with the smallest unique deleted block plus replacement rows for precise changes. @REPLACE uses pi's edit matcher: fuzzy normalization, uniqueness checks, and overlap checks all apply.",
 	"Consecutive + rows or - rows form one block; for multiple replacements, use separate @REPLACE operations, alternating +/- block pairs, or @@-separated context hunks.",
+	"Use exactly one contiguous - anchor block and one contiguous + insert block in each @INS.BEFORE/@INS.AFTER operation; use a separate operation for each insertion.",
 	"Use @INS.BEFORE/@INS.AFTER with - rows for the anchor to avoid brittle line numbers when there is a unique nearby line or block.",
+	"After an edit anchor uniqueness or mismatch error, re-read the target region and extend the anchor with the enclosing block header; do not retry a similar anchor.",
+	"Before multi-hunk edits in files with repeated blocks, such as Terraform, HCL, or test files, re-read the exact target regions and use a unique anchor for each hunk.",
 	"Use @INS.PRE/@INS.POST or @DEL only when line numbers are reliable from a recent read; line-number operations are applied sequentially in script order.",
 	"Use @DEL N-M for inclusive line ranges. @DEL N deletes one line. Multiple [file] sections are allowed in one edit call.",
 ];

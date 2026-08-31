@@ -55,8 +55,8 @@
         "model": "litellm-openai/gpt-5.6-sol",
       },
       "reviewer": {
-        "thinking": "xhigh",
-        "model": "litellm-anthropic/claude-opus-5",
+        "thinking": "high",
+        "model": "{{model.reviewer}}",
       },
       "oracle": {
         "thinking": "max",

@@ -6,7 +6,7 @@
 Parse pi session JSONL files into readable formats.
 
 Usage:
-    uv run read_session.py <session_path> [--mode MODE] [--offset N] [--limit N] [--max-content N]
+    python3 read_session.py <session_path> [--mode MODE] [--offset N] [--limit N] [--max-content N]
 
 Modes:
     overview      Session metadata + turn-by-turn summary (default)

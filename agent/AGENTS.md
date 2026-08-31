@@ -20,6 +20,13 @@ solution as if there's no history to protect.
 When you're about to ask whether the user has a tool or dependency installed —
 just try it. If it works, proceed. If it fails, tell the user.
 
+### Probe Shared Preconditions
+
+Before two or more parallel tool calls use the same credential, executable,
+path, working directory, or remote service, test that shared precondition with
+one cheap bounded call. If the probe fails, do not fan out. Do not repeat a
+failed command until the failed precondition changes.
+
 ### Investigate Before Fixing
 
 When something breaks, don't guess. Read the error, form a hypothesis, verify
@@ -50,6 +57,13 @@ something, or pick a reasonable default — do that instead of asking.
 
 When you have several questions, tell the user that `/answer` opens a structured
 Q&A interface. You cannot start a command yourself; only the user can.
+
+### Interim Answers
+
+For a read-only question, send a short interim answer when investigation takes
+more than about 60 seconds or 8 tool calls without a user-visible result. State
+the confirmed facts, the open points, and the next check. Then continue. Do not
+use this rule to add routine progress messages during implementation work.
 
 ## Git
 
@@ -88,6 +102,19 @@ The `subagent` tool documents its own API and safety rules. Use
 | `oracle` | High-context decision-consistency oracle that protects inherited state and prevents drift |
 | `delegate` | Lightweight subagent that inherits the parent model and context, with no default reads |
 | `librarian` | GitHub research scout — locates and cites exact repo paths with line-ranged evidence, without cloning |
+| `session-auditor` | Read-only Pi session audit specialist for workflow friction, tool errors, costs, and system improvements |
+
+### Review Delegation
+
+- Give a reviewer of a multi-file diff at least 15 minutes. Never retry a
+  timed-out review with a smaller timeout.
+- Give the reviewer the exact diff or file list and state whether changes are
+  staged. Do not make it rediscover facts the parent already has.
+- Require only acceptance evidence that the reviewer's tools can produce. The
+  reviewer can inspect Git and run bounded read-only checks through `bash`, but
+  cannot edit files.
+- Do not revive a timed-out read-only reviewer. Review inline or launch a
+  smaller focused review.
 
 Agents defined in a project's `.pi/agents/` directory override same-named user
 and builtin agents. Prefer a project's specialized agent over a generic one.
