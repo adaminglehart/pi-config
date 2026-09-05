@@ -21,7 +21,7 @@ import {
 	type ExtensionAPI,
 	type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { Box, Container, getCapabilities, hyperlink, Spacer, Text, type Component } from "@earendil-works/pi-tui";
+import { getCapabilities, hyperlink, Text } from "@earendil-works/pi-tui";
 import { constants } from "node:fs";
 import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -92,7 +92,6 @@ const unifiedEditSchema = Type.Object(
 );
 
 type UnifiedEditParams = { text: string };
-type ToolContent = Array<{ type: "text"; text: string }>;
 
 interface Edit {
 	oldText: string;
@@ -162,35 +161,6 @@ type FileSnapshot = {
 	absolutePath: string;
 	original: string | null;
 	current: string | null;
-};
-
-type RenderContext<TState> = {
-	state: TState;
-	cwd: string;
-	invalidate: () => void;
-	argsComplete: boolean;
-	isError: boolean;
-	args: UnifiedEditParams;
-	lastComponent?: Component;
-};
-
-type Preview = { diff: string; files: string[]; firstChangedLine?: number } | { error: string };
-
-type UnifiedEditCallRenderComponent = Box & {
-	preview?: Preview;
-	previewArgsKey?: string;
-	previewBuiltFromCompleteArgs?: boolean;
-	previewPending?: boolean;
-	previewPendingArgsKey?: string;
-	previewSuppressedArgsKey?: string;
-	settledError?: boolean;
-};
-
-type UnifiedRenderState = {
-	planKey?: string;
-	preview?: Preview;
-	pending?: boolean;
-	callComponent?: UnifiedEditCallRenderComponent;
 };
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -1135,13 +1105,6 @@ async function buildPlan(text: string, cwd: string): Promise<ParsedPlan> {
 	return isPatchLikePayload(text) ? buildPatchPlan(text, cwd) : buildRowPlan(text, cwd);
 }
 
-async function buildPreviewPlan(text: string, cwd: string, argsComplete: boolean): Promise<ParsedPlan> {
-	if (!argsComplete && isPatchLikePayload(text) && !isPatchPayload(text)) {
-		return buildPatchPlan(patchTextForPreview(text), cwd);
-	}
-	return buildPlan(text, cwd);
-}
-
 // ============================================================================
 // Preflight and real file mutation
 // ============================================================================
@@ -1279,17 +1242,6 @@ function formatSummary(details: UnifiedEditDetails): string {
 // Rendering
 // ============================================================================
 
-function previewForPlan(plan: ParsedPlan): Preview {
-	const details = combineDetails(
-		plan.changes.map((change) => ({
-			path: change.path,
-			kind: change.kind,
-			details: detailsForChange(change.path, change.oldText, change.newText),
-		})),
-	);
-	return { diff: details.diff, files: uniquePaths(plan.changes.map((change) => change.path)), firstChangedLine: details.firstChangedLine };
-}
-
 function shortenPath(path: string): string {
 	const home = homedir();
 	if (path.startsWith(home)) return `~${path.slice(home.length)}`;
@@ -1387,149 +1339,6 @@ function renderUnifiedPathLabel(paths: string[] | undefined, theme: Theme, cwd: 
 	return theme.fg("accent", `${unique.length} files`);
 }
 
-function formatUnifiedEditCall(text: string | undefined, preview: Preview | undefined, theme: Theme, cwd: string): string {
-	const title = theme.fg("toolTitle", theme.bold("edit"));
-	const paths = preview && !("error" in preview) ? preview.files : getRenderablePaths(text);
-	return `${title} ${renderUnifiedPathLabel(paths, theme, cwd)}`;
-}
-
-function createUnifiedEditCallRenderComponent(): UnifiedEditCallRenderComponent {
-	return Object.assign(new Box(1, 1, (text: string) => text), {
-		preview: undefined as Preview | undefined,
-		previewArgsKey: undefined as string | undefined,
-		previewBuiltFromCompleteArgs: false,
-		previewPending: false,
-		previewPendingArgsKey: undefined as string | undefined,
-		previewSuppressedArgsKey: undefined as string | undefined,
-		settledError: false,
-	});
-}
-
-function getUnifiedEditCallRenderComponent(
-	state: UnifiedRenderState,
-	lastComponent: Component | undefined,
-): UnifiedEditCallRenderComponent {
-	if (lastComponent instanceof Box) {
-		const component = lastComponent as UnifiedEditCallRenderComponent;
-		state.callComponent = component;
-		return component;
-	}
-	if (state.callComponent) return state.callComponent;
-	const component = createUnifiedEditCallRenderComponent();
-	state.callComponent = component;
-	return component;
-}
-
-function getUnifiedEditHeaderBg(
-	preview: Preview | undefined,
-	settledError: boolean | undefined,
-	theme: Theme,
-): (text: string) => string {
-	if (preview) {
-		if ("error" in preview) return (text: string) => theme.bg("toolErrorBg", text);
-		return (text: string) => theme.bg("toolSuccessBg", text);
-	}
-	if (settledError) return (text: string) => theme.bg("toolErrorBg", text);
-	return (text: string) => theme.bg("toolPendingBg", text);
-}
-
-function setUnifiedEditPreview(
-	component: UnifiedEditCallRenderComponent,
-	preview: Preview,
-	argsKey: string | undefined,
-	argsComplete = true,
-): boolean {
-	const current = component.preview;
-	const changed =
-		current === undefined ||
-		("error" in current && "error" in preview
-			? current.error !== preview.error
-			: "error" in current !== "error" in preview) ||
-		(!("error" in current) &&
-			!("error" in preview) &&
-			(current.diff !== preview.diff ||
-				current.firstChangedLine !== preview.firstChangedLine ||
-				current.files.join("\0") !== preview.files.join("\0")));
-	component.preview = preview;
-	component.previewArgsKey = argsKey;
-	component.previewBuiltFromCompleteArgs = argsComplete;
-	component.previewPending = false;
-	component.previewPendingArgsKey = undefined;
-	component.previewSuppressedArgsKey = undefined;
-	return changed;
-}
-
-function requestUnifiedEditPreview(
-	component: UnifiedEditCallRenderComponent,
-	text: string | undefined,
-	argsKey: string | undefined,
-	cwd: string,
-	argsComplete: boolean,
-	invalidate: () => void,
-): void {
-	const hasUsablePreview = component.preview && (!argsComplete || component.previewBuiltFromCompleteArgs);
-	if (!text || !argsKey || hasUsablePreview || component.previewPendingArgsKey === argsKey) return;
-	if (!argsComplete && component.previewSuppressedArgsKey === argsKey) return;
-
-	component.previewPending = true;
-	component.previewPendingArgsKey = argsKey;
-	const requestKey = argsKey;
-	void buildPreviewPlan(text, cwd, argsComplete)
-		.then((plan): Preview => previewForPlan(plan))
-		.catch((err): Preview | undefined => {
-			if (!argsComplete) return undefined;
-			return { error: err instanceof Error ? err.message : String(err) };
-		})
-		.then((preview) => {
-			if (component.previewArgsKey !== requestKey) return;
-			component.previewPending = false;
-			component.previewPendingArgsKey = undefined;
-			if (preview) {
-				setUnifiedEditPreview(component, preview, requestKey, argsComplete);
-			} else {
-				component.previewSuppressedArgsKey = requestKey;
-			}
-			invalidate();
-		});
-}
-
-function buildUnifiedEditCallComponent(
-	component: UnifiedEditCallRenderComponent,
-	text: string | undefined,
-	theme: Theme,
-	cwd: string,
-): UnifiedEditCallRenderComponent {
-	component.setBgFn(getUnifiedEditHeaderBg(component.preview, component.settledError, theme));
-	component.clear();
-	component.addChild(new Text(formatUnifiedEditCall(text, component.preview, theme, cwd), 0, 0));
-
-	if (!component.preview) return component;
-
-	const body = "error" in component.preview ? theme.fg("error", component.preview.error) : renderDiff(component.preview.diff);
-	component.addChild(new Spacer(1));
-	component.addChild(new Text(body, 0, 0));
-	return component;
-}
-
-function formatUnifiedEditResult(
-	preview: Preview | undefined,
-	result: { content: ToolContent; details?: UnifiedEditDetails },
-	theme: Theme,
-	isError: boolean,
-): string | undefined {
-	const previewDiff = preview && !("error" in preview) ? preview.diff : undefined;
-	const previewError = preview && "error" in preview ? preview.error : undefined;
-	if (isError) {
-		const errorText = result.content.map((item) => item.text || "").join("\n");
-		if (!errorText || errorText === previewError) return undefined;
-		return theme.fg("error", errorText);
-	}
-
-	const resultDiff = result.details?.diff;
-	if (resultDiff && resultDiff !== previewDiff) return renderDiff(resultDiff);
-	return undefined;
-}
-
 export default function unifiedEditExtension(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "edit",
@@ -1538,7 +1347,7 @@ export default function unifiedEditExtension(pi: ExtensionAPI) {
 		promptSnippet: TOOL_PROMPT_SNIPPET,
 		promptGuidelines: TOOL_PROMPT_GUIDELINES,
 		parameters: unifiedEditSchema,
-		renderShell: "self",
+		renderShell: "default",
 
 		async execute(_toolCallId, params: UnifiedEditParams, signal, _onUpdate, ctx) {
 			const text = params.text;
@@ -1553,59 +1362,25 @@ export default function unifiedEditExtension(pi: ExtensionAPI) {
 			return { content: [{ type: "text" as const, text: formatSummary(details) }], details };
 		},
 
-		renderCall(args, theme, context: RenderContext<UnifiedRenderState>) {
-			const component = getUnifiedEditCallRenderComponent(context.state, context.lastComponent);
-			const text = typeof args.text === "string" ? args.text : undefined;
-			const key = text === undefined ? undefined : `${context.cwd}\0${text}`;
-			if (component.previewArgsKey !== key) {
-				component.preview = undefined;
-				component.previewArgsKey = key;
-				component.previewBuiltFromCompleteArgs = false;
-				component.previewPending = false;
-				component.previewPendingArgsKey = undefined;
-				component.previewSuppressedArgsKey = undefined;
-				component.settledError = false;
-			}
-
-			requestUnifiedEditPreview(component, text, key, context.cwd, context.argsComplete, () => context.invalidate());
-
-			return buildUnifiedEditCallComponent(component, text, theme, context.cwd);
+		renderCall(args, theme, context) {
+			const component = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			// Do not read files or build diffs from incomplete input. The final
+			// result is the only source of diff output, including on session restore.
+			const text = context.argsComplete && typeof args.text === "string" ? args.text : undefined;
+			const title = theme.fg("toolTitle", theme.bold("edit"));
+			component.setText(`${title} ${renderUnifiedPathLabel(getRenderablePaths(text), theme, context.cwd)}`);
+			return component;
 		},
 
-		renderResult(result, _options, theme, context: RenderContext<UnifiedRenderState>) {
-			const typed = result as { content: ToolContent; details?: UnifiedEditDetails };
-			const component = context.state.callComponent;
-			const text = typeof context.args.text === "string" ? context.args.text : undefined;
-			const key = text === undefined ? undefined : `${context.cwd}\0${text}`;
-			let changed = false;
-
-			if (component) {
-				if (!context.isError && typed.details?.diff) {
-					changed =
-						setUnifiedEditPreview(
-							component,
-							{
-								diff: typed.details.diff,
-								files: uniquePaths(typed.details.files.map((file) => file.path)),
-								firstChangedLine: typed.details.firstChangedLine,
-							},
-							key,
-						) || changed;
-				}
-				if (component.settledError !== context.isError) {
-					component.settledError = context.isError;
-					changed = true;
-				}
-				if (changed) buildUnifiedEditCallComponent(component, text, theme, context.cwd);
-			}
-
-			const output = formatUnifiedEditResult(component?.preview, typed, theme, context.isError);
-			const resultComponent = (context.lastComponent as Container | undefined) ?? new Container();
-			resultComponent.clear();
-			if (!output) return resultComponent;
-			resultComponent.addChild(new Spacer(1));
-			resultComponent.addChild(new Text(output, 1, 0));
-			return resultComponent;
+		renderResult(result, { isPartial }, theme, context) {
+			const component = context.lastComponent instanceof Text ? context.lastComponent : new Text("", 0, 0);
+			const details = result.details as UnifiedEditDetails | undefined;
+			const text = result.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
+			const output = isPartial ? "" : context.isError
+				? theme.fg("error", text)
+				: details?.diff ? renderDiff(details.diff) : theme.fg("toolOutput", text);
+			component.setText(output ? `\n${output}` : "");
+			return component;
 		},
 	});
 }
