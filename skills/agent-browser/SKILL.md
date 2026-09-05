@@ -51,8 +51,21 @@ agent-browser click @e5                        # click a result
 agent-browser screenshot result.png
 ```
 
-The browser stays running across commands so these feel like a single
-session. Use `agent-browser close` (or `close --all`) when you're done.
+The browser stays running across commands so these feel like a single session.
+
+## Session cleanup (required)
+
+Close the browser session before your final response, including when the task
+fails or stops early:
+
+```bash
+agent-browser close                       # default session
+agent-browser --session <name> close      # named session
+```
+
+Close only the session used for the task. Do not use `close --all` for routine
+cleanup because it can stop sessions owned by parallel agents. The configured
+idle timeout is a fallback for crashes, not a substitute for explicit cleanup.
 
 ## Reading a page
 

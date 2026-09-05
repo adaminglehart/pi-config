@@ -77,7 +77,7 @@ const TOOL_PROMPT_GUIDELINES = [
 	"Prefer @REPLACE with the smallest unique deleted block plus replacement rows for precise changes. @REPLACE uses pi's edit matcher: fuzzy normalization, uniqueness checks, and overlap checks all apply.",
 	"Consecutive + rows or - rows form one block; for multiple replacements, use separate @REPLACE operations, alternating +/- block pairs, or @@-separated context hunks.",
 	"Use exactly one contiguous - anchor block and one contiguous + insert block in each @INS.BEFORE/@INS.AFTER operation; use a separate operation for each insertion.",
-	"Use @INS.BEFORE/@INS.AFTER with - rows for the anchor to avoid brittle line numbers when there is a unique nearby line or block.",
+	"Use @INS.BEFORE/@INS.AFTER with - rows for the anchor to avoid brittle line numbers when there is a unique nearby line or block. Put only new rows in the + block; do not repeat the anchor rows.",
 	"After an edit anchor uniqueness or mismatch error, re-read the target region and extend the anchor with the enclosing block header; do not retry a similar anchor.",
 	"Before multi-hunk edits in files with repeated blocks, such as Terraform, HCL, or test files, re-read the exact target regions and use a unique anchor for each hunk.",
 	"Use @INS.PRE/@INS.POST or @DEL only when line numbers are reliable from a recent read; line-number operations are applied sequentially in script order.",
@@ -801,8 +801,18 @@ function applyAnchorInsertOperation(
 	if (groups.length !== 2 || groups[0].marker === groups[1].marker) {
 		throw new Error(`${opName} in ${path} must contain exactly one - anchor block and one + insert block.`);
 	}
-	const anchorText = (groups[0].marker === "-" ? groups[0] : groups[1]).lines.join("\n");
-	const insertText = (groups[0].marker === "+" ? groups[0] : groups[1]).lines.join("\n");
+	const anchorLines = (groups[0].marker === "-" ? groups[0] : groups[1]).lines;
+	const insertLines = (groups[0].marker === "+" ? groups[0] : groups[1]).lines;
+	const adjacentInsertOffset = op.kind === "insertBeforeAnchor" ? insertLines.length - anchorLines.length : 0;
+	const adjacentInsertLines = insertLines.slice(adjacentInsertOffset, adjacentInsertOffset + anchorLines.length);
+	if (
+		adjacentInsertOffset >= 0 &&
+		normalizeForFuzzyMatch(adjacentInsertLines.join("\n")) === normalizeForFuzzyMatch(anchorLines.join("\n"))
+	) {
+		throw new Error(`${opName} in ${path} repeats the - anchor block in the + insert block. Remove the anchor rows from the + block.`);
+	}
+	const anchorText = anchorLines.join("\n");
+	const insertText = insertLines.join("\n");
 	const newText = op.kind === "insertBeforeAnchor" ? `${insertText}\n${anchorText}` : `${anchorText}\n${insertText}`;
 	return applyEditsToNormalizedContent(content, [{ oldText: anchorText, newText }], path, {
 		requireWholeLines: true,

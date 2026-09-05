@@ -2,7 +2,7 @@
   "honcho": {
     "baseUrl": "https://honcho.inglehart.io",
   },
-  "defaultModel": "{{model.standard}}",
+  "defaultModel": "openai-codex/gpt-5.6-sol",
   "modelAliases": {
     "fast": "openai-codex/gpt-5.6-luna",
     "standard": "openai-codex/gpt-5.6-terra",
@@ -10,21 +10,20 @@
     "reviewer": "openai-codex/gpt-5.6-sol",
   },
   "enabledModels": [
+    "openai-codex/gpt-6-astra",
     "openai-codex/gpt-5.6-sol",
     "openai-codex/gpt-5.6-terra",
     "openai-codex/gpt-5.6-luna",
-    "openai-codex/gpt-5.5",
+    "litellm/qwen3.8-27b-q4",
     "openai-codex/gpt-5.3-codex-spark",
     "openrouter/minimax/minimax-m2.5",
-    "openrouter/qwen/qwen3-coder",
-    "openrouter/z-ai/glm-5.2",
     "openrouter/deepseek/deepseek-v4-pro",
     "openrouter/deepseek/deepseek-v4-flash",
     "google/gemini-3-flash-preview",
     "google/gemini-3.1-flash-lite-preview",
     "llama-server/muse-glimmer-30b",
   ],
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "compaction": {
     "provider": "openrouter",
     "model": "google/gemini-3.1-flash-lite-preview",

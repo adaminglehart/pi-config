@@ -12,6 +12,7 @@
       "goal",
       "herdr-agent-state",
       "honcho",
+      "imagegen",
       "lsp",
       "minimal-tools",
       "model-switch",

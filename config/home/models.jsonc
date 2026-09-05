@@ -22,23 +22,6 @@
             },
           },
         },
-        {
-          "id": "qwen/qwen3-coder",
-          "name": "Qwen 3 Coder",
-          "reasoning": true,
-          "contextWindow": 1000000,
-          "cost": {
-            "input": 0.22,
-            "output": 1.8,
-            "cacheRead": 0.22,
-            "cacheWrite": 1.8,
-          },
-          "compat": {
-            "openRouterRouting": {
-              "order": ["google-vertex/us-south1"],
-            },
-          },
-        },
         // {
         //   "id": "z-ai/glm-5.2",
         //   "name": "GLM 5.2",
@@ -63,6 +46,23 @@
         //     "cacheWrite": 0,
         //   },
         // },
+      ],
+    },
+    "litellm": {
+      "baseUrl": "https://litellm.inglehart.io/v1",
+      "apiKey": "$LITELLM_PI_API_KEY",
+      "api": "openai-completions",
+      "compat": {
+        "supportsStore": false,
+      },
+      "models": [
+        {
+          "id": "qwen3.8-27b-q4",
+          "name": "Qwen3.8 27B Q4",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 196608,
+        },
       ],
     },
     "llama-server": {
