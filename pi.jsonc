@@ -14,7 +14,7 @@
       "honcho",
       "imagegen",
       "lsp",
-      "minimal-tools",
+      "tool-view",
       "model-switch",
       "notify",
       "prompt-reminders",
