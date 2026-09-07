@@ -20,6 +20,7 @@ import { type AssistantMessage, type Message, type ThinkingLevel as AiThinkingLe
 import {
 	Container,
 	Input,
+	matchesKey,
 	Markdown,
 	truncateToWidth,
 	visibleWidth,
@@ -190,7 +191,7 @@ function notify(ctx: ExtensionContext | ExtensionCommandContext, message: string
 }
 
 
-class BtwOverlay extends Container implements Focusable {
+export class BtwOverlay extends Container implements Focusable {
 	private readonly input: Input;
 	private readonly tui: TUI;
 	private readonly theme: ExtensionContext["ui"]["theme"];
@@ -200,6 +201,10 @@ class BtwOverlay extends Container implements Focusable {
 	private readonly onSubmitCallback: (value: string) => void;
 	private readonly onDismissCallback: () => void;
 	private _focused = false;
+	private scrollTop = 0;
+	private maxScrollTop = 0;
+	private transcriptHeight = 1;
+	private followTail = true;
 
 	get focused(): boolean {
 		return this._focused;
@@ -243,7 +248,27 @@ class BtwOverlay extends Container implements Focusable {
 			return;
 		}
 
-		this.input.handleInput(data);
+		if (matchesKey(data, "pageUp")) {
+			this.scroll(-this.transcriptHeight);
+		} else if (matchesKey(data, "pageDown")) {
+			this.scroll(this.transcriptHeight);
+		} else if (matchesKey(data, "shift+up")) {
+			this.scroll(-1);
+		} else if (matchesKey(data, "shift+down")) {
+			this.scroll(1);
+		} else if (matchesKey(data, "ctrl+home")) {
+			this.scroll(-this.maxScrollTop);
+		} else if (matchesKey(data, "ctrl+end")) {
+			this.scroll(this.maxScrollTop);
+		} else {
+			this.input.handleInput(data);
+		}
+	}
+
+	private scroll(delta: number): void {
+		this.scrollTop = Math.max(0, Math.min(this.maxScrollTop, this.scrollTop + delta));
+		this.followTail = this.scrollTop === this.maxScrollTop;
+		this.tui.requestRender();
 	}
 
 	setDraft(value: string): void {
@@ -268,16 +293,20 @@ class BtwOverlay extends Container implements Focusable {
 	}
 
 	override render(width: number): string[] {
-		const dialogWidth = Math.max(56, Math.min(width, Math.floor(width * 0.9)));
-		const innerWidth = Math.max(40, dialogWidth - 2);
-		const terminalRows = process.stdout.rows ?? 30;
-		const dialogHeight = Math.max(16, Math.min(30, Math.floor(terminalRows * 0.75)));
-		const chromeHeight = 7;
-		const transcriptHeight = Math.max(6, dialogHeight - chromeHeight);
+		const dialogWidth = Math.min(width, Math.max(3, Math.floor(width * 0.9)));
+		const innerWidth = Math.max(1, dialogWidth - 2);
+		const terminalRows = this.tui.terminal.rows;
+		const chromeHeight = 9;
+		const dialogHeight = Math.min(30, Math.floor(terminalRows * 0.75));
+		const transcriptHeight = Math.max(1, dialogHeight - chromeHeight);
+		this.transcriptHeight = transcriptHeight;
 
 		// Markdown renders to innerWidth already — no manual wrapping needed
 		const transcript = this.getTranscript(innerWidth, this.theme);
-		const visibleTranscript = transcript.slice(-transcriptHeight);
+		this.maxScrollTop = Math.max(0, transcript.length - transcriptHeight);
+		this.scrollTop = this.followTail ? this.maxScrollTop : Math.min(this.scrollTop, this.maxScrollTop);
+		const visibleTranscript = transcript.slice(this.scrollTop, this.scrollTop + transcriptHeight);
+		const scrollInfo = `Lines ${transcript.length === 0 ? 0 : this.scrollTop + 1}–${this.scrollTop + visibleTranscript.length}/${transcript.length}`;
 		const transcriptPadding = Math.max(0, transcriptHeight - visibleTranscript.length);
 
 		const status = this.getStatus();
@@ -290,7 +319,7 @@ class BtwOverlay extends Container implements Focusable {
 		const lines = [
 			this.borderLine(innerWidth, "top"),
 			this.frameLine(this.theme.fg("accent", this.theme.bold(" BTW side chat ")), innerWidth),
-			this.frameLine(this.theme.fg("dim", "Separate side conversation. Esc closes."), innerWidth),
+			this.frameLine(this.theme.fg("dim", `${scrollInfo} · ${this.followTail ? "Latest" : "Scroll paused"} · Ctrl+Home/End first/latest`), innerWidth),
 			this.theme.fg("borderMuted", `├${"─".repeat(innerWidth)}┤`),
 		];
 
@@ -306,7 +335,7 @@ class BtwOverlay extends Container implements Focusable {
 		lines.push(
 			`${this.theme.fg("borderMuted", "│")}${inputLine}${this.theme.fg("borderMuted", "│")}`,
 		);
-		lines.push(this.frameLine(this.theme.fg("dim", "Enter submit · Esc close"), innerWidth));
+		lines.push(this.frameLine(this.theme.fg("dim", "PgUp/PgDn scroll · Shift+↑↓ line · Enter submit · Esc close"), innerWidth));
 		lines.push(this.borderLine(innerWidth, "bottom"));
 
 		return lines;
@@ -395,7 +424,7 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		const lines: string[] = [];
-		for (const item of thread.slice(-6)) {
+		for (const item of thread) {
 			// User message
 			const userText = item.question.trim().split("\n")[0];
 			lines.push(theme.fg("accent", theme.bold("You: ")) + truncateToWidth(userText, width - 5, "…"));

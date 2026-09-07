@@ -1,53 +1,29 @@
 {
   "providers": {
-    "openrouter": {
-      "baseUrl": "https://openrouter.ai/api/v1",
-      "apiKey": "$OPENROUTER_API_KEY",
-      "api": "openai-completions",
-      "models": [
-        {
-          "id": "minimax/minimax-m2.5",
-          "name": "Minimax M2.5 (mara)",
-          "reasoning": true,
-          "contextWindow": 204800,
-          "cost": {
-            "input": 0.3,
-            "output": 1.2,
-            "cacheRead": 0.3,
-            "cacheWrite": 1.2,
-          },
-          "compat": {
-            "openRouterRouting": {
-              "order": ["mara"],
-            },
-          },
-        },
-        // {
-        //   "id": "z-ai/glm-5.2",
-        //   "name": "GLM 5.2",
-        //   "reasoning": true,
-        //   "contextWindow": 1048576,
-        //   "cost": {
-        //     "input": 0.76,
-        //     "output": 2.42,
-        //     "cacheRead": 0.14,
-        //     "cacheWrite": 0,
-        //   },
-        // },
-        // {
-        //   "id": "deepseek/deepseek-v4-flash",
-        //   "name": "DeepSeek V4 Flash",
-        //   "reasoning": true,
-        //   "contextWindow": 1048576,
-        //   "cost": {
-        //     "input": 0.14,
-        //     "output": 0.28,
-        //     "cacheRead": 0.028,
-        //     "cacheWrite": 0,
-        //   },
-        // },
-      ],
-    },
+    // "openrouter": {
+    //   "baseUrl": "https://openrouter.ai/api/v1",
+    //   "apiKey": "$OPENROUTER_API_KEY",
+    //   "api": "openai-completions",
+    //   "models": [
+    //     {
+    //       "id": "minimax/minimax-m2.5",
+    //       "name": "Minimax M2.5 (mara)",
+    //       "reasoning": true,
+    //       "contextWindow": 204800,
+    //       "cost": {
+    //         "input": 0.3,
+    //         "output": 1.2,
+    //         "cacheRead": 0.3,
+    //         "cacheWrite": 1.2,
+    //       },
+    //       "compat": {
+    //         "openRouterRouting": {
+    //           "order": ["mara"],
+    //         },
+    //       },
+    //     },
+    //   ],
+    // },
     "litellm": {
       "baseUrl": "https://litellm.inglehart.io/v1",
       "apiKey": "$LITELLM_PI_API_KEY",

@@ -9,15 +9,15 @@ importers:
   .:
     dependencies:
       '@honcho-ai/sdk':
-        specifier: 2.3.0
-        version: 2.3.0
+        specifier: 2.4.0
+        version: 2.4.0
     devDependencies:
       '@types/node':
-        specifier: ^25.5.0
-        version: 25.9.5
+        specifier: ^26.4.1
+        version: 26.4.1
       tsx:
-        specifier: ^4.20.6
-        version: 4.23.12
+        specifier: ^4.23.13
+        version: 4.23.13
 
 packages:
 
@@ -177,11 +177,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@honcho-ai/sdk@2.3.0':
-    resolution: {integrity: sha512-98TKsWvXpuR/Qcew+uIFH/ISBtnzWnTAjsJVkAuiH8gs5yOd/MNefj6Z9V4IG3vjkADyJunAmsi85UsgIchQ7w==}
+  '@honcho-ai/sdk@2.4.0':
+    resolution: {integrity: sha512-nZE0RJOY3/KhHZdJ9T/fan8Wr26R6Q8s+5GhFpbWwHmnR6680S0r++hoeRpHzcngiU/3cmNQW248pdWpSwU2+Q==}
 
-  '@types/node@25.9.5':
-    resolution: {integrity: sha512-OScDchr2fwuUmWdf4kZ9h7PcJiYDVInhJizG/biAq3cAvqwYktuy/TYGGdZNMtNTFUP7rnb0NU4TUdm82kt4Rg==}
+  '@types/node@26.4.1':
+    resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
 
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
@@ -193,13 +193,13 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  tsx@4.23.12:
-    resolution: {integrity: sha512-FDf4L4sYzKtzWYhU/Xm0AQFdTjdIxNo9ElTf2mxXM6k8YMHXzYUe4yODVaXP4V9uMFbVg8c0qyBccK2OOxb45Q==}
+  tsx@4.23.13:
+    resolution: {integrity: sha512-BL5MGkRln6aDYhb0xbQlEAGw743BaZYWdbWtdJOBriYJboKgUUYCadFp2/FpBBZquBC/ezNBn7wMMPx7FDZUDw==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  undici-types@7.24.6:
-    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
+  undici-types@8.3.0:
+    resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
   zod@4.0.0:
     resolution: {integrity: sha512-9diLdTPc/L7w/5jI4C3gHYNiGHDV9IZYxo1e5LSD8cabi65WVTWWb+g2BGPEpUUCOxR4D+6O5B0AzyMdUAXwrw==}
@@ -284,13 +284,13 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@honcho-ai/sdk@2.3.0':
+  '@honcho-ai/sdk@2.4.0':
     dependencies:
       zod: 4.0.0
 
-  '@types/node@25.9.5':
+  '@types/node@26.4.1':
     dependencies:
-      undici-types: 7.24.6
+      undici-types: 8.3.0
 
   esbuild@0.28.2:
     optionalDependencies:
@@ -324,12 +324,12 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  tsx@4.23.12:
+  tsx@4.23.13:
     dependencies:
       esbuild: 0.28.2
     optionalDependencies:
       fsevents: 2.3.3
 
-  undici-types@7.24.6: {}
+  undici-types@8.3.0: {}
 
   zod@4.0.0: {}

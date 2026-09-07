@@ -2,13 +2,14 @@
   "honcho": {
     "baseUrl": "https://honcho.inglehart.io",
   },
-  "defaultModel": "openai-codex/gpt-5.6-sol",
+  "defaultModel": "{{model.strong}}",
   "modelAliases": {
     "fast": "openai-codex/gpt-5.6-luna",
     "standard": "openai-codex/gpt-5.6-terra",
-    "strong": "openai-codex/gpt-5.6-sol",
-    "reviewer": "openai-codex/gpt-5.6-sol",
+    "strong": "openai-codex/gpt-6-astra",
+    "reviewer": "openai-codex/gpt-6-astra",
   },
+  "defaultThinkingLevel": "medium",
   "enabledModels": [
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-5.6-sol",
@@ -16,26 +17,22 @@
     "openai-codex/gpt-5.6-luna",
     "litellm/qwen3.8-27b-q4",
     "openai-codex/gpt-5.3-codex-spark",
-    "openrouter/minimax/minimax-m2.5",
     "openrouter/deepseek/deepseek-v4-pro",
     "openrouter/deepseek/deepseek-v4-flash",
-    "google/gemini-3-flash-preview",
-    "google/gemini-3.1-flash-lite-preview",
-    "llama-server/muse-glimmer-30b",
+    "google/gemini-3.8-flash",
   ],
-  "defaultThinkingLevel": "medium",
   "compaction": {
     "provider": "openrouter",
-    "model": "google/gemini-3.1-flash-lite-preview",
+    "model": "google/gemini-3.8-flash",
   },
   "sessionTitle": {
     "provider": "openai-codex",
     "model": "gpt-5.6-luna",
   },
-  "lcm": {
-    "summaryProvider": "openai-codex",
-    "summaryModel": "GPT-4o",
-  },
+  // "lcm": {
+  //   "summaryProvider": "openai-codex",
+  //   "summaryModel": "GPT-4o",
+  // },
   "subagents": {
     "defaultModel": "openai-codex/gpt-5.6-terra",
     "agentOverrides": {

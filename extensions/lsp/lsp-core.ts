@@ -33,7 +33,7 @@ import {
   DocumentSymbolRequest,
   RenameRequest,
   CodeActionRequest,
-} from "vscode-languageserver-protocol/node.js";
+} from "vscode-languageserver-protocol/node";
 import {
   type Diagnostic,
   type Location,
@@ -1140,9 +1140,15 @@ export class LSPManager {
 
 export { DiagnosticSeverity };
 
+export function diagnosticMessageText(diagnostic: Diagnostic): string {
+  return typeof diagnostic.message === "string"
+    ? diagnostic.message
+    : diagnostic.message.value;
+}
+
 export function formatDiagnostic(d: Diagnostic): string {
   const sev = ["", "ERROR", "WARN", "INFO", "HINT"][d.severity ?? 1];
-  return `${sev} [${d.range.start.line + 1}:${d.range.start.character + 1}] ${d.message}`;
+  return `${sev} [${d.range.start.line + 1}:${d.range.start.character + 1}] ${diagnosticMessageText(d)}`;
 }
 
 export function filterDiagnosticsBySeverity(

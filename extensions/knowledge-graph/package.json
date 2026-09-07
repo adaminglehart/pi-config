@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@tobilu/qmd": "^2.5.3"
+    "@tobilu/qmd": "^2.8.3"
   },
   "pi": {
     "extensions": [
@@ -11,6 +11,6 @@
     ]
   },
   "devDependencies": {
-    "@types/node": "^25.5.0"
+    "@types/node": "^26.4.1"
   }
 }

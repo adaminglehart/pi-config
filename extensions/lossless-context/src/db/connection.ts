@@ -13,10 +13,9 @@ import { drizzle, type NodeSQLiteDatabase } from "drizzle-orm/node-sqlite";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import * as schema from "./schema.js";
 
 /** Drizzle database instance type for LCM. */
-export type DrizzleDB = NodeSQLiteDatabase<typeof schema>;
+export type DrizzleDB = NodeSQLiteDatabase;
 
 export class LcmDatabase {
   /** Raw node:sqlite handle (for FTS5 queries and other raw SQL). */
@@ -48,7 +47,7 @@ export class LcmDatabase {
     this.db.exec("PRAGMA busy_timeout=5000");
 
     // Create Drizzle instance wrapping the raw connection
-    this.drizzle = drizzle({ client: this.db, schema });
+    this.drizzle = drizzle({ client: this.db });
 
     // Detect FTS5 availability
     this.hasFts5 = this.detectFts5();

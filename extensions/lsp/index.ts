@@ -22,6 +22,7 @@ import {
   getOrCreateManager,
   shutdownManager,
   formatDiagnostic,
+  diagnosticMessageText,
   filterDiagnosticsBySeverity,
   uriToPath,
   resolvePosition,
@@ -202,7 +203,8 @@ function formatWorkspaceEdit(edit: WorkspaceEdit, cwd?: string): string {
         lines.push(`${display}:`);
         for (const e of change.edits ?? []) {
           const loc = `${e.range.start.line + 1}:${e.range.start.character + 1}`;
-          lines.push(`  [${loc}] → "${e.newText}"`);
+          const text = "newText" in e ? e.newText : e.snippet.value;
+          lines.push(`  [${loc}] → "${text}"`);
         }
       }
     }
@@ -443,7 +445,7 @@ export default function (pi: ExtensionAPI) {
     const MAX = 5;
     const lines = diagnostics.slice(0, MAX).map((e) => {
       const sev = e.severity === 1 ? "ERROR" : "WARN";
-      return `${sev}[${e.range.start.line + 1}] ${e.message.split("\n")[0]}`;
+      return `${sev}[${e.range.start.line + 1}] ${diagnosticMessageText(e).split("\n")[0]}`;
     });
 
     let notification = `📋 ${relativePath}\n${lines.join("\n")}`;
