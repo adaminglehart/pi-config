@@ -9,7 +9,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
-import { execSync } from "child_process";
+import { execFileSync } from "node:child_process";
 import {
   DESKTOP_NOTIFICATION_REQUEST_EVENT,
   type DesktopNotificationRequest,
@@ -22,9 +22,13 @@ import { isSubagent } from "./_lib/env.js";
  */
 const isTerminalFocused = (): boolean => {
   try {
-    const result = execSync(
-      "osascript -e 'tell application \"System Events\" to name of (first process whose frontmost is true)'",
-      { encoding: "utf8", timeout: 1000 },
+    const result = execFileSync(
+      "osascript",
+      [
+        "-e",
+        'tell application "System Events" to name of (first process whose frontmost is true)',
+      ],
+      { encoding: "utf8", timeout: 1000, stdio: "pipe" },
     );
     const frontmostApp = result.trim().toLowerCase();
     const terminalApps = [
@@ -46,9 +50,15 @@ const isTerminalFocused = (): boolean => {
  * Send a native macOS notification via osascript.
  */
 const notify = (title: string, body: string): void => {
-  const script = `display notification "${body.replace(/"/g, '\\"')}" with title "${title.replace(/"/g, '\\"')}"`;
+  // Keep response text out of both shell commands and AppleScript source.
+  const script = `on run argv
+  display notification (item 2 of argv) with title (item 1 of argv)
+end run`;
   try {
-    execSync(`osascript -e '${script}'`, { timeout: 1000 });
+    execFileSync("osascript", ["-e", script, "--", title, body], {
+      timeout: 1000,
+      stdio: "pipe",
+    });
   } catch {
     // Ignore notification failures
   }
