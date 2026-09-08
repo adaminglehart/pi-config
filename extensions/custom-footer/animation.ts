@@ -1,5 +1,8 @@
 import { aquariumScene } from "./scenes/aquarium.js";
-import { nebulaScene } from "./scenes/nebula.js";
+import { auroraVortexScene } from "./scenes/aurora-vortex.js";
+import { auroraBloomScene } from "./scenes/aurora-bloom.js";
+import { tidePrismScene } from "./scenes/tide-prism.js";
+import { orbitScene } from "./scenes/orbit.js";
 import type { Scene } from "./scenes/types.js";
 
 /**
@@ -11,7 +14,7 @@ export const CONFIG = {
    *  renders triggered by *other* sources (Loader, animations extension,
    *  input events) return identical strings and are skipped by the TUI
    *  diff — so this interval doesn't compete with them. */
-  RENDER_INTERVAL_MS: 150,
+  RENDER_INTERVAL_MS: 80,
 };
 
 /**
@@ -31,15 +34,31 @@ export function getAgentState(): AgentState {
 /**
  * SCENE MANAGEMENT
  */
-const scenes: Scene[] = [nebulaScene, aquariumScene];
+const scenes: Scene[] = [
+  auroraVortexScene, auroraBloomScene, tidePrismScene,
+  orbitScene, aquariumScene,
+];
 let currentSceneIdx = 0;
 
 export function getActiveScene(): Scene {
   return scenes[currentSceneIdx]!;
 }
 
+export function getSceneNames(): string[] {
+  return scenes.map((scene) => scene.name);
+}
+
+export function selectScene(name: string): string | undefined {
+  const index = scenes.findIndex((scene) => scene.name === name);
+  if (index === -1) return undefined;
+  currentSceneIdx = index;
+  currentTick++;
+  return scenes[index]!.name;
+}
+
 export function cycleScene(): string {
   currentSceneIdx = (currentSceneIdx + 1) % scenes.length;
+  currentTick++;
   return scenes[currentSceneIdx]!.name;
 }
 
@@ -62,7 +81,7 @@ let tuiReference: { requestRender: () => void } | null = null;
  */
 let sceneCacheLines: string[] = [];
 let sceneCacheWidth = 0;
-let sceneCacheTick = 0;
+let sceneCacheTick = -1;
 let currentTick = 0;
 
 export function getCurrentTick(): number {

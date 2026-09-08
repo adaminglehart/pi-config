@@ -25,6 +25,8 @@ import {
   startAnimation,
   stopAnimation,
   cycleScene,
+  selectScene,
+  getSceneNames,
   getActiveScene,
   getSceneCache,
   setAgentState,
@@ -418,9 +420,20 @@ export default function customFooter(pi: ExtensionAPI) {
   // Keeping ACM status request in session_start instead
 
   pi.registerCommand("footer-scene", {
-    description: "Cycle footer scene",
-    handler: async (_args, ctx) => {
-      const scene = cycleScene();
+    description: "Cycle footer scenes, or select one by name",
+    getArgumentCompletions: (prefix) => {
+      const matches = getSceneNames()
+        .filter((name) => name.startsWith(prefix))
+        .map((name) => ({ value: name, label: name }));
+      return matches.length > 0 ? matches : null;
+    },
+    handler: async (args, ctx) => {
+      const name = args.trim().toLowerCase();
+      const scene = name ? selectScene(name) : cycleScene();
+      if (!scene) {
+        ctx.ui.notify(`Choose a scene: ${getSceneNames().join(", ")}`, "warning");
+        return;
+      }
       ctx.ui.notify(`Scene: ${scene}`, "info");
       tuiRef?.requestRender();
     },

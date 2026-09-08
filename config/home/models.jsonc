@@ -1,5 +1,8 @@
 {
   "providers": {
+    "opencode-go": {
+      "apiKey": "$OPENCODE_GO_API_KEY",
+    },
     // "openrouter": {
     //   "baseUrl": "https://openrouter.ai/api/v1",
     //   "apiKey": "$OPENROUTER_API_KEY",
