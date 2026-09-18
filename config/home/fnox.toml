@@ -26,6 +26,9 @@ EXA_API_KEY = { provider = "op", value = "op://dotenv/EXA_API_KEY/value", sync =
 # Work environment - LiteLLM
 # LITELLM_API_KEY = { provider = "op", value = "op://dotenv/LITELLM_API_KEY/value" }
 
+# Home environment - GB10 direct API
+GB10_VLLM_API_KEY = { provider = "op", value = "op://dotenv/GB10_VLLM_API_KEY/password", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBJZll4bk9FZzV4cjVCOWVyaVA0ejJ4OS9uMzZDdjZ3b21NMHJGVmJEUnp3ClRScExiWEEreEVzLytSekFIelgyVkVETm5NTnhTallRd1QyK1pLYktOWkkKLT4gels6RC1ncmVhc2UgbHMgbURCICI0ViBXLUwzU2IKYzNER2JNbmh2eHNZL3Vua0dXZzlITmkzd0U2V05UdTlHdnhpOVh2VDFQVlQ2OVdMUlI0U1N4MFZ6bHhSU3VFdwpnS0EzUWdDc3ZiOWw5WWJEMmw5VEVmNmp3RGJPc3M3bWtvczU2YkNSWGN4S2lObjIyMDIwZmc3YU9KdzN4K3ROCllWUEsKLS0tIDBkckoyaDlLMkd6bm15REtlcXNWeVNJcXcwVndCdFVMT1hsNWdmRXlxdmsKUu+9HF1GSjj7tQHxeulkKxpzNQd7FIO5u2GcRBrgKDa/VgiTphkkAdNnODpGQciOSh+0GT4daRUIN005P+d3oGJHcUFfmZ5AyiEj0jFahzA=" } }
+
 # Home environment - LiteLLM
 LITELLM_PI_API_KEY = { provider = "op", value = "op://kubernetes/litellm/PI_HOME_API_KEY", sync = { provider = "age", value = "YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBXNnVtUUZ6WHR4cSt4N25yU0JpQ1dKRGd1YWE2eUpZREJPRmNTakgwZW04CmQ3NWIxRlhFRzlFYXJjYmhiYlJaRVJPTXcyZGhTdldROWFTZHQ0MWJPY1kKLT4gUDVrZURmLWdyZWFzZQpLZGNYcnRaWVU1YXVFbnJra1l6T3ZKM0FmeHF3Y2Yrc0grWHF1Uk9ibjdNRnA2dUErZWVnVnNpM0ovb05uejAKLS0tIDRzYWJJdEh6VlBZQVdaMkpITW0xTzBiWUpkTk80YWVIQ2JFRGo4Uzd4SFUKEaQmzhz5zgzkmf4O1PUuEeQ7de1x9550p1VxCI09HaZVBk61HrD+/+EFL5oF4RivYA7dM2aTlYmO" } }
 # Home environment - OpenCode Go
