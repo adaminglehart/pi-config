@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@vectorize-io/hindsight-client':
-        specifier: ^0.9.2
-        version: 0.9.2
+        specifier: ^0.10.0
+        version: 0.10.1
     devDependencies:
       '@types/node':
         specifier: ^26.4.1
@@ -21,8 +21,8 @@ packages:
   '@types/node@26.4.1':
     resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
 
-  '@vectorize-io/hindsight-client@0.9.2':
-    resolution: {integrity: sha512-sjmLkhyH2XafpLzT4abWdF4wcjHWhLU1igxxo6Ng67vGMAWA6Br1Ck3rmdejIyxcsArscpu+JrJ3X+jpcp+LLQ==}
+  '@vectorize-io/hindsight-client@0.10.1':
+    resolution: {integrity: sha512-83FsMz/FyFwKooN1KsBZq4cWLB4RJQcTTnmxpZ0n4bXZih1iySLCtR88OAuqhqSnT3ajw4Nx5Oa8OwrrBuI6Lw==}
 
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
@@ -33,6 +33,6 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
-  '@vectorize-io/hindsight-client@0.9.2': {}
+  '@vectorize-io/hindsight-client@0.10.1': {}
 
   undici-types@8.3.0: {}
