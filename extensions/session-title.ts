@@ -22,7 +22,7 @@ const MAX_TITLE_LENGTH = 80;
 function readSessionTitleSettings(): { provider: string; model: string } {
   return getNamespacedConfig("sessionTitle", {
     provider: "openai-codex",
-    model: "gpt-5.6-luna",
+    model: "gpt-6-luna",
   });
 }
 

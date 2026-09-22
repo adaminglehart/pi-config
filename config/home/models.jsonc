@@ -3,30 +3,6 @@
     "opencode-go": {
       "apiKey": "$OPENCODE_GO_API_KEY",
     },
-    // "openrouter": {
-    //   "baseUrl": "https://openrouter.ai/api/v1",
-    //   "apiKey": "$OPENROUTER_API_KEY",
-    //   "api": "openai-completions",
-    //   "models": [
-    //     {
-    //       "id": "minimax/minimax-m2.5",
-    //       "name": "Minimax M2.5 (mara)",
-    //       "reasoning": true,
-    //       "contextWindow": 204800,
-    //       "cost": {
-    //         "input": 0.3,
-    //         "output": 1.2,
-    //         "cacheRead": 0.3,
-    //         "cacheWrite": 1.2,
-    //       },
-    //       "compat": {
-    //         "openRouterRouting": {
-    //           "order": ["mara"],
-    //         },
-    //       },
-    //     },
-    //   ],
-    // },
     "litellm": {
       "baseUrl": "https://litellm.inglehart.io/v1",
       "apiKey": "$LITELLM_PI_API_KEY",
@@ -61,24 +37,28 @@
           "input": ["text", "image"],
           "contextWindow": 500000,
         },
-      ],
-    },
-    "llama-server": {
-      "baseUrl": "https://llama-server.inglehart.io/v1",
-      "apiKey": "llama-server",
-      "api": "openai-completions",
-      "models": [
         {
-          "id": "gemma-4-26b-q4",
-          "name": "Gemma 4 26B Q4",
+          "id": "deepseek-v4-flash-vision-exp",
+          "name": "DeepSeek V4 Flash (GB10)",
           "reasoning": true,
-          "contextWindow": 163840,
+          "input": ["text", "image"],
+          "contextWindow": 1048576,
         },
         {
-          "id": "muse-glimmer-30b",
-          "name": "Muse Glimmer 30B",
+          "id": "MiMo-V2.6-Flash-RL",
+          "name": "MiMo V2.6 Flash RL (GB10)",
           "reasoning": true,
-          "contextWindow": 131072,
+          "input": ["text"],
+          // Prompts above 64K are not tested with this runtime configuration.
+          "contextWindow": 262144,
+          "maxTokens": 16384,
+          "compat": {
+            "maxTokensField": "max_tokens",
+            "thinkingFormat": "chat-template",
+            "chatTemplateKwargs": {
+              "enable_thinking": { "$var": "thinking.enabled" },
+            },
+          },
         },
       ],
     },
