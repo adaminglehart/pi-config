@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@honcho-ai/sdk": "2.4.0"
+    "@honcho-ai/sdk": "2.5.0"
   },
   "pi": {
     "extensions": [
