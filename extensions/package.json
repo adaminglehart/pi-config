@@ -9,7 +9,7 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.86.1",
     "@earendil-works/pi-coding-agent": "^0.86.1",
-    "@earendil-works/pi-server": "0.86.1",
+    "@earendil-works/pi-server": "0.87.1",
     "@earendil-works/pi-tui": "^0.86.1",
     "parallel-web": "^1.3.3",
     "tsx": "4.23.13",
