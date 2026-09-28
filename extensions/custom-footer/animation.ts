@@ -62,6 +62,12 @@ export function cycleScene(): string {
   return scenes[currentSceneIdx]!.name;
 }
 
+export function selectRandomScene(): string {
+  currentSceneIdx = Math.floor(Math.random() * scenes.length);
+  currentTick++;
+  return scenes[currentSceneIdx]!.name;
+}
+
 let animationInterval: ReturnType<typeof setInterval> | null = null;
 
 let tuiReference: { requestRender: () => void } | null = null;

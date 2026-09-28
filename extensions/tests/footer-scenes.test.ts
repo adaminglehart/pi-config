@@ -9,7 +9,7 @@ import { BrailleCanvas } from "../custom-footer/scenes/braille-canvas.js";
 import { lightGlyph, spectralColor, type Palette } from "../custom-footer/scenes/spectral-color.js";
 import {
   cycleScene, getActiveScene, getCurrentTick, getSceneCache,
-  getSceneNames, selectScene,
+  getSceneNames, selectRandomScene, selectScene,
 } from "../custom-footer/animation.js";
 
 const stripColor = (line: string): string => line.replace(/\x1b\[[0-9;]*m/g, "");
@@ -93,6 +93,18 @@ test("scene selection updates both caches immediately; other renders reuse the f
   assert.equal(getCurrentTick(), selectedTick);
   assert.equal(getActiveScene().name, "aurora-vortex");
   assert.ok(getSceneCache(37, 0).every((line) => visibleWidth(line) === 37));
+});
+
+test("random scene selection uses the full scene list", () => {
+  const originalRandom = Math.random;
+  try {
+    Math.random = () => 0;
+    assert.equal(selectRandomScene(), "aurora-vortex");
+    Math.random = () => 0.999;
+    assert.equal(selectRandomScene(), "aquarium");
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 test("every option can be selected by name without a timer tick", () => {

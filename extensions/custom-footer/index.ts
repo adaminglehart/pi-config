@@ -25,6 +25,7 @@ import {
   startAnimation,
   stopAnimation,
   cycleScene,
+  selectRandomScene,
   selectScene,
   getSceneNames,
   getActiveScene,
@@ -531,6 +532,7 @@ export default function customFooter(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
+    if (!isSubagent()) selectRandomScene();
     pi.events.emit("context-pilot:status_request", {});
     if (enabled && ctx.hasUI) setupFooter(ctx);
   });
