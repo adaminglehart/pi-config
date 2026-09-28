@@ -2,40 +2,34 @@
   "honcho": {
     "baseUrl": "http://localhost:8100",
   },
-  "defaultModel": "{{model.strong}}",
-  "defaultThinkingLevel": "high",
+  "defaultModel": "litellm-anthropic/claude-opus-5-5",
+  "defaultThinkingLevel": "medium",
   "modelAliases": {
-    "fast": "litellm-openai/gpt-5.6-luna",
-    "standard": "litellm-openai/gpt-5.6-terra",
-    "strong": "litellm-openai/gpt-5.6-sol",
-    "reviewer": "litellm-anthropic/claude-opus-5",
+    "fast": "litellm-openai/gpt-6-luna",
+    "standard": "litellm-openai/gpt-6-sol",
+    "reviewer": "litellm-anthropic/claude-opus-5-5",
   },
   "enabledModels": [
-    "litellm-openai/gpt-5.6-sol",
-    "litellm-openai/gpt-5.6-terra",
-    "litellm-openai/gpt-5.6-luna",
-    "litellm-anthropic/claude-opus-5",
-    "litellm-anthropic/claude-opus-4-8",
-    "litellm-anthropic/claude-sonnet-5",
-    "litellm-anthropic/claude-4.5-haiku",
+    "litellm-openai/gpt-6-astra",
+    "litellm-openai/gpt-6-sol",
+    "litellm-openai/gpt-6-luna",
+    // "litellm-openai/gpt-5.6-sol",
+    // "litellm-openai/gpt-5.6-luna",
+    "litellm-anthropic/claude-opus-5-5",
+    // "litellm-anthropic/claude-opus-5",
+    // "litellm-anthropic/claude-sonnet-5",
     "litellm-google/gemini-3.1-pro",
     "litellm-google/gemini-3-flash",
   ],
 
   "compaction": {
-    // "provider": "litellm-anthropic",
-    // "model": "claude-sonnet-5",
     "provider": "litellm-openai",
-    "model": "gpt-5.6-luna",
+    "model": "gpt-6-luna",
   },
   "sessionTitle": {
     "provider": "litellm-openai",
-    "model": "gpt-5.6-luna",
+    "model": "gpt-6-luna",
   },
-  // "lcm": {
-  //   "summaryProvider": "litellm-google",
-  //   "summaryModel": "gemini-3-flash",
-  // },
   "subagents": {
     "agentOverrides": {
       "librarian": {
@@ -44,15 +38,15 @@
       },
       "researcher": {
         "thinking": "high",
-        "model": "litellm-openai/gpt-5.6-sol",
+        "model": "litellm-openai/gpt-6-sol",
       },
       "scout": {
         "thinking": "high",
-        "model": "litellm-openai/gpt-5.6-luna",
+        "model": "litellm-openai/gpt-6-luna",
       },
       "worker": {
         "thinking": "high",
-        "model": "litellm-openai/gpt-5.6-sol",
+        "model": "litellm-openai/gpt-6-sol",
       },
       "reviewer": {
         "thinking": "high",
