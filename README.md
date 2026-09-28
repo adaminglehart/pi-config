@@ -62,6 +62,9 @@ just update-ui-skills
 # Typecheck build tooling and extensions
 just check
 
+# Check runtime version, Node compatibility, local lock state, and deployment
+just doctor
+
 # Build build/agent/
 just build
 
@@ -88,6 +91,29 @@ build under this repository. The hook installs only production dependencies
 for each staged extension package. Deployment then syncs each complete
 `node_modules` tree to the agent directory without running package install
 scripts there.
+
+The deploy flow also stages exact `npm:` package pins from generated
+`settings.json` under `build/agent/npm/` using pnpm, then syncs that complete
+tree to the destination. This keeps native dependency install checks under the
+repository, where work-machine execution policy permits them, instead of
+letting Pi reconcile packages under `~/.pi/agent/npm/` at startup.
+
+## Troubleshooting a broken installation
+
+Run `just doctor` first. It detects the failure modes that can otherwise look
+like extension load failures: an incompatible active Node version, an obsolete
+or wrong-family `pi` executable earlier on `PATH`, a stale ignored
+`extensions/pnpm-lock.yaml`, or deployed managed packages that do not match
+the exact pins in `settings.json`.
+
+The normal config repair is `pnpm --dir extensions install`, followed by
+`just apply`. If the doctor reports an obsolete or wrong-family runtime,
+install a compatible Node and replace it with
+`@earendil-works/pi-coding-agent` at the version declared in
+`extensions/package.json`. Do not install dependencies directly under
+`~/.pi/agent`: native package install checks may be terminated there by
+work-machine execution policy, and `just apply` now stages those dependencies
+safely under the repository.
 
 ## Setup on a new machine
 

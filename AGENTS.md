@@ -71,6 +71,7 @@ not break:
 
 ```bash
 just check              # Typecheck build tooling and extensions
+just doctor             # Check runtime, lockfile, and deployed package health
 just build              # Generate build/agent/
 just apply              # Build and deploy the primary agent
 just deploy             # Alias of `just apply`
@@ -106,6 +107,15 @@ dangerouslyAllowAllBuilds: true
 
 When adding or updating an extension dependency, edit that extension's
 `package.json`, run `pnpm install` in its directory, and commit its lockfile.
+
+## Pi animations
+
+Before changing an animation, identify the exact UI surface:
+
+- Footer scenes are in `extensions/custom-footer/`.
+- Thinking and working indicators are in `extensions/animations/`.
+
+Do not edit one system when the request is for the other system.
 
 ## Verification
 

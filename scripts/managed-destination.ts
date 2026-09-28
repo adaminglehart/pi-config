@@ -30,6 +30,7 @@ export const MANAGED_DESTINATION_PATHS: readonly ManagedDestinationPath[] = [
   { path: "settings.json" },
   { path: "models.json" },
   { path: "mcp.json" },
+  { path: "npm" },
   { path: "fnox.toml" },
   { path: "run_after_install_extension_deps.sh" },
   { path: "APPEND_SYSTEM.md" },

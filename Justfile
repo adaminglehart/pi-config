@@ -3,6 +3,10 @@ check:
     pnpm exec tsc --project tsconfig.json
     pnpm --dir extensions exec tsc --project tsconfig.json
 
+# Check the active Pi runtime, toolchain, and deployed package state
+doctor:
+    bun scripts/doctor.ts
+
 # Build the primary Pi agent configuration
 build:
     bun run build.ts
@@ -30,10 +34,15 @@ _deploy:
     if [ -f "$BUILD/run_after_install_extension_deps.sh" ]; then
       bash "$BUILD/run_after_install_extension_deps.sh"
     fi
+    # Pi's configured npm packages may contain native install checks that work
+    # under this repository but are blocked under the deployment destination.
+    bun scripts/stage-package-deps.ts "$BUILD/settings.json" "$BUILD/npm"
     echo "Deploying primary agent → $DEST"
     mkdir -p "$DEST"
     bun scripts/managed-destination.ts reconcile "$BUILD" "$DEST"
     rsync -a --exclude 'node_modules' "$BUILD/" "$DEST/"
+    # Remove stale files inside enabled extensions while preserving dependency trees.
+    rsync -a --delete --exclude 'node_modules' "$BUILD/extensions/" "$DEST/extensions/"
     # Copy each complete production dependency tree without running it in DEST.
     for modules in "$BUILD"/extensions/*/node_modules; do
       [ -d "$modules" ] || continue
@@ -42,6 +51,10 @@ _deploy:
       mkdir -p "$destination_modules"
       rsync -a --delete "$modules/" "$destination_modules/"
     done
+    if [ -d "$BUILD/npm/node_modules" ]; then
+      mkdir -p "$DEST/npm"
+      rsync -a --delete "$BUILD/npm/" "$DEST/npm/"
+    fi
     echo "✓ Deployed primary agent → $DEST"
 
 # Build and deploy the primary agent
