@@ -1141,9 +1141,10 @@ export class LSPManager {
 export { DiagnosticSeverity };
 
 export function diagnosticMessageText(diagnostic: Diagnostic): string {
-  return typeof diagnostic.message === "string"
-    ? diagnostic.message
-    : diagnostic.message.value;
+  const message: unknown = diagnostic.message;
+  return typeof message === "string"
+    ? message
+    : (message as { value: string }).value;
 }
 
 export function formatDiagnostic(d: Diagnostic): string {

@@ -203,7 +203,10 @@ function formatWorkspaceEdit(edit: WorkspaceEdit, cwd?: string): string {
         lines.push(`${display}:`);
         for (const e of change.edits ?? []) {
           const loc = `${e.range.start.line + 1}:${e.range.start.character + 1}`;
-          const text = "newText" in e ? e.newText : e.snippet.value;
+          const text =
+            "snippet" in e
+              ? (e.snippet as { value: string }).value
+              : e.newText;
           lines.push(`  [${loc}] → "${text}"`);
         }
       }
