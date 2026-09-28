@@ -582,18 +582,18 @@ export default function (pi: ExtensionAPI) {
 			return null;
 		}
 
+		const sessionManager = SessionManager.inMemory();
+		for (const message of buildSeedMessages(ctx, thread)) {
+			sessionManager.appendMessage(message);
+		}
+
 		const { session } = await createAgentSession({
-			sessionManager: SessionManager.inMemory(),
+			sessionManager,
 			model: ctx.model,
 			thinkingLevel: pi.getThinkingLevel() as SessionThinkingLevel,
 			tools: ["read", "bash", "edit", "write"],
 			resourceLoader: createBtwResourceLoader(ctx),
 		});
-
-		const seedMessages = buildSeedMessages(ctx, thread);
-		if (seedMessages.length > 0) {
-			session.agent.state.messages = seedMessages as typeof session.agent.state.messages;
-		}
 
 		const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
 			if (!sideBusy || !pendingQuestion) {

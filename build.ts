@@ -437,16 +437,21 @@ async function buildPrimaryAgent(): Promise<void> {
   );
   console.log("  generated settings.json");
 
-  for (const configName of ["models", "mcp"]) {
+  // pi-mcp-adapter 3.x reads mcp-adapter.json; Pi's built-in MCP owns mcp.json.
+  const generatedConfigs = [
+    { configName: "models", outputName: "models.json" },
+    { configName: "mcp", outputName: "mcp-adapter.json" },
+  ];
+  for (const { configName, outputName } of generatedConfigs) {
     const basePath = findJsonFile(join(CONFIG_DIR, `${configName}.base`));
     if (!basePath) continue;
 
     const config = await buildMergedConfig(configName, basePath);
     await Bun.write(
-      join(BUILD_DIR, `${configName}.json`),
+      join(BUILD_DIR, outputName),
       `${JSON.stringify(config, null, 2)}\n`,
     );
-    console.log(`  generated ${configName}.json`);
+    console.log(`  generated ${outputName}`);
   }
 
   const environmentFnoxPath = join(CONFIG_DIR, environment, "fnox.toml");

@@ -29,6 +29,7 @@ export const MANAGED_DESTINATION_PATHS: readonly ManagedDestinationPath[] = [
   { path: "skills", entryLabel: "skill" },
   { path: "settings.json" },
   { path: "models.json" },
+  { path: "mcp-adapter.json" },
   { path: "mcp.json" },
   { path: "npm" },
   { path: "fnox.toml" },

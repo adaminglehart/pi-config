@@ -38,9 +38,9 @@ function setup() {
       },
       emit() {},
     },
-    on: ((_name: string, handler: (event: unknown, ctx: unknown) => void) => {
+    on() {
       return () => {};
-    }) as ExtensionAPI["on"],
+    },
   };
   notifyExtension(pi as ExtensionAPI);
   return (title: string, body: string) => request({ title, body });
