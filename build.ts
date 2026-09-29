@@ -37,10 +37,12 @@ const CONFIG_DIR = join(ROOT, "config");
 
 const environment = resolveBuildEnvironment();
 
+type ModelAlias = { model: string; thinking: string };
+
 type ModelSettings = JsonObject & {
   defaultProvider?: string;
   defaultModel?: string;
-  modelAliases?: Record<string, string>;
+  modelAliases?: Record<string, ModelAlias>;
 };
 
 function fatal(message: string): never {
@@ -153,13 +155,11 @@ function parseModelSettings(value: JsonObject): ModelSettings {
     fatal("Merged settings modelAliases must be an object");
   }
 
-  const validatedAliases: Record<string, string> = {};
+  const validatedAliases: Record<string, ModelAlias> = {};
   if (modelAliases) {
-    for (const [name, reference] of Object.entries(modelAliases)) {
-      if (!/^\w+$/.test(name) || typeof reference !== "string" || !reference) {
-        fatal(
-          "Merged settings modelAliases must use word-only names and non-empty values",
-        );
+    for (const [name, alias] of Object.entries(modelAliases)) {
+      if (!/^\w+$/.test(name) || !isJsonObject(alias)) {
+        fatal("Merged settings modelAliases must use word-only names and objects");
       }
       if (name === "default") {
         fatal(
@@ -167,13 +167,14 @@ function parseModelSettings(value: JsonObject): ModelSettings {
         );
       }
 
-      const separator = reference.indexOf("/");
-      if (separator <= 0 || separator >= reference.length - 1) {
-        fatal(
-          `Merged settings modelAliases.${name} must use a provider/model reference`,
-        );
+      const { model, thinking } = alias;
+      if (typeof model !== "string" || model.indexOf("/") <= 0 || model.endsWith("/")) {
+        fatal(`Merged settings modelAliases.${name}.model must use a provider/model reference`);
       }
-      validatedAliases[name] = reference;
+      if (typeof thinking !== "string" || !["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(thinking)) {
+        fatal(`Merged settings modelAliases.${name}.thinking must be a valid thinking level`);
+      }
+      validatedAliases[name] = { model, thinking };
     }
   }
 
@@ -188,8 +189,9 @@ function parseModelSettings(value: JsonObject): ModelSettings {
 /** Read named model aliases from merged settings as build variables. */
 function readModelAliasVars(settings: ModelSettings): Record<string, string> {
   const modelVars: Record<string, string> = {};
-  for (const [name, reference] of Object.entries(settings.modelAliases ?? {})) {
-    modelVars[`model.${name}`] = reference;
+  for (const [name, alias] of Object.entries(settings.modelAliases ?? {})) {
+    modelVars[`model.${name}`] = alias.model;
+    modelVars[`model.${name}.thinking`] = alias.thinking;
   }
   return modelVars;
 }
@@ -362,6 +364,10 @@ async function buildPrimaryAgent(): Promise<void> {
     defaultModelUsesAlias(mergedSettings),
   );
   buildVars["model.default"] = resolveDefaultModelReference(settings);
+  if (typeof settings.defaultThinkingLevel !== "string") {
+    fatal("Merged settings must define defaultThinkingLevel");
+  }
+  buildVars["model.default.thinking"] = settings.defaultThinkingLevel;
 
   console.log(`  environment: ${environment}\n`);
 

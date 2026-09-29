@@ -51,8 +51,10 @@ inspect another environment without changing the hostname, set
 `PI_BUILD_ENV`, for example `PI_BUILD_ENV=home just build`.
 
 String values using `${VAR_NAME}` are resolved from the build environment.
-Missing variables fail the build. Model aliases from merged settings are also
-substituted into primary agent files.
+Missing variables fail the build. Each `modelAliases` entry has a `model`
+(`provider/model`) and a `thinking` level. Use `{{model.fast}}` for the model
+and `{{model.fast.thinking}}` for its thinking level in settings or agent files.
+The `/fast` and `/default` commands set both values.
 
 ## Commands
 

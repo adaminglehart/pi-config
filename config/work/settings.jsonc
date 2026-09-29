@@ -5,9 +5,9 @@
   "defaultModel": "litellm-anthropic/claude-opus-5-5",
   "defaultThinkingLevel": "medium",
   "modelAliases": {
-    "fast": "litellm-openai/gpt-6-luna",
-    "standard": "litellm-openai/gpt-6-sol",
-    "reviewer": "litellm-anthropic/claude-opus-5-5",
+    "fast": { "model": "litellm-openai/gpt-6-luna", "thinking": "high" },
+    "standard": { "model": "litellm-openai/gpt-6-sol", "thinking": "high" },
+    "reviewer": { "model": "litellm-anthropic/claude-opus-5-5", "thinking": "high" },
   },
   "enabledModels": [
     "litellm-openai/gpt-6-astra",
@@ -49,7 +49,7 @@
         "model": "litellm-openai/gpt-6-sol",
       },
       "reviewer": {
-        "thinking": "high",
+        "thinking": "{{model.reviewer.thinking}}",
         "model": "{{model.reviewer}}",
       },
       "oracle": {

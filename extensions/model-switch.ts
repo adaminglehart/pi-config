@@ -10,6 +10,10 @@ interface ModelReference {
 
 const FAST_MODEL = "{{model.fast}}";
 const DEFAULT_MODEL = "{{model.default}}";
+const FAST_THINKING = "{{model.fast.thinking}}" as ThinkingLevel;
+const DEFAULT_THINKING = "{{model.default.thinking}}" as ThinkingLevel;
+
+type ThinkingLevel = Parameters<ExtensionAPI["setThinkingLevel"]>[0];
 
 function parseModelReference(value: string): ModelReference | undefined {
   const separator = value.indexOf("/");
@@ -28,6 +32,7 @@ async function switchModel(
   ctx: ExtensionContext,
   reference: ModelReference | undefined,
   label: string,
+  thinking: ThinkingLevel,
 ): Promise<void> {
   if (!reference) {
     ctx.ui.notify(`Could not determine the ${label} model`, "warning");
@@ -49,6 +54,7 @@ async function switchModel(
     return;
   }
 
+  pi.setThinkingLevel(thinking);
   ctx.ui.notify(`Switched to ${model.id}`, "info");
 }
 
@@ -61,6 +67,7 @@ export default function modelSwitchExtension(pi: ExtensionAPI): void {
         ctx,
         parseModelReference(FAST_MODEL),
         "fast",
+        FAST_THINKING,
       );
     },
   });
@@ -68,7 +75,7 @@ export default function modelSwitchExtension(pi: ExtensionAPI): void {
   pi.registerCommand("default", {
     description: "Switch to pi's default model",
     handler: async (_args, ctx) => {
-      await switchModel(pi, ctx, parseModelReference(DEFAULT_MODEL), "default");
+      await switchModel(pi, ctx, parseModelReference(DEFAULT_MODEL), "default", DEFAULT_THINKING);
     },
   });
 }

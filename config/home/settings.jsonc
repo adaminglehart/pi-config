@@ -3,12 +3,11 @@
     "baseUrl": "https://honcho.inglehart.io",
   },
   "defaultModel": "{{model.standard}}",
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "{{model.standard.thinking}}",
   "modelAliases": {
-    "fast": "openai-codex/gpt-6-luna",
-    "standard": "openai-codex/gpt-6-sol",
-    "strong": "openai-codex/gpt-6-6-sol",
-    "reviewer": "openai-codex/gpt-6-astra",
+    "fast": { "model": "openai-codex/gpt-6-luna", "thinking": "max" },
+    "standard": { "model": "openai-codex/gpt-6-sol", "thinking": "medium" },
+    "reviewer": { "model": "openai-codex/gpt-6-astra", "thinking": "high" },
   },
   "enabledModels": [
     "openai-codex/gpt-6-astra",
@@ -33,7 +32,7 @@
     "agentOverrides": {
       "reviewer": {
         "model": "{{model.reviewer}}",
-        "thinking": "high",
+        "thinking": "{{model.reviewer.thinking}}",
       },
       "worker": {
         "model": "opencode-go/deepseek-v4.1-flash",
