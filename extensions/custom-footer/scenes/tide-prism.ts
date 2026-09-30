@@ -1,5 +1,5 @@
-import { lightGlyph, spectralColor, type Palette } from "./spectral-color.js";
-import type { Scene } from "./types.js";
+import { lightGlyph, spectralColor, type Palette } from "../rendering/spectral-color.js";
+import type { Scene } from "../rendering/types.js";
 
 const GLYPHS = " .·:░▒▓█";
 const PALETTE: Palette = [
@@ -35,7 +35,8 @@ export function renderTidePrism(width: number, seconds: number): string[] {
       const colorPhase = field * 0.16 + u * 0.35 + row * 0.045 + t * 0.018;
       let intensity = base;
       let color = spectralColor(PALETTE, colorPhase);
-      let pearl = filament * filament * 0.55;
+      // Only the brightest filaments go pale, so the colors stay saturated.
+      let pearl = Math.pow(filament, 4) * 0.3;
 
       // A second, offset contour acts as a colored rim behind the main wave.
       const refraction = 0.18 * Math.sin(warpX * 1.8 - warpY + t * 0.38);
@@ -50,16 +51,25 @@ export function renderTidePrism(width: number, seconds: number): string[] {
         color[1] * (1 - blend) + rimColor[1] * blend,
         color[2] * (1 - blend) + rimColor[2] * blend,
       ];
-      intensity += rim * 0.22 * swell + glint * 0.18;
-      pearl = Math.min(0.8, pearl + glint * 0.3);
+      intensity += rim * 0.22 * swell + glint * 0.4;
+      pearl = Math.min(0.85, pearl + glint * 0.6);
 
       intensity = Math.min(1, intensity * edge);
-      const glyph = GLYPHS[Math.min(GLYPHS.length - 1, Math.floor(intensity * GLYPHS.length))]!;
+      // Low light is clear dark water, which gives the bright bands contrast.
+      const level = (intensity - 0.22) / 0.78;
+      let glyph = level <= 0 ? " "
+        : GLYPHS[Math.min(GLYPHS.length - 1, 1 + Math.floor(level * (GLYPHS.length - 1)))]!;
+      // Caustic sparkles flash briefly on the brightest crests.
+      const sparkle = Math.sin(col * 12.9898 + row * 78.233 + Math.floor(t * 3) * 37.719) * 43758.5453;
+      if (glint > 0.35 && sparkle - Math.floor(sparkle) > 0.8) {
+        glyph = "✦";
+        pearl = 0.9;
+      }
       line += lightGlyph(glyph, [
         color[0] * (1 - pearl) + 232 * pearl,
         color[1] * (1 - pearl) + 255 * pearl,
         color[2] * (1 - pearl) + 248 * pearl,
-      ], 0.32 + Math.min(1, intensity * 1.4) * 0.68);
+      ], 0.12 + Math.min(1, intensity * 1.5) * 0.88);
     }
     lines.push(line + "\x1b[0m");
   }

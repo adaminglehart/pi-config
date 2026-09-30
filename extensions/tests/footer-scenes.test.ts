@@ -5,8 +5,10 @@ import { auroraVortexScene, renderAuroraVortex } from "../custom-footer/scenes/a
 import { auroraBloomScene, renderAuroraBloom } from "../custom-footer/scenes/aurora-bloom.js";
 import { tidePrismScene, renderTidePrism } from "../custom-footer/scenes/tide-prism.js";
 import { orbitScene, renderOrbit } from "../custom-footer/scenes/orbit.js";
-import { BrailleCanvas } from "../custom-footer/scenes/braille-canvas.js";
-import { lightGlyph, spectralColor, type Palette } from "../custom-footer/scenes/spectral-color.js";
+import { neonHorizonScene, renderNeonHorizon } from "../custom-footer/scenes/neon-horizon.js";
+import { fireworksScene, renderFireworks } from "../custom-footer/scenes/fireworks.js";
+import { BrailleCanvas } from "../custom-footer/rendering/braille-canvas.js";
+import { lightGlyph, spectralColor, type Palette } from "../custom-footer/rendering/spectral-color.js";
 import {
   cycleScene, getActiveScene, getCurrentTick, getSceneCache,
   getSceneNames, selectRandomScene, selectScene,
@@ -16,6 +18,7 @@ const stripColor = (line: string): string => line.replace(/\x1b\[[0-9;]*m/g, "")
 
 const renderers = [
   renderAuroraVortex, renderAuroraBloom, renderTidePrism, renderOrbit,
+  renderNeonHorizon, renderFireworks,
 ];
 
 for (const render of renderers) {
@@ -57,6 +60,7 @@ for (const render of renderers) {
 test("all new runtime scenes keep the original four-row height", () => {
   for (const scene of [
     auroraVortexScene, auroraBloomScene, tidePrismScene, orbitScene,
+    neonHorizonScene, fireworksScene,
   ]) {
     assert.equal(scene.height, 4);
     assert.equal(scene.render(80, 50).length, scene.height);
@@ -74,6 +78,7 @@ test("palette wraps smoothly and light channels stay in range", () => {
 test("scene selection updates both caches immediately; other renders reuse the frame", () => {
   assert.deepEqual(getSceneNames(), [
     "aurora-vortex", "aurora-bloom", "tide-prism", "orbit", "aquarium",
+    "neon-horizon", "fireworks",
   ]);
   selectScene("aurora-vortex");
   assert.equal(getSceneCache(0, 0).length, 4);
@@ -87,6 +92,8 @@ test("scene selection updates both caches immediately; other renders reuse the f
   assert.equal(cycleScene(), "tide-prism");
   assert.equal(cycleScene(), "orbit");
   assert.equal(cycleScene(), "aquarium");
+  assert.equal(cycleScene(), "neon-horizon");
+  assert.equal(cycleScene(), "fireworks");
   assert.equal(cycleScene(), "aurora-vortex");
   const selectedTick = getCurrentTick();
   assert.equal(selectScene("missing"), undefined);
@@ -101,7 +108,7 @@ test("random scene selection uses the full scene list", () => {
     Math.random = () => 0;
     assert.equal(selectRandomScene(), "aurora-vortex");
     Math.random = () => 0.999;
-    assert.equal(selectRandomScene(), "aquarium");
+    assert.equal(selectRandomScene(), "fireworks");
   } finally {
     Math.random = originalRandom;
   }
@@ -110,6 +117,7 @@ test("random scene selection uses the full scene list", () => {
 test("every option can be selected by name without a timer tick", () => {
   for (const scene of [
     auroraVortexScene, auroraBloomScene, tidePrismScene, orbitScene,
+    neonHorizonScene, fireworksScene,
   ]) {
     const before = getCurrentTick();
     assert.equal(selectScene(scene.name), scene.name);

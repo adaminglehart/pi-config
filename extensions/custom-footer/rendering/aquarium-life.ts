@@ -1,4 +1,4 @@
-export const AQUARIUM_ROWS = 3;
+export const AQUARIUM_ROWS = 4;
 
 const FISH = [
   ["><>", "}<>"],
@@ -42,8 +42,8 @@ export function aquariumCreatures(
   const creatures: AquariumCreature[] = [];
 
   for (let row = 0; row < AQUARIUM_ROWS; row++) {
-    const direction = row === 1 ? -1 : 1;
-    const speed = 1.9 + aquariumRandom(seed, row + 1) * 1.5 + (row === 1 ? 0.7 : 0);
+    const direction = row % 2 === 1 ? -1 : 1;
+    const speed = 1.9 + aquariumRandom(seed, row + 1) * 1.5 + (direction === -1 ? 0.7 : 0);
     const start = aquariumRandom(seed, row + 10) * track;
     for (let slot = 0; slot < slots; slot++) {
       const id = row * 1009 + slot * 17;
@@ -61,7 +61,7 @@ export function aquariumCreatures(
       const fin = Math.floor(seconds * (1.6 + aquariumRandom(seed, birth + 40))
         + aquariumRandom(seed, birth + 41) * 8) % 2;
       const species = Math.floor(aquariumRandom(seed, birth + 50) * FISH.length);
-      const crab = row === 2 && aquariumRandom(seed, birth + 51) > 0.8;
+      const crab = row === AQUARIUM_ROWS - 1 && aquariumRandom(seed, birth + 51) > 0.8;
       let sprite: string = crab ? CRAB[fin]! : FISH[species]![fin]!;
       if (direction === -1) {
         sprite = [...sprite].reverse().map((glyph) => MIRROR[glyph] ?? glyph).join("");

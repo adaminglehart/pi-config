@@ -1,6 +1,6 @@
-import { BrailleCanvas } from "./braille-canvas.js";
-import { spectralColor, type Palette } from "./spectral-color.js";
-import type { Scene } from "./types.js";
+import { BrailleCanvas } from "../rendering/braille-canvas.js";
+import { spectralColor, type Palette } from "../rendering/spectral-color.js";
+import type { Scene } from "../rendering/types.js";
 
 const PALETTE: Palette = [
   [66, 255, 186], [72, 222, 255], [124, 106, 255],
@@ -19,7 +19,7 @@ export function renderAuroraVortex(width: number, seconds: number): string[] {
     radius: span / 7 + 0.3 * Math.sin(t * 0.37 + i),
     spin: i % 2 === 0 ? 1 : -1,
     phase: i * 1.8,
-    color: spectralColor(PALETTE, i * 0.24 + t * 0.018),
+    hue: i * 0.24 + t * 0.018,
   }));
 
   for (let py = 0; py < canvas.dotHeight; py++) {
@@ -42,7 +42,13 @@ export function renderAuroraVortex(width: number, seconds: number): string[] {
         const eye = Math.min(1, r * r * 3);
         const surge = 0.8 + 0.2 * Math.sin(r * 3.4 - t * 1.1 + vortex.phase);
         const energy = (filament + undercurrent) * reach * eye * surge * edge * 1.15;
-        canvas.addDot(px, py, energy, vortex.color);
+        if (energy < 0.02) continue;
+        // Color shifts along each curl, from the eye outward and around it.
+        const color = spectralColor(PALETTE, vortex.hue + r * 0.05 + Math.sin(angle) * 0.04);
+        canvas.addDot(px, py, energy, color);
+        // A bright pulse travels outward along each filament.
+        const pulse = Math.pow(Math.max(0, Math.sin(r * 2.1 - t * 2.4 + vortex.phase)), 12);
+        if (pulse > 0.05) canvas.addDot(px, py, pulse * filament * reach * edge * 1.3, [255, 252, 240]);
       }
     }
   }

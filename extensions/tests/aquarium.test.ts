@@ -4,14 +4,14 @@ import assert from "node:assert/strict";
 import { afterEach, mock, spyOn, test } from "bun:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { aquariumScene, renderAquarium } from "../custom-footer/scenes/aquarium.js";
-import { aquariumCreatures, aquariumRandom, AQUARIUM_ROWS } from "../custom-footer/scenes/aquarium-life.js";
+import { aquariumCreatures, aquariumRandom, AQUARIUM_ROWS } from "../custom-footer/rendering/aquarium-life.js";
 
 const stripColor = (line: string): string => line.replace(/\x1b\[[0-9;]*m/g, "");
 
 afterEach(() => mock.restore());
 
-test("aquarium keeps its three-row size at every terminal width", () => {
-  assert.equal(aquariumScene.height, 3);
+test("aquarium keeps its four-row size at every terminal width", () => {
+  assert.equal(aquariumScene.height, 4);
   for (const width of [0, 1, 2, 20, 40, 80, 120, 240]) {
     for (const seed of [0, 42, 913]) {
       for (const time of [0, 0.08, 1, 30, 3600]) {

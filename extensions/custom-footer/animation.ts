@@ -3,7 +3,9 @@ import { auroraVortexScene } from "./scenes/aurora-vortex.js";
 import { auroraBloomScene } from "./scenes/aurora-bloom.js";
 import { tidePrismScene } from "./scenes/tide-prism.js";
 import { orbitScene } from "./scenes/orbit.js";
-import type { Scene } from "./scenes/types.js";
+import { neonHorizonScene } from "./scenes/neon-horizon.js";
+import { fireworksScene } from "./scenes/fireworks.js";
+import type { Scene } from "./rendering/types.js";
 
 /**
  * GLOBAL CONFIGURATION
@@ -36,7 +38,7 @@ export function getAgentState(): AgentState {
  */
 const scenes: Scene[] = [
   auroraVortexScene, auroraBloomScene, tidePrismScene,
-  orbitScene, aquariumScene,
+  orbitScene, aquariumScene, neonHorizonScene, fireworksScene,
 ];
 let currentSceneIdx = 0;
 
