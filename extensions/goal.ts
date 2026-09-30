@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { AgentEndEvent, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { formatCompactNumber } from "./_lib/format.js";
 
 const STATE_TYPE = "goal";
 const UI_MESSAGE_TYPE = "goal-ui";
@@ -157,19 +158,6 @@ function statusLabel(status: GoalStatus): string {
 	}
 }
 
-function formatTokensCompact(value: number): string {
-	const abs = Math.abs(value);
-	if (abs >= 1_000_000) {
-		const scaled = value / 1_000_000;
-		return `${Number.isInteger(scaled) ? scaled.toFixed(0) : scaled.toFixed(1)}M`;
-	}
-	if (abs >= 1_000) {
-		const scaled = value / 1_000;
-		return `${Number.isInteger(scaled) ? scaled.toFixed(0) : scaled.toFixed(1)}K`;
-	}
-	return String(value);
-}
-
 function formatElapsedSeconds(totalSeconds: number): string {
 	const seconds = Math.max(0, Math.floor(totalSeconds));
 	const days = Math.floor(seconds / 86_400);
@@ -239,10 +227,10 @@ function goalSummary(goal: Goal): string {
 		`Status: ${statusLabel(goal.status)}`,
 		`Objective: ${goal.objective}`,
 		`Time used: ${formatElapsedSeconds(goal.timeUsedSeconds)}`,
-		`Tokens used: ${formatTokensCompact(goal.tokensUsed)}`,
+		`Tokens used: ${formatCompactNumber(goal.tokensUsed)}`,
 	];
 	if (goal.tokenBudget !== undefined) {
-		lines.push(`Token budget: ${formatTokensCompact(goal.tokenBudget)}`);
+		lines.push(`Token budget: ${formatCompactNumber(goal.tokenBudget)}`);
 	}
 	const commandHint = (() => {
 		switch (goal.status) {
@@ -420,7 +408,7 @@ export default function goalExtension(pi: ExtensionAPI) {
 				const snapshot = currentGoalSnapshot() ?? goal;
 				const usage = snapshot.tokenBudget === undefined
 					? ` (${formatElapsedSeconds(snapshot.timeUsedSeconds)})`
-					: ` (${formatTokensCompact(snapshot.tokensUsed)} / ${formatTokensCompact(snapshot.tokenBudget)})`;
+					: ` (${formatCompactNumber(snapshot.tokensUsed)} / ${formatCompactNumber(snapshot.tokenBudget)})`;
 				ctx.ui.setStatus("goal", theme.fg("accent", `Pursuing goal${usage}`));
 				break;
 			}

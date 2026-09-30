@@ -29,6 +29,8 @@ import {
 	type OverlayHandle,
 	type TUI,
 } from "@earendil-works/pi-tui";
+import { messageText } from "./_lib/message-text.js";
+import { getModelAuth } from "./_lib/model-auth.js";
 
 const BTW_ENTRY_TYPE = "btw-thread-entry";
 const BTW_RESET_TYPE = "btw-thread-reset";
@@ -108,11 +110,7 @@ function createBtwResourceLoader(ctx: ExtensionContext, appendSystemPrompt: stri
 }
 
 function extractText(parts: AssistantMessage["content"]): string {
-	return parts
-		.filter((part) => part.type === "text")
-		.map((part) => part.text)
-		.join("\n")
-		.trim();
+	return messageText(parts).trim();
 }
 
 type SessionEventMessage = Extract<AgentSessionEvent, { type: "message_start" }>["message"];
@@ -760,15 +758,11 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	async function summarizeThread(ctx: ExtensionContext, items: BtwDetails[]): Promise<string> {
-		const model = ctx.model;
-		if (!model) {
-			throw new Error("No active model selected.");
-		}
-
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (auth.ok === false) {
+		const auth = await getModelAuth(ctx.modelRegistry, ctx.model);
+		if (!auth.ok) {
 			throw new Error(auth.error);
 		}
+		const { model } = auth;
 
 		const { session } = await createAgentSession({
 			sessionManager: SessionManager.inMemory(),
@@ -842,20 +836,13 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	async function runBtwPrompt(ctx: ExtensionCommandContext, question: string): Promise<void> {
-		const model = ctx.model;
-		if (!model) {
-			setOverlayStatus("No active model selected.");
-			notify(ctx, "No active model selected.", "error");
+		const auth = await getModelAuth(ctx.modelRegistry, ctx.model);
+		if (!auth.ok) {
+			setOverlayStatus(auth.error);
+			notify(ctx, auth.error, "error");
 			return;
 		}
-
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (auth.ok === false) {
-			const message = auth.error;
-			setOverlayStatus(message);
-			notify(ctx, message, "error");
-			return;
-		}
+		const { model } = auth;
 
 		if (sideBusy) {
 			notify(ctx, "BTW is still processing the previous message.", "warning");

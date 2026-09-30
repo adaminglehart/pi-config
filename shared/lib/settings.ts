@@ -5,10 +5,7 @@
  * with support for namespaced config (e.g., settings.honcho.baseUrl).
  *
  * Usage:
- *   import { readPiSettings, getNamespacedConfig } from "../_lib/settings.js";
- *
- *   // Read entire settings object
- *   const settings = readPiSettings();
+ *   import { getNamespacedConfig } from "../_lib/settings.js";
  *
  *   // Read namespaced config with defaults
  *   const config = getNamespacedConfig("honcho", {
@@ -18,10 +15,13 @@
  */
 
 import * as fs from "node:fs";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
 
-const DEFAULT_SETTINGS_PATH = path.join(
+// Do not import runtime values from the Pi SDK here. extensions/_lib is a
+// symlink to shared/lib in development, and Node cannot resolve the SDK
+// package from shared/lib when tests run.
+const GLOBAL_SETTINGS_PATH = path.join(
   os.homedir(),
   ".pi",
   "agent",
@@ -29,12 +29,10 @@ const DEFAULT_SETTINGS_PATH = path.join(
 );
 
 /**
- * Read the Pi settings file from the default location.
+ * Read a Pi settings file.
  * Returns an empty object if the file doesn't exist or can't be parsed.
  */
-export function readPiSettings(
-  settingsPath: string = DEFAULT_SETTINGS_PATH,
-): Record<string, unknown> {
+function readPiSettings(settingsPath: string): Record<string, unknown> {
   try {
     if (!fs.existsSync(settingsPath)) {
       return {};
@@ -75,7 +73,7 @@ export function readPiSettings(
 export function getNamespacedConfig<T extends Record<string, unknown>>(
   namespace: string,
   defaults: T,
-  settingsPath?: string,
+  settingsPath: string = GLOBAL_SETTINGS_PATH,
 ): T {
   const settings = readPiSettings(settingsPath);
   const namespaced = settings[namespace] as Record<string, unknown> | undefined;
@@ -112,24 +110,32 @@ export function getNamespacedConfig<T extends Record<string, unknown>>(
 }
 
 /**
- * Write namespaced configuration to Pi settings.
- * Creates the file and any parent directories if they don't exist.
+ * Merge keys into a namespace of the global Pi settings file.
+ * Keeps other keys in the namespace. Creates the file and any parent
+ * directories if they don't exist.
  *
- * @param namespace - The top-level key to write (e.g., "honcho")
- * @param config - The configuration object to write
+ * @param namespace - The top-level key to update (e.g., "lsp")
+ * @param config - The keys to write into the namespace
  * @returns true if successful, false otherwise
  */
 export function setNamespacedConfig(
   namespace: string,
   config: Record<string, unknown>,
-  settingsPath: string = DEFAULT_SETTINGS_PATH,
 ): boolean {
   try {
-    const settings = readPiSettings(settingsPath);
-    settings[namespace] = config;
+    const settings = readPiSettings(GLOBAL_SETTINGS_PATH);
+    const existing = settings[namespace];
+    settings[namespace] =
+      existing && typeof existing === "object" && !Array.isArray(existing)
+        ? { ...existing, ...config }
+        : config;
 
-    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+    fs.mkdirSync(path.dirname(GLOBAL_SETTINGS_PATH), { recursive: true });
+    fs.writeFileSync(
+      GLOBAL_SETTINGS_PATH,
+      JSON.stringify(settings, null, 2),
+      "utf-8",
+    );
     return true;
   } catch {
     return false;

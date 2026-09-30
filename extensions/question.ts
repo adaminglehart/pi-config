@@ -20,6 +20,8 @@ import {
 } from "@earendil-works/pi-tui";
 import { type Static, Type } from "typebox";
 import { requestDesktopNotification } from "./_lib/desktop-notification.js";
+import { messageText } from "./_lib/message-text.js";
+import { findModelAuth, getModelAuth, type ModelAuth } from "./_lib/model-auth.js";
 
 const QuestionKindSchema = StringEnum(["single", "multiple", "text"] as const);
 
@@ -98,14 +100,16 @@ Rules:
 async function selectExtractionModel(
   currentModel: Model<Api>,
   modelRegistry: ModelRegistry,
-): Promise<Model<Api>> {
-  const extractionModel = modelRegistry.find(EXTRACTION_PROVIDER, EXTRACTION_MODEL);
-  if (!extractionModel) {
-    return currentModel;
+): Promise<ModelAuth> {
+  const extraction = await findModelAuth(
+    modelRegistry,
+    EXTRACTION_PROVIDER,
+    EXTRACTION_MODEL,
+  );
+  if (extraction.ok && extraction.apiKey) {
+    return extraction;
   }
-
-  const apiKey = await modelRegistry.getApiKeyForProvider(extractionModel.provider);
-  return apiKey ? extractionModel : currentModel;
+  return getModelAuth(modelRegistry, currentModel);
 }
 
 function parseExtractionResult(text: string): QuestionParams | null {
@@ -941,14 +945,7 @@ export default function question(pi: ExtensionAPI) {
           return;
         }
 
-        const text = entry.message.content
-          .filter(
-            (content): content is { type: "text"; text: string } =>
-              content.type === "text",
-          )
-          .map((content) => content.text)
-          .join("\n")
-          .trim();
+        const text = messageText(entry.message.content).trim();
         if (text.length > 0) {
           lastAssistantText = text;
           break;
@@ -967,7 +964,12 @@ export default function question(pi: ExtensionAPI) {
 
       const assistantText = lastAssistantText;
       const modelRegistry = ctx.modelRegistry;
-      const extractionModel = await selectExtractionModel(ctx.model, modelRegistry);
+      const extractionAuth = await selectExtractionModel(ctx.model, modelRegistry);
+      if (!extractionAuth.ok) {
+        ctx.ui.notify(extractionAuth.error, "error");
+        return;
+      }
+      const { model: extractionModel, apiKey, headers } = extractionAuth;
       const extractionResult = await ctx.ui.custom<QuestionParams | null>(
         (tui, theme, _keybindings, done) => {
           const loader = new BorderedLoader(
@@ -978,9 +980,6 @@ export default function question(pi: ExtensionAPI) {
           loader.onAbort = () => done(null);
 
           const extract = async (): Promise<QuestionParams | null> => {
-            const apiKey = await modelRegistry.getApiKeyForProvider(
-              extractionModel.provider,
-            );
             const userMessage: UserMessage = {
               role: "user",
               content: [{ type: "text", text: assistantText }],
@@ -989,21 +988,14 @@ export default function question(pi: ExtensionAPI) {
             const response = await complete(
               extractionModel,
               { systemPrompt: EXTRACTION_SYSTEM_PROMPT, messages: [userMessage] },
-              { apiKey, signal: loader.signal },
+              { apiKey, headers, signal: loader.signal },
             );
 
             if (response.stopReason === "aborted") {
               return null;
             }
 
-            const responseText = response.content
-              .filter(
-                (content): content is { type: "text"; text: string } =>
-                  content.type === "text",
-              )
-              .map((content) => content.text)
-              .join("\n");
-            return parseExtractionResult(responseText);
+            return parseExtractionResult(messageText(response.content));
           };
 
           extract().then(done).catch(() => done(null));

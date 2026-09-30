@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { compact } from "@earendil-works/pi-coding-agent";
+import { findModelAuth } from "../_lib/model-auth.js";
 import { getNamespacedConfig } from "../_lib/settings.js";
 
 interface CompactionModelConfig {
@@ -28,24 +29,15 @@ export default function (pi: ExtensionAPI) {
     const compactionSettings = readCompactionSettings();
     const { provider, model: modelId } = compactionSettings;
 
-    const model = ctx.modelRegistry.find(provider, modelId);
-    if (!model) {
-      ctx.ui.notify(
-        `Could not find compaction model ${provider}/${modelId}, using default compaction`,
-        "warning",
-      );
-      return;
-    }
-
-    // Resolve request auth for the summarization model
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+    const auth = await findModelAuth(ctx.modelRegistry, provider, modelId);
     if (!auth.ok || !auth.apiKey) {
-      ctx.ui.notify(
-        `Compaction auth unavailable for ${model.id}, using default compaction`,
-        "warning",
-      );
+      const reason = auth.ok
+        ? `No API key for ${provider}/${modelId}.`
+        : auth.error;
+      ctx.ui.notify(`${reason} Using default compaction.`, "warning");
       return;
     }
+    const { model } = auth;
 
     ctx.ui.notify(
       `Custom compaction: using ${model.id} for summarization (${preparation.tokensBefore.toLocaleString()} tokens)...`,

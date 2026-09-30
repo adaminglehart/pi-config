@@ -22,6 +22,7 @@
 
 import {
 	DynamicBorder,
+	getAgentDir,
 	keyHint,
 	type ExtensionAPI,
 	type ExtensionContext,
@@ -43,6 +44,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { createReadStream, type Dirent } from "node:fs";
 import readline from "node:readline";
+import { formatCompactNumber, formatUsd } from "./_lib/format.js";
 
 type ModelKey = string; // `${provider}/${model}`
 type CwdKey = string; // normalized cwd path
@@ -229,7 +231,7 @@ interface BreakdownData {
 	};
 }
 
-const SESSION_ROOT = path.join(os.homedir(), ".pi", "agent", "sessions");
+const SESSION_ROOT = path.join(getAgentDir(), "sessions");
 const RANGE_DAYS = [7, 30, 90] as const;
 
 type MeasurementMode = "sessions" | "messages" | "tokens";
@@ -344,21 +346,6 @@ function dim(text: string): string {
 
 function bold(text: string): string {
 	return `\x1b[1m${text}\x1b[0m`;
-}
-
-function formatCount(n: number): string {
-	if (!Number.isFinite(n) || n === 0) return "0";
-	if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`;
-	return n.toLocaleString("en-US");
-}
-
-function formatUsd(cost: number): string {
-	if (!Number.isFinite(cost)) return "$0.00";
-	if (cost >= 1) return `$${cost.toFixed(2)}`;
-	if (cost >= 0.1) return `$${cost.toFixed(3)}`;
-	return `$${cost.toFixed(4)}`;
 }
 
 /**
@@ -1236,7 +1223,7 @@ function renderModelTable(range: RangeAgg, mode: MeasurementMode, maxRows = 8, g
 		const costPerSession = sess > 0 ? formatUsd(cost / sess) : "-";
 		const share = total > 0 ? `${Math.round((value / total) * 100)}%` : "0%";
 		lines.push(
-			`${padRight(r.key.slice(0, modelWidth), modelWidth)}  ${padLeft(formatCount(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
+			`${padRight(r.key.slice(0, modelWidth), modelWidth)}  ${padLeft(formatCompactNumber(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
 		);
 	}
 
@@ -1285,7 +1272,7 @@ function renderCwdTable(range: RangeAgg, mode: MeasurementMode, maxRows = 8): st
 		const costPerSession = sess > 0 ? formatUsd(cost / sess) : "-";
 		const share = total > 0 ? `${Math.round((value / total) * 100)}%` : "0%";
 		lines.push(
-			`${padRight(displayPaths[i].slice(0, cwdWidth), cwdWidth)}  ${padLeft(formatCount(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
+			`${padRight(displayPaths[i].slice(0, cwdWidth), cwdWidth)}  ${padLeft(formatCompactNumber(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
 		);
 	}
 
@@ -1342,7 +1329,7 @@ function renderDowDistributionLines(
 		const pct = padLeft(`${Math.round(share * 100)}%`, pctWidth);
 
 		let line = `${padRight(dow, dayWidth)} ${filledBar}${emptyBar} ${pct}`;
-		if (showValue) line += ` ${padLeft(formatCount(value), valueWidth)}`;
+		if (showValue) line += ` ${padLeft(formatCompactNumber(value), valueWidth)}`;
 		lines.push(line);
 	}
 
@@ -1366,7 +1353,7 @@ function renderDowTable(range: RangeAgg, mode: MeasurementMode): string[] {
 		const costPerSession = sess > 0 ? formatUsd(cost / sess) : "-";
 		const share = total > 0 ? `${Math.round((value / total) * 100)}%` : "0%";
 		lines.push(
-			`${padRight(dow, dowWidth)}  ${padLeft(formatCount(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
+			`${padRight(dow, dowWidth)}  ${padLeft(formatCompactNumber(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
 		);
 	}
 
@@ -1406,7 +1393,7 @@ function renderTodTable(range: RangeAgg, mode: MeasurementMode): string[] {
 		const costPerSession = sess > 0 ? formatUsd(cost / sess) : "-";
 		const share = total > 0 ? `${Math.round((value / total) * 100)}%` : "0%";
 		lines.push(
-			`${padRight(b.label, todWidth)}  ${padLeft(formatCount(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
+			`${padRight(b.label, todWidth)}  ${padLeft(formatCompactNumber(value), valueWidth)}  ${padLeft(formatUsd(cost), 10)}  ${padLeft(costPerSession, 8)}  ${padLeft(share, 6)}`,
 		);
 	}
 
@@ -1434,12 +1421,12 @@ function rangeSummary(range: RangeAgg, days: number, mode: MeasurementMode): str
 	const costPart = range.totalCost > 0 ? `${formatUsd(range.totalCost)} · avg ${formatUsd(avg)}/session` : `$0.0000`;
 
 	if (mode === "tokens") {
-		return `Last ${days} days: ${formatCount(range.sessions)} sessions · ${formatCount(range.totalTokens)} tokens · ${costPart}`;
+		return `Last ${days} days: ${formatCompactNumber(range.sessions)} sessions · ${formatCompactNumber(range.totalTokens)} tokens · ${costPart}`;
 	}
 	if (mode === "messages") {
-		return `Last ${days} days: ${formatCount(range.sessions)} sessions · ${formatCount(range.totalMessages)} messages · ${costPart}`;
+		return `Last ${days} days: ${formatCompactNumber(range.sessions)} sessions · ${formatCompactNumber(range.totalMessages)} messages · ${costPart}`;
 	}
-	return `Last ${days} days: ${formatCount(range.sessions)} sessions · ${costPart}`;
+	return `Last ${days} days: ${formatCompactNumber(range.sessions)} sessions · ${costPart}`;
 }
 
 async function computeBreakdown(
@@ -1800,10 +1787,10 @@ export default function sessionBreakdownExtension(pi: ExtensionAPI) {
 				const renderMessage = (): string => {
 					const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
 					if (progress.phase === "scan") {
-						return `${baseMessage}  scanning (${formatCount(progress.foundFiles)} files) · ${elapsed}s`;
+						return `${baseMessage}  scanning (${formatCompactNumber(progress.foundFiles)} files) · ${elapsed}s`;
 					}
 					if (progress.phase === "parse") {
-						return `${baseMessage}  parsing (${formatCount(progress.parsedFiles)}/${formatCount(progress.totalFiles)}) · ${elapsed}s`;
+						return `${baseMessage}  parsing (${formatCompactNumber(progress.parsedFiles)}/${formatCompactNumber(progress.totalFiles)}) · ${elapsed}s`;
 					}
 					return `${baseMessage}  finalizing · ${elapsed}s`;
 				};

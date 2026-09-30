@@ -9,7 +9,6 @@
  */
 import * as path from "node:path";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import { Type, type Static } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type {
@@ -31,6 +30,7 @@ import {
   type LSPManager,
 } from "./lsp-core.js";
 import { LSP_SERVERS, WARMUP_MAP } from "./lsp-servers.js";
+import { getNamespacedConfig, setNamespacedConfig } from "../_lib/settings.js";
 
 // -------------------------------------------------------------------
 // Constants
@@ -41,10 +41,6 @@ const DIAGNOSTICS_PREVIEW_LINES = 10;
 const LSP_IDLE_SHUTDOWN_MS = 2 * 60 * 1000;
 const SETTINGS_NAMESPACE = "lsp";
 const LSP_CONFIG_ENTRY = "lsp-hook-config";
-const DIM = "\x1b[2m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
-const RESET = "\x1b[0m";
 
 // -------------------------------------------------------------------
 // Types
@@ -272,8 +268,7 @@ export default function (pi: ExtensionAPI) {
   // -----------------------------------------------------------------
 
   const activeClients = new Set<string>();
-  let statusUpdateFn: ((key: string, text: string | undefined) => void) | null =
-    null;
+  let statusUi: ExtensionContext["ui"] | null = null;
   let hookMode: HookMode = "agent_end";
   let hookScope: HookScope = "global";
   let diagnosticsAbort: AbortController | null = null;
@@ -281,56 +276,20 @@ export default function (pi: ExtensionAPI) {
   let idleShutdownTimer: NodeJS.Timeout | null = null;
 
   const touchedFiles = new Map<string, boolean>();
-  const globalSettingsPath = path.join(
-    os.homedir(),
-    ".pi",
-    "agent",
-    "settings.json",
-  );
 
   // -----------------------------------------------------------------
   // Settings persistence
   // -----------------------------------------------------------------
 
-  function readSettingsFile(filePath: string): Record<string, unknown> {
-    try {
-      if (!fs.existsSync(filePath)) return {};
-      const raw = fs.readFileSync(filePath, "utf-8");
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
-
   function getGlobalHookMode(): HookMode | undefined {
-    const settings = readSettingsFile(globalSettingsPath);
-    const lspSettings = settings[SETTINGS_NAMESPACE] as
-      | Record<string, unknown>
-      | undefined;
-    return normalizeHookMode(lspSettings?.hookMode);
+    const { hookMode } = getNamespacedConfig(SETTINGS_NAMESPACE, {
+      hookMode: "",
+    });
+    return normalizeHookMode(hookMode);
   }
 
   function setGlobalHookMode(mode: HookMode): boolean {
-    try {
-      const settings = readSettingsFile(globalSettingsPath);
-      const existing = settings[SETTINGS_NAMESPACE];
-      settings[SETTINGS_NAMESPACE] =
-        existing && typeof existing === "object"
-          ? { ...(existing as Record<string, unknown>), hookMode: mode }
-          : { hookMode: mode };
-      fs.mkdirSync(path.dirname(globalSettingsPath), { recursive: true });
-      fs.writeFileSync(
-        globalSettingsPath,
-        JSON.stringify(settings, null, 2),
-        "utf-8",
-      );
-      return true;
-    } catch {
-      return false;
-    }
+    return setNamespacedConfig(SETTINGS_NAMESPACE, { hookMode: mode });
   }
 
   function restoreHookState(ctx: ExtensionContext): void {
@@ -359,22 +318,21 @@ export default function (pi: ExtensionAPI) {
   // -----------------------------------------------------------------
 
   function updateLspStatus(): void {
-    if (!statusUpdateFn) return;
+    if (!statusUi) return;
+    const { theme } = statusUi;
 
     const clients = activeClients.size > 0 ? [...activeClients].join(", ") : "";
-    const clientsText = clients ? `${DIM}(${clients})${RESET}` : "";
+    const clientsText = clients ? theme.fg("dim", `(${clients})`) : "";
 
     if (hookMode === "disabled") {
-      const text = clientsText
-        ? `${YELLOW}LSP${RESET} ${DIM}(tool)${RESET}: ${clientsText}`
-        : `${YELLOW}LSP${RESET} ${DIM}(tool)${RESET}`;
-      statusUpdateFn("lsp", text);
+      const text = `${theme.fg("warning", "LSP")} ${theme.fg("dim", "(tool)")}`;
+      statusUi.setStatus("lsp", clientsText ? `${text}: ${clientsText}` : text);
       return;
     }
 
-    let text = `${GREEN}LSP${RESET}`;
+    let text = theme.fg("success", "LSP");
     if (clientsText) text += ` ${clientsText}`;
-    statusUpdateFn("lsp", text);
+    statusUi.setStatus("lsp", text);
   }
 
   // -----------------------------------------------------------------
@@ -981,8 +939,7 @@ Use bash to find files: find src -name "*.ts" -type f`,
 
   pi.on("session_start", async (_event, ctx) => {
     restoreHookState(ctx);
-    statusUpdateFn =
-      ctx.hasUI && ctx.ui.setStatus ? ctx.ui.setStatus.bind(ctx.ui) : null;
+    statusUi = ctx.hasUI ? ctx.ui : null;
     updateLspStatus();
 
     if (hookMode === "disabled") return;
@@ -1018,7 +975,7 @@ Use bash to find files: find src -name "*.ts" -type f`,
     diagnosticsAbort = null;
     await shutdownManager();
     activeClients.clear();
-    statusUpdateFn?.("lsp", undefined);
+    statusUi?.setStatus("lsp", undefined);
   });
 
   pi.on("tool_call", async (event, ctx) => {

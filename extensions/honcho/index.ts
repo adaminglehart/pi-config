@@ -16,6 +16,7 @@ import {
   type Session,
 } from "@honcho-ai/sdk";
 import { isSubagent } from "../_lib/env.js";
+import { messageText } from "../_lib/message-text.js";
 import {
   HONCHO_DELETED_MARKER,
   HONCHO_SYNC_MARKER,
@@ -118,18 +119,8 @@ function latestPrompt(entries: SessionEntry[]): string | null {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
     if (entry.type !== "message" || entry.message.role !== "user") continue;
-    const content = entry.message.content;
-    const text =
-      typeof content === "string"
-        ? content
-        : content
-            .filter(
-              (part): part is { type: "text"; text: string } =>
-                part.type === "text" && typeof part.text === "string",
-            )
-            .map((part) => part.text)
-            .join("\n");
-    if (text.trim()) return text.trim();
+    const text = messageText(entry.message.content).trim();
+    if (text) return text;
   }
   return null;
 }

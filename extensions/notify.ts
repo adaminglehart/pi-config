@@ -7,6 +7,7 @@
  * Uses osascript - works through tmux, zellij, ssh, and any terminal setup.
  */
 
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { execFileSync } from "node:child_process";
@@ -15,6 +16,7 @@ import {
   type DesktopNotificationRequest,
 } from "./_lib/desktop-notification.js";
 import { isSubagent } from "./_lib/env.js";
+import { messageText } from "./_lib/message-text.js";
 
 /**
  * Check if the terminal app has focus by getting the frontmost process.
@@ -70,36 +72,13 @@ const notifyIfUnfocused = ({ title, body }: DesktopNotificationRequest): void =>
   }
 };
 
-const isTextPart = (part: unknown): part is { type: "text"; text: string } =>
-  Boolean(
-    part &&
-    typeof part === "object" &&
-    "type" in part &&
-    part.type === "text" &&
-    "text" in part,
-  );
-
-const extractLastAssistantText = (
-  messages: Array<{ role?: string; content?: unknown }>,
-): string | null => {
+const extractLastAssistantText = (messages: AgentMessage[]): string | null => {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
-    if (message?.role !== "assistant") {
+    if (message.role !== "assistant") {
       continue;
     }
-    const content = message.content;
-    if (typeof content === "string") {
-      return content.trim() || null;
-    }
-    if (Array.isArray(content)) {
-      const text = content
-        .filter(isTextPart)
-        .map((part) => part.text)
-        .join("\n")
-        .trim();
-      return text || null;
-    }
-    return null;
+    return messageText(message.content).trim() || null;
   }
   return null;
 };

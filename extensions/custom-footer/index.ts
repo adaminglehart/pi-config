@@ -34,6 +34,7 @@ import {
   getCurrentTick,
 } from "./animation.js";
 import { isSubagent } from "../_lib/env.js";
+import { formatCompactNumber, formatUsd } from "../_lib/format.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Color helpers
@@ -62,20 +63,8 @@ export const colors = {
 // Formatting helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-function formatCost(cost: number): string {
-  if (cost === 0) return "free";
-  if (cost < 0.01) return `${(cost * 100).toFixed(2)}¢`;
-  return `$${cost.toFixed(2)}`;
-}
-
-function formatTokens(n: number): string {
-  if (n < 1000) return n.toString();
-  if (n < 1000000) {
-    if (n < 10000) return `${(n / 1000).toFixed(1)}k`;
-    return `${Math.round(n / 1000)}k`;
-  }
-  if (n < 10000000) return `${(n / 1000000).toFixed(1)}M`;
-  return `${Math.round(n / 1000000)}M`;
+function formatPrice(cost: number): string {
+  return cost === 0 ? "free" : formatUsd(cost);
 }
 
 function getThinkingEmoji(level: string): string {
@@ -160,8 +149,8 @@ function renderModelSegment(ctx: FooterContext): string {
 function renderPricingSegment(ctx: FooterContext): string {
   if (!ctx.model) return "";
   const { cost } = ctx.model;
-  const inPrice = formatCost(cost.input);
-  const outPrice = formatCost(cost.output);
+  const inPrice = formatPrice(cost.input);
+  const outPrice = formatPrice(cost.output);
   const inColor = ansi.fg(colors.input);
   const outColor = ansi.fg(colors.output);
   const sepColor = ansi.fg(colors.sep);
@@ -206,7 +195,7 @@ function renderContextSegment(ctx: FooterContext): string {
     ctx.contextPercent !== null
       ? `${Math.round(ctx.contextPercent * 10) / 10}%`
       : `${dimColor}?${ansi.reset}${inColor}`;
-  display += `/${formatTokens(ctx.contextWindow)}`;
+  display += `/${formatCompactNumber(ctx.contextWindow)}`;
   return `${textColor}ctx:${ansi.reset} ${inColor}${display}${ansi.reset}`;
 }
 

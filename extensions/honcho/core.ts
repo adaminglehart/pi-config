@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { basename } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import { messageText } from "../_lib/message-text.js";
 import { getNamespacedConfig } from "../_lib/settings.js";
 
 export const HONCHO_SYNC_MARKER = "honcho-sync";
@@ -239,18 +240,7 @@ function extractText(message: AgentMessage): string | null {
     return null;
   }
 
-  const content = message.content;
-  const text =
-    typeof content === "string"
-      ? content
-      : content
-          .filter(
-            (part): part is { type: "text"; text: string } =>
-              part.type === "text" && typeof part.text === "string",
-          )
-          .map((part) => part.text)
-          .join("\n");
-  const trimmed = text.trim();
+  const trimmed = messageText(message.content).trim();
   return trimmed || null;
 }
 

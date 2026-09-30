@@ -1,7 +1,7 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
+import { formatUsd } from "../_lib/format.js";
 
 interface CostEntry {
   cost: number;
@@ -57,10 +57,6 @@ function getCutoffDate(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatCost(n: number): string {
-  return `$${n.toFixed(2)}`;
-}
-
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("cost", {
     description: "Show API cost summary (default: 7 days). Usage: /cost [days]",
@@ -72,7 +68,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const cutoff = getCutoffDate(days);
-      const sessionsDir = path.join(os.homedir(), ".pi", "agent", "sessions");
+      const sessionsDir = path.join(getAgentDir(), "sessions");
       const tmpDir = process.env.TMPDIR ?? "/tmp";
 
       // Collect main sessions
@@ -142,10 +138,10 @@ export default function (pi: ExtensionAPI) {
       // Build output
       const lines: string[] = [];
       lines.push(
-        `💰 Total: ${formatCost(total)}  (${totalSessions} sessions, last ${days} days)`,
+        `💰 Total: ${formatUsd(total)}  (${totalSessions} sessions, last ${days} days)`,
       );
       lines.push(
-        `   Main: ${formatCost(mainCost)} (${mainSessions})  ·  Subagents: ${formatCost(subagentCost)} (${subagentSessions})`,
+        `   Main: ${formatUsd(mainCost)} (${mainSessions})  ·  Subagents: ${formatUsd(subagentCost)} (${subagentSessions})`,
       );
       lines.push("");
 
@@ -157,7 +153,7 @@ export default function (pi: ExtensionAPI) {
           const bar = "█".repeat(
             Math.max(1, Math.round((byDate[d] / total) * 30)),
           );
-          lines.push(`   ${d}  ${formatCost(byDate[d]).padStart(8)}  ${bar}`);
+          lines.push(`   ${d}  ${formatUsd(byDate[d]).padStart(8)}  ${bar}`);
         }
         lines.push("");
       }
@@ -169,7 +165,7 @@ export default function (pi: ExtensionAPI) {
       if (projects.length > 0) {
         lines.push("📁 By project:");
         for (const [name, cost] of projects) {
-          lines.push(`   ${name.padEnd(30)} ${formatCost(cost).padStart(8)}`);
+          lines.push(`   ${name.padEnd(30)} ${formatUsd(cost).padStart(8)}`);
         }
         lines.push("");
       }
@@ -179,7 +175,7 @@ export default function (pi: ExtensionAPI) {
       if (models.length > 0) {
         lines.push("🤖 By model:");
         for (const [name, cost] of models) {
-          lines.push(`   ${name.padEnd(30)} ${formatCost(cost).padStart(8)}`);
+          lines.push(`   ${name.padEnd(30)} ${formatUsd(cost).padStart(8)}`);
         }
       }
 

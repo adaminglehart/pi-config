@@ -4,6 +4,8 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { messageText } from "./_lib/message-text.js";
+import { findModelAuth } from "./_lib/model-auth.js";
 import { getNamespacedConfig } from "./_lib/settings.js";
 
 const SYSTEM_PROMPT = `Create a concise title for a coding-agent session from the user's first message.
@@ -72,14 +74,9 @@ async function generateSessionTitle(
   signal: AbortSignal,
 ): Promise<string> {
   const { provider, model: modelId } = readSessionTitleSettings();
-  const model = ctx.modelRegistry.find(provider, modelId);
-  if (!model) {
-    throw new Error(`model ${provider}/${modelId} is unavailable`);
-  }
-
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+  const auth = await findModelAuth(ctx.modelRegistry, provider, modelId);
   if (!auth.ok) {
-    throw new Error(`authentication for ${provider}/${modelId} failed`);
+    throw new Error(auth.error);
   }
 
   const context = {
@@ -99,17 +96,12 @@ async function generateSessionTitle(
     signal,
   };
 
-  const response = await completeSimple(model, context, options);
+  const response = await completeSimple(auth.model, context, options);
   if (response.stopReason === "error") {
     throw new Error(response.errorMessage || "title model request failed");
   }
 
-  const title = sanitizeGeneratedTitle(
-    response.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join(" "),
-  );
+  const title = sanitizeGeneratedTitle(messageText(response.content));
   if (!title) {
     throw new Error("model returned an empty title");
   }
