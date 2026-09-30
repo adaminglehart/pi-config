@@ -1,18 +1,16 @@
 import assert from "node:assert/strict";
-import { mock, test } from "node:test";
+import { mock, test } from "bun:test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, visibleWidth, type TUI } from "@earendil-works/pi-tui";
 // Overlay tests do not start an agent or load server dependencies.
 const unused = () => { throw new Error("Agent API must not run in overlay tests"); };
-mock.module("@earendil-works/pi-coding-agent", {
-	namedExports: {
-		buildSessionContext: unused,
-		createAgentSession: unused,
-		createExtensionRuntime: unused,
-		getMarkdownTheme: unused,
-		SessionManager: unused,
-	},
-});
+mock.module("@earendil-works/pi-coding-agent", () => ({
+	buildSessionContext: unused,
+	createAgentSession: unused,
+	createExtensionRuntime: unused,
+	getMarkdownTheme: unused,
+	SessionManager: unused,
+}));
 const { BtwOverlay } = await import("../btw");
 
 function fixture(count = 100) {

@@ -38,9 +38,9 @@ offline and do not change reviewed skill content.
 
 ## Configuration merge order
 
-Generated `settings.json`, `models.json`, and `mcp-adapter.json` merge later
-layers over earlier ones (`mcp-adapter.json` comes from the `mcp.*` config
-files):
+Generated `settings.json`, `models.json`, and `mcp.json` merge later
+layers over earlier ones (`mcp.json` comes from the `mcp.*` config files
+and is read by Pi's built-in MCP support):
 
 1. **Base** — `config/<name>.base.json(.c)`
 2. **Environment** — `config/<env>/<name>.json(.c)`

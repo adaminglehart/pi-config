@@ -1,26 +1,26 @@
 import assert from "node:assert/strict";
 import * as childProcess from "node:child_process";
-import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
-import { mock, test } from "node:test";
+import { type ExecFileSyncOptions } from "node:child_process";
+import { mock, spyOn, test } from "bun:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const calls: Array<{ file: string; args: string[]; options: ExecFileSyncOptions }> = [];
+// Captured before the module mock so the failure path can spawn a real child.
+const realExecFileSync = childProcess.execFileSync;
 let frontmostApp = "Safari";
 let failAt = 0;
-mock.module("node:child_process", {
-  namedExports: {
-    ...childProcess,
-    execFileSync(file: string, args: string[], options: ExecFileSyncOptions) {
-      calls.push({ file, args, options });
-      if (calls.length === failAt) {
-        // A real child failure must not write to the parent terminal.
-        return execFileSync(process.execPath, ["-e", 'process.stderr.write("notification failure"); process.exit(1)'], options);
-      }
-      return frontmostApp;
-    },
+mock.module("node:child_process", () => ({
+  ...childProcess,
+  execFileSync(file: string, args: string[], options: ExecFileSyncOptions) {
+    calls.push({ file, args, options });
+    if (calls.length === failAt) {
+      // A real child failure must not write to the parent terminal.
+      return realExecFileSync(process.execPath, ["-e", 'process.stderr.write("notification failure"); process.exit(1)'], options);
+    }
+    return frontmostApp;
   },
-});
-mock.module("../_lib/env.js", { namedExports: { isSubagent: () => false } });
+}));
+mock.module("../_lib/env.js", () => ({ isSubagent: () => false }));
 const { default: notifyExtension } = await import("../notify.ts");
 
 function setup() {
@@ -73,20 +73,18 @@ for (const failedCall of [1, 2]) {
   test(`failure in call ${failedCall} is silent and does not escape`, () => {
     const send = setup();
     failAt = failedCall;
-    const stderr = mock.method(process.stderr, "write", () => true);
+    const stderr = spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
       assert.doesNotThrow(() => send("π", "Done"));
       assert.equal(calls.length, failedCall);
-      assert.equal(stderr.mock.callCount(), 0);
+      assert.equal(stderr.mock.calls.length, 0);
     } finally {
-      stderr.mock.restore();
+      stderr.mockRestore();
     }
   });
 }
 
-test("macOS preserves special characters through the AppleScript argument handler", {
-  skip: process.platform !== "darwin",
-}, () => {
+test.skipIf(process.platform !== "darwin")("macOS preserves special characters through the AppleScript argument handler", () => {
   const send = setup();
   send("π's title", "Path: \\q \"quote\" 'apostrophe' $(echo unsafe)\nend\\");
   const { args } = calls[1]!;
@@ -95,7 +93,7 @@ test("macOS preserves special characters through the AppleScript argument handle
     "display notification (item 2 of argv) with title (item 1 of argv)",
     'return (item 1 of argv) & linefeed & (item 2 of argv)',
   );
-  const result = execFileSync("osascript", ["-e", script, ...args.slice(2)], {
+  const result = realExecFileSync("osascript", ["-e", script, ...args.slice(2)], {
     encoding: "utf8", stdio: "pipe", timeout: 1000,
   });
   assert.equal(result, `${args[3]}\n${args[4]}\n`);

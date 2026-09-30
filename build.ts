@@ -443,10 +443,10 @@ async function buildPrimaryAgent(): Promise<void> {
   );
   console.log("  generated settings.json");
 
-  // pi-mcp-adapter 3.x reads mcp-adapter.json; Pi's built-in MCP owns mcp.json.
+  // Pi's built-in MCP reads mcp.json.
   const generatedConfigs = [
     { configName: "models", outputName: "models.json" },
-    { configName: "mcp", outputName: "mcp-adapter.json" },
+    { configName: "mcp", outputName: "mcp.json" },
   ];
   for (const { configName, outputName } of generatedConfigs) {
     const basePath = findJsonFile(join(CONFIG_DIR, `${configName}.base`));

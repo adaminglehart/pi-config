@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { test } from "node:test";
-import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { ToolExecutionComponent } from "../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/components/tool-execution.js";
 import { initTheme, theme } from "../node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js";
@@ -13,6 +13,16 @@ import unifiedEditExtension from "../unified-edit.ts";
 initTheme("dark", false);
 let tool: ToolDefinition;
 unifiedEditExtension({ registerTool(definition) { tool = definition as ToolDefinition; } } as ExtensionAPI);
+
+function toolContext(cwd: string): ExtensionToolContext {
+	return {
+		cwd,
+		tools: [],
+		executeTool: async () => {
+			throw new Error("executeTool is not available in tests");
+		},
+	} as unknown as ExtensionToolContext;
+}
 
 function createRow(cwd: string, text = "") {
 	let redraws = 0;
@@ -77,7 +87,7 @@ for (const [mode, script] of [
 			const { row } = createRow(cwd, script);
 			row.setArgsComplete();
 			row.markExecutionStarted();
-			const result = await tool.execute("test-edit", { text: script }, undefined, undefined, { cwd } as ExtensionContext);
+			const result = await tool.execute("test-edit", { text: script }, undefined, undefined, toolContext(cwd));
 			row.updateResult({ ...result, isError: false });
 			assert.equal(await readFile(join(cwd, "sample.txt"), "utf8"), "after\n");
 			assert.equal(plain(row).match(/after/g)?.length, 1);

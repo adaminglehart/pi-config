@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { crc32, deflateSync } from "node:zlib";
-import { createBashTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { registeredTools } from "./test-support.js";
+import { createBashTool, createFindTool, createGrepTool, createLsTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
+import { registeredTools, toolContext } from "./test-support.js";
 import type { DisplayResult } from "./row.js";
 
 const tools = registeredTools();
@@ -18,7 +18,7 @@ function tool(name: string) {
 // Real factories and a different cwd for each test. No network or fixture commands from user data.
 test("all six execution results match the current Pi factories", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "tool-view-parity-"));
-  const ctx = { cwd } as ExtensionContext;
+  const ctx = toolContext(cwd);
   try {
     await writeFile(join(cwd, "fixture.txt"), "first\n  match 界\nlast\n");
     assert.deepEqual(await tool("read").execute("read", { path: "fixture.txt", offset: 2, limit: 1 }, undefined, undefined, ctx), await createReadTool(cwd).execute("read", { path: "fixture.txt", offset: 2, limit: 1 }));
@@ -35,7 +35,7 @@ test("all six execution results match the current Pi factories", async () => {
 
 test("read retains truncation details and image blocks from the factory", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "tool-view-read-"));
-  const ctx = { cwd } as ExtensionContext;
+  const ctx = toolContext(cwd);
   try {
     await writeFile(join(cwd, "large.txt"), "line\n".repeat(2200));
     const large = await tool("read").execute("read", { path: "large.txt" }, undefined, undefined, ctx);
@@ -69,7 +69,7 @@ test("Bash forwards real streaming updates and returns the same final output", a
   const cwd = tmpdir();
   const updates: DisplayResult[] = [];
   const args = { command: "printf 'first\\n'; sleep 0.15; printf 'second\\n'", timeout: 5 };
-  const result = await tool("bash").execute("stream", args, undefined, update => { updates.push(update); }, { cwd } as ExtensionContext);
+  const result = await tool("bash").execute("stream", args, undefined, update => { updates.push(update); }, toolContext(cwd));
   assert.deepEqual(result, await createBashTool(cwd).execute("stream", args));
   assert.ok(updates.some(update => update.content.some(block => block.type === "text" && block.text.includes("first"))));
   assert.equal(result.content.filter(block => block.type === "text").map(block => block.text).join(""), "first\nsecond\n");
@@ -77,8 +77,11 @@ test("Bash forwards real streaming updates and returns the same final output", a
 
 test("errors, timeout, and cancellation stay errors", async () => {
   const cwd = tmpdir();
-  const ctx = { cwd } as ExtensionContext;
-  await assert.rejects(tool("bash").execute("failure", { command: "printf 'diagnostic\\n'; exit 7" }, undefined, undefined, ctx), /diagnostic[\s\S]*Command exited with code 7/);
+  const ctx = toolContext(cwd);
+  // SDK 0.99 delivers a non-zero exit as an isError result, not a rejection.
+  const failed = await tool("bash").execute("failure", { command: "printf 'diagnostic\\n'; exit 7" }, undefined, undefined, ctx);
+  assert.equal(failed.isError, true);
+  assert.match(failed.content.map(block => block.type === "text" ? block.text : "").join(""), /diagnostic[\s\S]*Command exited with code 7/);
   await assert.rejects(tool("bash").execute("timeout", { command: "sleep 3", timeout: 0.05 }, undefined, undefined, ctx), /Command timed out/);
   const controller = new AbortController();
   const running = tool("bash").execute("cancel", { command: "printf 'ready\\n'; sleep 3" }, controller.signal, update => {
