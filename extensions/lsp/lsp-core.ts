@@ -33,6 +33,13 @@ import {
   DocumentSymbolRequest,
   RenameRequest,
   CodeActionRequest,
+  ImplementationRequest,
+  TypeDefinitionRequest,
+  CallHierarchyPrepareRequest,
+  CallHierarchyIncomingCallsRequest,
+  CallHierarchyOutgoingCallsRequest,
+  WorkspaceSymbolRequest,
+  DidChangeWatchedFilesNotification,
 } from "vscode-languageserver-protocol/node";
 import {
   type Diagnostic,
@@ -40,15 +47,31 @@ import {
   type LocationLink,
   type DocumentSymbol,
   type SymbolInformation,
+  type WorkspaceSymbol,
   type Hover,
   type SignatureHelp,
   type WorkspaceEdit,
   type CodeAction,
   type Command,
+  type CallHierarchyItem,
+  type CallHierarchyIncomingCall,
+  type CallHierarchyOutgoingCall,
+  type FileEvent,
+  type ProgressToken,
+  type WorkDoneProgressBegin,
+  type WorkDoneProgressReport,
+  type WorkDoneProgressEnd,
   DiagnosticSeverity,
   CodeActionKind,
   DocumentDiagnosticReportKind,
+  FileChangeType,
 } from "vscode-languageserver-protocol";
+import { LSP_CLIENT_CAPABILITIES } from "./lsp-client-capabilities.js";
+import {
+  LspRequestTimeoutError,
+  sendRequestWithTimeout,
+} from "./lsp-request-timeout.js";
+import { findWordPosition } from "./lsp-word-position.js";
 
 // -------------------------------------------------------------------
 // Configuration
@@ -58,6 +81,24 @@ const INIT_TIMEOUT_MS = 30_000;
 const MAX_OPEN_FILES = 30;
 const IDLE_FILE_TIMEOUT_MS = 60_000;
 const CLEANUP_INTERVAL_MS = 30_000;
+/**
+ * The first diagnostics wait of a client. A cold server loads the project
+ * before it publishes (typescript-language-server: about 18 s for a
+ * 4000-file project).
+ */
+const COLD_DIAGNOSTICS_WAIT_MS = 30_000;
+/** Upper limit when the wait is extended because `$/progress` shows work. */
+const MAX_BUSY_DIAGNOSTICS_WAIT_MS = 60_000;
+const NEW_FILE_EMPTY_SETTLE_MS = 2500;
+/**
+ * typescript-language-server answers navigation from a syntax-only server
+ * while the project loads, which gives single-file results. Navigation waits
+ * until the project is loaded: a publish was received, no progress is active,
+ * and the file has diagnostics (or it has been open for NEW_FILE_READY_WAIT_MS).
+ */
+const PROJECT_READY_MAX_WAIT_MS = 30_000;
+const NEW_FILE_READY_WAIT_MS = 1500;
+const PROJECT_READY_POLL_MS = 50;
 
 // -------------------------------------------------------------------
 // Language ID mapping
@@ -106,6 +147,9 @@ export interface LSPServerHandle {
 interface OpenFile {
   version: number;
   lastAccess: number;
+  openedAt: number;
+  /** True after the server published diagnostics for this file. */
+  diagnosticsReceived: boolean;
 }
 
 interface LSPClient {
@@ -117,6 +161,10 @@ interface LSPClient {
   capabilities?: ServerCapabilities<unknown>;
   root: string;
   closed: boolean;
+  /** Work-done progress tokens that have begun and not ended. */
+  busyProgressTokens: Set<ProgressToken>;
+  /** True after the first publish or after the first (cold) wait ends. */
+  diagnosticsReady: boolean;
 }
 
 export interface FileDiagnosticItem {
@@ -127,6 +175,27 @@ export interface FileDiagnosticItem {
 }
 
 export type SeverityFilter = "all" | "error" | "warning" | "info" | "hint";
+
+export type LocationRequestKind =
+  | "definition"
+  | "references"
+  | "implementation"
+  | "typeDefinition";
+
+interface WorkDoneProgressNotificationParams {
+  token: ProgressToken;
+  value?: WorkDoneProgressBegin | WorkDoneProgressReport | WorkDoneProgressEnd;
+}
+
+export interface IncomingCallsResult {
+  items: CallHierarchyItem[];
+  calls: CallHierarchyIncomingCall[];
+}
+
+export interface OutgoingCallsResult {
+  items: CallHierarchyItem[];
+  calls: CallHierarchyOutgoingCall[];
+}
 
 // -------------------------------------------------------------------
 // Utilities
@@ -198,6 +267,16 @@ function timeout<T>(promise: Promise<T>, ms: number, name: string): Promise<T> {
       (e) => { clearTimeout(timer); reject(e); },
     );
   });
+}
+
+/** Returns the fallback on server errors, but lets request timeouts through. */
+async function requestOrFallback<T>(request: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await request;
+  } catch (error) {
+    if (error instanceof LspRequestTimeoutError) throw error;
+    return fallback;
+  }
 }
 
 // -------------------------------------------------------------------
@@ -315,6 +394,11 @@ export class LSPManager {
     }
   }
 
+  /** Reads a file path that is relative to the manager cwd or absolute. */
+  readFileText(fp: string): string | null {
+    return this.readFile(this.resolve(fp));
+  }
+
   private toPos(line: number, col: number) {
     return {
       line: Math.max(0, line - 1),
@@ -355,6 +439,8 @@ export class LSPManager {
         listeners: new Map(),
         root,
         closed: false,
+        busyProgressTokens: new Set(),
+        diagnosticsReady: false,
       };
 
       // Handle published diagnostics
@@ -364,6 +450,9 @@ export class LSPManager {
           const fpRaw = decodeURIComponent(new URL(params.uri).pathname);
           const fp = normalizeFsPath(fpRaw);
           client.diagnostics.set(fp, params.diagnostics);
+          client.diagnosticsReady = true;
+          const openFile = client.openFiles.get(fp);
+          if (openFile) openFile.diagnosticsReceived = true;
 
           const notify = (target: string) => {
             const cbs = client.listeners.get(target);
@@ -386,6 +475,16 @@ export class LSPManager {
         handle.initOptions ?? {},
       ]);
       conn.onRequest("window/workDoneProgress/create", () => null);
+      conn.onNotification(
+        "$/progress",
+        (params: WorkDoneProgressNotificationParams) => {
+          if (params.value?.kind === "begin") {
+            client.busyProgressTokens.add(params.token);
+          } else if (params.value?.kind === "end") {
+            client.busyProgressTokens.delete(params.token);
+          }
+        },
+      );
       conn.onRequest("client/registerCapability", () => {});
       conn.onRequest("client/unregisterCapability", () => {});
       conn.onRequest("workspace/workspaceFolders", () => [
@@ -413,23 +512,7 @@ export class LSPManager {
             { name: "workspace", uri: pathToFileURL(root).href },
           ],
           initializationOptions: handle.initOptions ?? {},
-          capabilities: {
-            window: { workDoneProgress: true },
-            workspace: { configuration: true },
-            textDocument: {
-              synchronization: {
-                didSave: true,
-                didOpen: true,
-                didChange: true,
-                didClose: true,
-              },
-              publishDiagnostics: { versionSupport: true },
-              diagnostic: {
-                dynamicRegistration: false,
-                relatedDocumentSupport: false,
-              },
-            },
-          },
+          capabilities: LSP_CLIENT_CAPABILITIES,
         }),
         INIT_TIMEOUT_MS,
         `${config.id} initialize`,
@@ -511,7 +594,7 @@ export class LSPManager {
       try {
         if (state) {
           const v = state.version + 1;
-          client.openFiles.set(absPath, { version: v, lastAccess: now });
+          client.openFiles.set(absPath, { ...state, version: v, lastAccess: now });
           client.connection
             .sendNotification(DidChangeTextDocumentNotification.method, {
               textDocument: { uri, version: v },
@@ -519,7 +602,12 @@ export class LSPManager {
             })
             .catch(() => {});
         } else {
-          client.openFiles.set(absPath, { version: 1, lastAccess: now });
+          client.openFiles.set(absPath, {
+            version: 1,
+            lastAccess: now,
+            openedAt: now,
+            diagnosticsReceived: false,
+          });
           client.connection
             .sendNotification(DidOpenTextDocumentNotification.method, {
               textDocument: { uri, languageId: langId, version: 0, text: content },
@@ -563,6 +651,38 @@ export class LSPManager {
   }
 
   // -----------------------------------------------------------------
+  // Project readiness for navigation
+  // -----------------------------------------------------------------
+
+  private isProjectReady(client: LSPClient, absPath: string): boolean {
+    if (client.closed) return true;
+    if (!client.diagnosticsReady || client.busyProgressTokens.size > 0) {
+      return false;
+    }
+    const open = client.openFiles.get(absPath);
+    return (
+      !open ||
+      open.diagnosticsReceived ||
+      Date.now() - open.openedAt >= NEW_FILE_READY_WAIT_MS
+    );
+  }
+
+  private async waitForProject(
+    clients: LSPClient[],
+    absPath: string,
+  ): Promise<void> {
+    const deadline = Date.now() + PROJECT_READY_MAX_WAIT_MS;
+    while (!clients.every((c) => this.isProjectReady(c, absPath))) {
+      if (Date.now() >= deadline) {
+        // Do not wait again for a server that never publishes.
+        for (const c of clients) c.diagnosticsReady = true;
+        return;
+      }
+      await new Promise((r) => setTimeout(r, PROJECT_READY_POLL_MS));
+    }
+  }
+
+  // -----------------------------------------------------------------
   // Diagnostics waiting
   // -----------------------------------------------------------------
 
@@ -575,6 +695,8 @@ export class LSPManager {
     return new Promise((resolve) => {
       if (client.closed) return resolve(false);
 
+      const startedAt = Date.now();
+      const coldWait = !client.diagnosticsReady;
       let resolved = false;
       let settleTimer: NodeJS.Timeout | null = null;
 
@@ -584,6 +706,7 @@ export class LSPManager {
         if (settleTimer) clearTimeout(settleTimer);
         clearTimeout(timer);
         cleanupListener();
+        if (coldWait) client.diagnosticsReady = true;
         resolve(value);
       };
 
@@ -602,19 +725,41 @@ export class LSPManager {
         // For new documents debounce empty diagnostics
         if (!isNew) return finish(true);
         if (settleTimer) clearTimeout(settleTimer);
-        settleTimer = setTimeout(() => finish(true), 2500);
+        settleTimer = setTimeout(() => finish(true), NEW_FILE_EMPTY_SETTLE_MS);
         (settleTimer as NodeJS.Timeout).unref?.();
       };
 
-      const timer = setTimeout(() => finish(false), timeoutMs);
-      (timer as NodeJS.Timeout).unref?.();
+      // When the wait ends, a received publish counts as a response. While the
+      // server reports work-done progress (project load), extend the wait.
+      const onTimeout = () => {
+        if (settleTimer) return finish(true);
+        const elapsed = Date.now() - startedAt;
+        if (
+          !client.closed &&
+          client.busyProgressTokens.size > 0 &&
+          elapsed < MAX_BUSY_DIAGNOSTICS_WAIT_MS
+        ) {
+          timer = setTimeout(
+            onTimeout,
+            Math.min(timeoutMs, MAX_BUSY_DIAGNOSTICS_WAIT_MS - elapsed),
+          );
+          timer.unref?.();
+          return;
+        }
+        finish(false);
+      };
+
+      let timer = setTimeout(
+        onTimeout,
+        coldWait ? Math.max(timeoutMs, COLD_DIAGNOSTICS_WAIT_MS) : timeoutMs,
+      );
+      timer.unref?.();
 
       const listeners = client.listeners.get(absPath) ?? [];
       listeners.push(listener);
       client.listeners.set(absPath, listeners);
     });
   }
-
   private async pullDiagnostics(
     client: LSPClient,
     absPath: string,
@@ -891,7 +1036,51 @@ export class LSPManager {
     return result as DocumentSymbol[];
   }
 
-  async getDefinition(
+  private async requestLocations(
+    client: LSPClient,
+    kind: LocationRequestKind,
+    uri: string,
+    position: { line: number; character: number },
+  ): Promise<Location[]> {
+    const textDocument = { uri };
+    switch (kind) {
+      case "definition":
+        return this.normalizeLocs(
+          await sendRequestWithTimeout(client.connection, DefinitionRequest.type, {
+            textDocument,
+            position,
+          }),
+        );
+      case "references":
+        return this.normalizeLocs(
+          await sendRequestWithTimeout(client.connection, ReferencesRequest.type, {
+            textDocument,
+            position,
+            context: { includeDeclaration: true },
+          }),
+        );
+      case "implementation":
+        return this.normalizeLocs(
+          await sendRequestWithTimeout(
+            client.connection,
+            ImplementationRequest.type,
+            { textDocument, position },
+          ),
+        );
+      case "typeDefinition":
+        return this.normalizeLocs(
+          await sendRequestWithTimeout(
+            client.connection,
+            TypeDefinitionRequest.type,
+            { textDocument, position },
+          ),
+        );
+    }
+  }
+
+  /** Definition, references, implementation, or type definition locations. */
+  async getLocations(
+    kind: LocationRequestKind,
     fp: string,
     line: number,
     col: number,
@@ -899,51 +1088,195 @@ export class LSPManager {
     const l = await this.loadFile(fp);
     if (!l) return [];
     await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
+    await this.waitForProject(l.clients, l.absPath);
     const pos = this.toPos(line, col);
     const results = await Promise.all(
-      l.clients.map(async (c) => {
-        if (c.closed) return [];
-        try {
-          return this.normalizeLocs(
-            await c.connection.sendRequest(DefinitionRequest.method, {
-              textDocument: { uri: l.uri },
-              position: pos,
-            }),
-          );
-        } catch {
-          return [];
-        }
-      }),
+      l.clients.map((c) =>
+        c.closed
+          ? []
+          : requestOrFallback(this.requestLocations(c, kind, l.uri, pos), []),
+      ),
     );
     return results.flat();
   }
 
-  async getReferences(
+  private async prepareCallHierarchy(
     fp: string,
     line: number,
     col: number,
-  ): Promise<Location[]> {
+  ): Promise<Array<{ client: LSPClient; item: CallHierarchyItem }>> {
     const l = await this.loadFile(fp);
     if (!l) return [];
     await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
-    const pos = this.toPos(line, col);
-    const results = await Promise.all(
-      l.clients.map(async (c) => {
-        if (c.closed) return [];
-        try {
-          return this.normalizeLocs(
-            await c.connection.sendRequest(ReferencesRequest.method, {
-              textDocument: { uri: l.uri },
-              position: pos,
-              context: { includeDeclaration: true },
-            }),
-          );
-        } catch {
-          return [];
-        }
+    await this.waitForProject(l.clients, l.absPath);
+    const position = this.toPos(line, col);
+    const prepared = await Promise.all(
+      l.clients.map(async (client) => {
+        if (client.closed) return [];
+        const items = await requestOrFallback(
+          sendRequestWithTimeout(
+            client.connection,
+            CallHierarchyPrepareRequest.type,
+            { textDocument: { uri: l.uri }, position },
+          ),
+          null,
+        );
+        return (items ?? []).map((item) => ({ client, item }));
       }),
     );
-    return results.flat();
+    return prepared.flat();
+  }
+
+  async getIncomingCalls(
+    fp: string,
+    line: number,
+    col: number,
+  ): Promise<IncomingCallsResult> {
+    const prepared = await this.prepareCallHierarchy(fp, line, col);
+    const calls = await Promise.all(
+      prepared.map(({ client, item }) =>
+        requestOrFallback(
+          sendRequestWithTimeout(
+            client.connection,
+            CallHierarchyIncomingCallsRequest.type,
+            { item },
+          ),
+          null,
+        ),
+      ),
+    );
+    return {
+      items: prepared.map((p) => p.item),
+      calls: calls.flatMap((c) => c ?? []),
+    };
+  }
+
+  async getOutgoingCalls(
+    fp: string,
+    line: number,
+    col: number,
+  ): Promise<OutgoingCallsResult> {
+    const prepared = await this.prepareCallHierarchy(fp, line, col);
+    const calls = await Promise.all(
+      prepared.map(({ client, item }) =>
+        requestOrFallback(
+          sendRequestWithTimeout(
+            client.connection,
+            CallHierarchyOutgoingCallsRequest.type,
+            { item },
+          ),
+          null,
+        ),
+      ),
+    );
+    return {
+      items: prepared.map((p) => p.item),
+      calls: calls.flatMap((c) => c ?? []),
+    };
+  }
+
+  /**
+   * Project-wide symbol search. `projectFile` is opened first, because some
+   * servers (tsserver navto) search only projects that have an open file.
+   */
+  async getWorkspaceSymbols(
+    projectFile: string,
+    query: string,
+  ): Promise<Array<SymbolInformation | WorkspaceSymbol>> {
+    const l = await this.loadFile(projectFile);
+    if (!l) return [];
+    await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
+    await this.waitForProject(l.clients, l.absPath);
+    const results = await Promise.all(
+      l.clients.map((c) =>
+        c.closed
+          ? null
+          : requestOrFallback(
+              sendRequestWithTimeout(c.connection, WorkspaceSymbolRequest.type, {
+                query,
+              }),
+              null,
+            ),
+      ),
+    );
+    return results.flatMap(
+      (r): Array<SymbolInformation | WorkspaceSymbol> => r ?? [],
+    );
+  }
+
+  /** Refresh every open document before a workspace-wide rename request.
+   * Return disk snapshots so the edit can reject changes made during the request.
+   */
+  async refreshOpenFilesFromDisk(): Promise<Map<string, string>> {
+    const paths = new Set<string>();
+    for (const client of this.clients.values()) {
+      for (const filePath of client.openFiles.keys()) paths.add(filePath);
+    }
+    const snapshots = new Map<string, string>();
+    for (const filePath of paths) {
+      const text = this.readFile(filePath);
+      if (text === null) {
+        for (const client of this.clients.values()) this.closeFile(client, filePath);
+        continue;
+      }
+      snapshots.set(filePath, text);
+    }
+    await this.syncFilesFromDisk([...paths]);
+    return snapshots;
+  }
+
+  /** Open all rename targets with current disk text before the final request. */
+  async openAndSnapshotFiles(filePaths: string[]): Promise<Map<string, string>> {
+    if (filePaths.length > 200) {
+      throw new Error("Rename affects more than 200 files. No files were changed.");
+    }
+    const snapshots = new Map<string, string>();
+    for (const filePath of filePaths) {
+      const loaded = await this.loadFile(filePath);
+      if (!loaded) throw new Error(`Cannot open rename target: ${filePath}. No files were changed.`);
+      await this.openOrUpdate(
+        loaded.clients,
+        loaded.absPath,
+        loaded.uri,
+        loaded.langId,
+        loaded.content,
+        false,
+      );
+      snapshots.set(loaded.absPath, loaded.content);
+    }
+    return snapshots;
+  }
+
+  /**
+   * After files change on disk (for example after rename), sends the new text
+   * for open documents and a watched-file change for every file.
+   */
+  async syncFilesFromDisk(filePaths: string[]): Promise<void> {
+    const absPaths = filePaths.map((fp) => this.resolve(fp));
+    const changes: FileEvent[] = absPaths.map((absPath) => ({
+      uri: pathToFileURL(absPath).href,
+      type: FileChangeType.Changed,
+    }));
+    for (const client of this.clients.values()) {
+      if (client.closed) continue;
+      client.connection
+        .sendNotification(DidChangeWatchedFilesNotification.type, { changes })
+        .catch(() => {});
+    }
+    for (const absPath of absPaths) {
+      const clients = [...this.clients.values()].filter(
+        (c) => !c.closed && c.openFiles.has(absPath),
+      );
+      const content = clients.length ? this.readFile(absPath) : null;
+      if (content === null) continue;
+      await this.openOrUpdate(
+        clients,
+        absPath,
+        pathToFileURL(absPath).href,
+        this.langId(absPath),
+        content,
+      );
+    }
   }
 
   async getHover(
@@ -954,18 +1287,18 @@ export class LSPManager {
     const l = await this.loadFile(fp);
     if (!l) return null;
     await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
+    await this.waitForProject(l.clients, l.absPath);
     const pos = this.toPos(line, col);
     for (const c of l.clients) {
       if (c.closed) continue;
-      try {
-        const r = (await c.connection.sendRequest(HoverRequest.method, {
+      const r = await requestOrFallback(
+        sendRequestWithTimeout(c.connection, HoverRequest.type, {
           textDocument: { uri: l.uri },
           position: pos,
-        })) as Hover | null;
-        if (r) return r;
-      } catch {
-        // ignore
-      }
+        }),
+        null,
+      );
+      if (r) return r;
     }
     return null;
   }
@@ -978,18 +1311,18 @@ export class LSPManager {
     const l = await this.loadFile(fp);
     if (!l) return null;
     await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
+    await this.waitForProject(l.clients, l.absPath);
     const pos = this.toPos(line, col);
     for (const c of l.clients) {
       if (c.closed) continue;
-      try {
-        const r = (await c.connection.sendRequest(SignatureHelpRequest.method, {
+      const r = await requestOrFallback(
+        sendRequestWithTimeout(c.connection, SignatureHelpRequest.type, {
           textDocument: { uri: l.uri },
           position: pos,
-        })) as SignatureHelp | null;
-        if (r) return r;
-      } catch {
-        // ignore
-      }
+        }),
+        null,
+      );
+      if (r) return r;
     }
     return null;
   }
@@ -1001,15 +1334,14 @@ export class LSPManager {
     const results = await Promise.all(
       l.clients.map(async (c) => {
         if (c.closed) return [];
-        try {
-          return this.normalizeSymbols(
-            await c.connection.sendRequest(DocumentSymbolRequest.method, {
+        return this.normalizeSymbols(
+          await requestOrFallback(
+            sendRequestWithTimeout(c.connection, DocumentSymbolRequest.type, {
               textDocument: { uri: l.uri },
             }),
-          );
-        } catch {
-          return [];
-        }
+            null,
+          ),
+        );
       }),
     );
     return results.flat();
@@ -1024,19 +1356,19 @@ export class LSPManager {
     const l = await this.loadFile(fp);
     if (!l) return null;
     await this.openOrUpdate(l.clients, l.absPath, l.uri, l.langId, l.content);
+    await this.waitForProject(l.clients, l.absPath);
     const pos = this.toPos(line, col);
     for (const c of l.clients) {
       if (c.closed) continue;
-      try {
-        const r = await c.connection.sendRequest(RenameRequest.method, {
+      const r = await requestOrFallback(
+        sendRequestWithTimeout(c.connection, RenameRequest.type, {
           textDocument: { uri: l.uri },
           position: pos,
           newName,
-        });
-        if (r) return r;
-      } catch {
-        // ignore
-      }
+        }),
+        null,
+      );
+      if (r) return r;
     }
     return null;
   }
@@ -1067,8 +1399,8 @@ export class LSPManager {
     const results = await Promise.all(
       l.clients.map(async (c) => {
         if (c.closed) return [];
-        try {
-          const r = await c.connection.sendRequest(CodeActionRequest.method, {
+        const r = await requestOrFallback(
+          sendRequestWithTimeout(c.connection, CodeActionRequest.type, {
             textDocument: { uri: l.uri },
             range,
             context: {
@@ -1079,11 +1411,10 @@ export class LSPManager {
                 CodeActionKind.Source,
               ],
             },
-          }) as (CodeAction | Command)[] | null;
-          return r ?? [];
-        } catch {
-          return [];
-        }
+          }),
+          null,
+        );
+        return r ?? [];
       }),
     );
     return results.flat();
@@ -1176,21 +1507,28 @@ export function uriToPath(uri: string): string {
 // Symbol utilities
 // -------------------------------------------------------------------
 
+/** Exact case-sensitive matches for safe rename, plus navigation matches. */
 export function findSymbolPosition(
   symbols: DocumentSymbol[],
   query: string,
-): { line: number; character: number } | null {
+): {
+  caseExact: Array<{ line: number; character: number }>;
+  exact: { line: number; character: number } | null;
+  partial: { line: number; character: number } | null;
+} {
   const q = query.toLowerCase();
+  const caseExact: Array<{ line: number; character: number }> = [];
   let exact: { line: number; character: number } | null = null;
   let partial: { line: number; character: number } | null = null;
 
   const visit = (items: DocumentSymbol[]) => {
     for (const sym of items) {
-      const name = String(sym?.name ?? "").toLowerCase();
+      const name = String(sym?.name ?? "");
       const pos = sym?.selectionRange?.start ?? sym?.range?.start;
       if (pos && typeof pos.line === "number" && typeof pos.character === "number") {
-        if (!exact && name === q) exact = pos;
-        if (!partial && name.includes(q)) partial = pos;
+        if (name === query) caseExact.push(pos);
+        if (!exact && name.toLowerCase() === q) exact = pos;
+        if (!partial && name.toLowerCase().includes(q)) partial = pos;
       }
       if ((sym as DocumentSymbol & { children?: DocumentSymbol[] })?.children?.length) {
         visit((sym as DocumentSymbol & { children: DocumentSymbol[] }).children);
@@ -1198,17 +1536,32 @@ export function findSymbolPosition(
     }
   };
   visit(symbols);
-  return exact ?? partial;
+  return { caseExact, exact, partial };
 }
 
+/**
+ * Order: exact document symbol, first whole-word text occurrence in the file,
+ * then partial document symbol match.
+ */
 export async function resolvePosition(
   manager: LSPManager,
   file: string,
   query: string,
+  exactOnly = false,
 ): Promise<{ line: number; column: number } | null> {
   const symbols = await manager.getDocumentSymbols(file);
-  const pos = findSymbolPosition(symbols, query);
-  return pos ? { line: pos.line + 1, column: pos.character + 1 } : null;
+  const { caseExact, exact, partial } = findSymbolPosition(symbols, query);
+  if (exactOnly && caseExact.length > 1) {
+    throw new Error(`More than one symbol is named "${query}". Pass line and column for rename.`);
+  }
+  const match = exactOnly ? caseExact[0] : exact;
+  if (match) return { line: match.line + 1, column: match.character + 1 };
+  const text = manager.readFileText(file);
+  const word = text === null ? null : findWordPosition(text, query);
+  if (word) return word;
+  return !exactOnly && partial
+    ? { line: partial.line + 1, column: partial.character + 1 }
+    : null;
 }
 
 export function collectSymbols(

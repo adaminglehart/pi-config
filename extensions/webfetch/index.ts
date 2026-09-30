@@ -2,6 +2,7 @@
  * WebFetch Tool - Fetch and convert web content
  *
  * Fetches content from URLs and converts to requested format (markdown, text, or html).
+ * HTML main content is extracted with Defuddle. Images are returned as image content.
  * Handles timeouts, size limits, and content type detection.
  */
 
@@ -25,6 +26,11 @@ import { Text, type TUI, type Component } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { tmpdir } from "os";
 import { join } from "path";
+import {
+  extractHtmlContent,
+  type HtmlExtractionMethod,
+} from "./html-extraction.js";
+import { safeImageContent } from "./image-content.js";
 
 // Size limits (matching opencode's implementation)
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -54,130 +60,10 @@ interface WebFetchDetails {
   truncated?: boolean;
   fullOutputPath?: string;
   isImage?: boolean;
+  imageUnsupported?: boolean;
   imageMime?: string;
-}
-
-// Simple HTML to text extraction
-function extractTextFromHTML(html: string): string {
-  // Remove script and style tags and their content
-  let text = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, "")
-    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, "")
-    .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, "");
-
-  // Replace common block elements with newlines
-  text = text
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<\/h[1-6]>/gi, "\n\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<li>/gi, "\n- ");
-
-  // Remove remaining HTML tags
-  text = text.replace(/<[^>]+>/g, "");
-
-  // Decode common HTML entities
-  text = text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&hellip;/g, "…")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–");
-
-  // Clean up whitespace
-  return text.replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// Simple HTML to Markdown conversion
-function convertHTMLToMarkdown(html: string): string {
-  // First extract text
-  let text = html;
-
-  // Convert headers
-  text = text.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
-  text = text.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
-  text = text.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");
-  text = text.replace(/<h4[^>]*>(.*?)<\/h4>/gi, "#### $1\n\n");
-  text = text.replace(/<h5[^>]*>(.*?)<\/h5>/gi, "##### $1\n\n");
-  text = text.replace(/<h6[^>]*>(.*?)<\/h6>/gi, "###### $1\n\n");
-
-  // Convert bold and italic
-  text = text.replace(/<(strong|b)[^>]*>(.*?)<\/(strong|b)>/gi, "**$2**");
-  text = text.replace(/<(em|i)[^>]*>(.*?)<\/(em|i)>/gi, "*$2*");
-
-  // Convert code
-  text = text.replace(/<code[^>]*>(.*?)<\/code>/gi, "`$1`");
-  text = text.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, "```\n$1\n```\n\n");
-
-  // Convert links
-  text = text.replace(/<a[^>]+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, "[$2]($1)");
-
-  // Convert images
-  text = text.replace(
-    /<img[^>]+src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi,
-    "![$2]($1)",
-  );
-  text = text.replace(/<img[^>]+src="([^"]*)"[^>]*\/?>/gi, "![]($1)");
-
-  // Convert lists
-  text = text.replace(/<ul[^>]*>[\s\S]*?<\/ul>/gi, (match) => {
-    return match.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
-  });
-  text = text.replace(/<ol[^>]*>[\s\S]*?<\/ol>/gi, (match) => {
-    let index = 1;
-    return match.replace(/<li[^>]*>(.*?)<\/li>/gi, () => `${index++}. $1\n`);
-  });
-
-  // Convert blockquotes
-  text = text.replace(
-    /<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi,
-    (match, content) => {
-      return content
-        .split("\n")
-        .map((line: string) => `> ${line}`)
-        .join("\n");
-    },
-  );
-
-  // Convert horizontal rules
-  text = text.replace(/<hr\s*\/?>/gi, "\n---\n\n");
-
-  // Convert paragraphs
-  text = text.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n");
-
-  // Convert line breaks
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-
-  // Remove script and style tags and their content
-  text = text
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, "");
-
-  // Remove remaining HTML tags
-  text = text.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
-  text = text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&hellip;/g, "…")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–");
-
-  // Clean up whitespace
-  return text.replace(/\n{3,}/g, "\n\n").trim();
+  extraction?: HtmlExtractionMethod;
+  extractionFallbackReason?: string;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -192,8 +78,8 @@ Parameters:
 - timeout: Optional timeout in seconds (max 120, default 30)
 
 Features:
-- Automatically converts HTML to markdown or plain text
-- Handles images (returns as base64 data URI in markdown format)
+- Extracts the main content of HTML pages with Defuddle: "markdown" adds the page title and source URL at the top, "text" returns plain text, "html" returns the raw HTML
+- Returns images as image attachments
 - Respects robots.txt and uses proper User-Agent
 - Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} if too large
 
@@ -324,15 +210,24 @@ Use this tool when you need to retrieve and analyze web content.`,
           mime !== "image/vnd.fastbidsheet";
 
         if (isImage) {
-          const base64Content = Buffer.from(arrayBuffer).toString("base64");
-          const dataUrl = `data:${mime};base64,${base64Content}`;
+          const image = await safeImageContent(new Uint8Array(arrayBuffer));
+          if (!image) {
+            return {
+              content: [{
+                type: "text",
+                text: `Fetched image from ${url}, but it could not be sent to the model. Only valid PNG, JPEG, GIF and WebP images within the size and dimension limits are supported.`,
+              }],
+              details: { url, format, contentType: mime, size: arrayBuffer.byteLength, imageUnsupported: true },
+            };
+          }
 
           return {
             content: [
               {
                 type: "text",
-                text: `Image fetched successfully from ${url}\n\n![Image](${dataUrl})`,
+                text: `Image fetched successfully from ${url} [${image.mimeType}, ${formatSize(arrayBuffer.byteLength)}]`,
               },
+              { type: "image", data: image.data, mimeType: image.mimeType },
             ],
             details: {
               url,
@@ -340,37 +235,30 @@ Use this tool when you need to retrieve and analyze web content.`,
               contentType: mime,
               size: arrayBuffer.byteLength,
               isImage: true,
-              imageMime: mime,
+              imageMime: image.mimeType,
             } as WebFetchDetails,
           };
         }
 
         const content = new TextDecoder().decode(arrayBuffer);
+        const isHtml = contentType.includes("text/html");
 
         // Process content based on requested format
         let processedContent: string;
+        let extraction: HtmlExtractionMethod | undefined;
+        let extractionFallbackReason: string | undefined;
 
-        switch (format) {
-          case "markdown":
-            if (contentType.includes("text/html")) {
-              processedContent = convertHTMLToMarkdown(content);
-            } else {
-              processedContent = content;
-            }
-            break;
-
-          case "text":
-            if (contentType.includes("text/html")) {
-              processedContent = extractTextFromHTML(content);
-            } else {
-              processedContent = content;
-            }
-            break;
-
-          case "html":
-          default:
-            processedContent = content;
-            break;
+        if (isHtml && (format === "markdown" || format === "text")) {
+          const extracted = await extractHtmlContent(
+            content,
+            response.url || url,
+            format,
+          );
+          processedContent = extracted.content;
+          extraction = extracted.method;
+          extractionFallbackReason = extracted.fallbackReason;
+        } else {
+          processedContent = content;
         }
 
         // Apply truncation using pi's built-in utilities
@@ -384,6 +272,8 @@ Use this tool when you need to retrieve and analyze web content.`,
           format,
           contentType: mime,
           size: arrayBuffer.byteLength,
+          extraction,
+          extractionFallbackReason,
         };
 
         let resultText = truncation.content;
@@ -441,7 +331,9 @@ Use this tool when you need to retrieve and analyze web content.`,
       // Build result display
       let text = "";
 
-      if (details?.isImage) {
+      if (details?.imageUnsupported) {
+        text = theme.fg("warning", "Image could not be sent to the model");
+      } else if (details?.isImage) {
         text = theme.fg(
           "success",
           `✓ Image fetched (${formatSize(details.size)})`,
@@ -454,6 +346,9 @@ Use this tool when you need to retrieve and analyze web content.`,
         if (details?.truncated) {
           text += theme.fg("warning", " (truncated)");
         }
+        if (details?.extraction === "tag-strip") {
+          text += theme.fg("warning", " (fallback extraction)");
+        }
       }
 
       // In expanded view, show more details
@@ -462,6 +357,9 @@ Use this tool when you need to retrieve and analyze web content.`,
         text += `\n${theme.fg("dim", `Format: ${details.format}`)}`;
         if (details.contentType) {
           text += `\n${theme.fg("dim", `Content-Type: ${details.contentType}`)}`;
+        }
+        if (details.extractionFallbackReason) {
+          text += `\n${theme.fg("dim", `Extraction: tag-strip (${details.extractionFallbackReason})`)}`;
         }
         if (details.fullOutputPath) {
           text += `\n${theme.fg("dim", `Full output: ${details.fullOutputPath}`)}`;

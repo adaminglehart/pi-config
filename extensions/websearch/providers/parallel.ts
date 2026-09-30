@@ -3,15 +3,29 @@
  * Uses the parallel-web SDK for AI-native web search
  */
 
-import Parallel from "parallel-web";
+import Parallel, { APIConnectionError, APIError } from "parallel-web";
 import {
   DEFAULT_NUM_RESULTS,
   PARALLEL_TIMEOUT_MS,
   type SearchResult,
 } from "../types.js";
 
+/**
+ * Parallel cannot serve the request now (no credit, rate limit, server or
+ * connection failure, or timeout). Another provider can try the search.
+ */
+export class ParallelUnavailableError extends Error {
+  constructor(reason: string) {
+    super(`Parallel search unavailable: ${reason.replace(/\.+$/, "")}`);
+    this.name = "ParallelUnavailableError";
+  }
+}
+
+function isUnavailableStatus(status: number | undefined): boolean {
+  return status === 402 || status === 429 || (status !== undefined && status >= 500);
+}
+
 // Initialize Parallel client (API key from PARALLEL_API_KEY env var)
-// const client = new Parallel();
 let _client: Parallel | undefined;
 const getClient = () => {
   if (!_client) {
@@ -74,8 +88,15 @@ export async function searchParallel(
     return { content, resultCount: results.length, latencyMs };
   } catch (error) {
     clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Parallel search request timed out");
+    if (signal?.aborted) throw error;
+    if (abortController.signal.aborted) {
+      throw new ParallelUnavailableError("request timed out");
+    }
+    if (error instanceof APIConnectionError) {
+      throw new ParallelUnavailableError(error.message);
+    }
+    if (error instanceof APIError && isUnavailableStatus(error.status)) {
+      throw new ParallelUnavailableError(`HTTP ${error.status}`);
     }
     throw error;
   }

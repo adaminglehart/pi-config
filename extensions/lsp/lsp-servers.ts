@@ -43,7 +43,13 @@ const typescript: LSPServerConfig = {
     if (findNearestFile(path.dirname(file), ["deno.json", "deno.jsonc"], cwd)) {
       return undefined;
     }
-    return findRoot(file, cwd, ["package.json", "tsconfig.json", "jsconfig.json"]);
+    // tsserver searches for tsconfig.json only up to the workspace root. A
+    // nested package.json without its own tsconfig.json must not become the
+    // root, or the file gets an inferred single-file project.
+    return (
+      findRoot(file, cwd, ["tsconfig.json", "jsconfig.json"]) ??
+      findRoot(file, cwd, ["package.json"])
+    );
   },
   spawn: async (root) => {
     // Prefer local installation
@@ -75,7 +81,11 @@ const gopls: LSPServerConfig = {
     // Prefer go.work for multi-module workspaces
     return findRoot(file, cwd, ["go.work"]) ?? findRoot(file, cwd, ["go.mod"]);
   },
-  spawn: simpleSpawn("gopls", []),
+  spawn: async (root) => {
+    const handle = await simpleSpawn("gopls", [])(root);
+    // workspace/symbol: search workspace packages, not all dependencies.
+    return handle && { ...handle, initOptions: { symbolScope: "workspace" } };
+  },
 };
 
 // -------------------------------------------------------------------

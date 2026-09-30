@@ -1,0 +1,9 @@
+{
+  "name": "webfetch",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "defuddle": "^0.19.4",
+    "linkedom": "^0.18.13"
+  }
+}

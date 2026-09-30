@@ -2,7 +2,8 @@
  * LSP Extension for pi-coding-agent
  *
  * Provides:
- * - `lsp` tool for definitions, references, hover, symbols, diagnostics, rename, code actions
+ * - `lsp` tool for workspace symbols, definitions, references, implementations,
+ *   call hierarchy, hover, symbols, diagnostics, rename, code actions
  * - Auto-diagnostics hook after file edits (configurable mode)
  * - `/lsp` command for settings
  * - Status bar integration
@@ -23,13 +24,19 @@ import {
   formatDiagnostic,
   diagnosticMessageText,
   filterDiagnosticsBySeverity,
-  uriToPath,
   resolvePosition,
   collectSymbols,
   type SeverityFilter,
   type LSPManager,
 } from "./lsp-core.js";
 import { LSP_SERVERS, WARMUP_MAP } from "./lsp-servers.js";
+import { editHeaderPaths, editedPathsFromDetails } from "./lsp-edit-paths.js";
+import {
+  runCallsAction,
+  runLocationAction,
+  runRenameAction,
+  runWorkspaceSymbolsAction,
+} from "./lsp-navigation-actions.js";
 import { getNamespacedConfig, setNamespacedConfig } from "../_lib/settings.js";
 
 // -------------------------------------------------------------------
@@ -65,8 +72,13 @@ const MODE_LABELS: Record<HookMode, string> = {
 // -------------------------------------------------------------------
 
 const ACTIONS = [
+  "workspace-symbols",
   "definition",
+  "type-definition",
+  "implementation",
   "references",
+  "incoming-calls",
+  "outgoing-calls",
   "hover",
   "symbols",
   "diagnostics",
@@ -76,12 +88,30 @@ const ACTIONS = [
   "codeAction",
 ] as const;
 
+type LspAction = (typeof ACTIONS)[number];
+
+const POSITION_ACTIONS: ReadonlySet<LspAction> = new Set([
+  "definition",
+  "type-definition",
+  "implementation",
+  "references",
+  "incoming-calls",
+  "outgoing-calls",
+  "hover",
+  "signature",
+  "rename",
+  "codeAction",
+]);
+
 const SEVERITY_FILTERS = ["all", "error", "warning", "info", "hint"] as const;
 
 const LspParams = Type.Object({
   action: StringEnum(ACTIONS),
   file: Type.Optional(
-    Type.String({ description: "File path (required for most actions)" }),
+    Type.String({
+      description:
+        "File path. Required for all actions except workspace-diagnostics and workspace-symbols (for workspace-symbols it selects the project).",
+    }),
   ),
   files: Type.Optional(
     Type.Array(Type.String(), {
@@ -113,7 +143,7 @@ const LspParams = Type.Object({
   query: Type.Optional(
     Type.String({
       description:
-        "Symbol name filter (for symbols) or to resolve position (for definition/references/hover/signature)",
+        "Symbol name to search (workspace-symbols, symbols), or identifier name that sets the position in file for position actions",
     }),
   ),
   newName: Type.Optional(
@@ -147,19 +177,6 @@ function normalizeHookMode(value: unknown): HookMode | undefined {
   return undefined;
 }
 
-function formatLocation(
-  loc: { uri: string; range?: { start?: { line: number; character: number } } },
-  cwd?: string,
-): string {
-  const abs = uriToPath(loc.uri);
-  const display = cwd && path.isAbsolute(abs) ? path.relative(cwd, abs) : abs;
-  const start = loc.range?.start;
-  return start &&
-    typeof start.line === "number" &&
-    typeof start.character === "number"
-    ? `${display}:${start.line + 1}:${start.character + 1}`
-    : display;
-}
 
 function formatHover(contents: unknown): string {
   if (typeof contents === "string") return contents;
@@ -187,42 +204,6 @@ function formatSignature(help: SignatureHelp | null): string {
   return text;
 }
 
-function formatWorkspaceEdit(edit: WorkspaceEdit, cwd?: string): string {
-  const lines: string[] = [];
-
-  if (edit.documentChanges?.length) {
-    for (const change of edit.documentChanges) {
-      if ("textDocument" in change && change.textDocument?.uri) {
-        const fp = uriToPath(change.textDocument.uri);
-        const display =
-          cwd && path.isAbsolute(fp) ? path.relative(cwd, fp) : fp;
-        lines.push(`${display}:`);
-        for (const e of change.edits ?? []) {
-          const loc = `${e.range.start.line + 1}:${e.range.start.character + 1}`;
-          const text =
-            "snippet" in e
-              ? (e.snippet as { value: string }).value
-              : e.newText;
-          lines.push(`  [${loc}] → "${text}"`);
-        }
-      }
-    }
-  }
-
-  if (edit.changes) {
-    for (const [uri, edits] of Object.entries(edit.changes)) {
-      const fp = uriToPath(uri);
-      const display = cwd && path.isAbsolute(fp) ? path.relative(cwd, fp) : fp;
-      lines.push(`${display}:`);
-      for (const e of edits) {
-        const loc = `${e.range.start.line + 1}:${e.range.start.character + 1}`;
-        lines.push(`  [${loc}] → "${e.newText}"`);
-      }
-    }
-  }
-
-  return lines.length ? lines.join("\n") : "No edits.";
-}
 
 function formatCodeActions(actions: (CodeAction | Command)[]): string[] {
   return actions.map((a, i) => {
@@ -253,7 +234,6 @@ function messageContentToText(content: unknown): string {
 
 import type {
   SignatureHelp,
-  WorkspaceEdit,
   CodeAction,
   Command,
 } from "vscode-languageserver-protocol";
@@ -504,16 +484,20 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "lsp",
     label: "LSP",
-    description: `Query language server for definitions, references, types, symbols, diagnostics, rename, and code actions.
+    description: `Semantic code navigation through a language server (TypeScript/JavaScript, Go, Python, Rust, Vue, Svelte, Kotlin, Swift).
 
-Actions: definition, references, hover, signature, rename (require file + line/column or query), symbols (file, optional query), diagnostics (file), workspace-diagnostics (files array), codeAction (file + position).
-Use bash to find files: find src -name "*.ts" -type f`,
+Actions:
+- workspace-symbols: find symbols by query across the project. file is optional and selects the project.
+- definition, type-definition, implementation, references, incoming-calls (callers), outgoing-calls (callees), hover, signature: file + line/column, or file + query (identifier name).
+- rename: file + position or query + newName. Writes the edits to disk.
+- symbols (file, optional query), diagnostics (file), workspace-diagnostics (files), codeAction (file + position).`,
     promptSnippet:
-      "Query language server for definitions, references, types, symbols, diagnostics, rename, and code actions",
+      "Semantic code navigation: find symbol definitions across the project, references, callers, callees, implementations, types, diagnostics, and rename",
     promptGuidelines: [
-      "Use lsp for code navigation: go to definition, find references, hover for types.",
-      "For rename and codeAction, provide file path plus line/column position.",
-      "Use bash to find files first if you're unsure of file paths: find src -name '*.ts' -type f",
+      "Use lsp instead of rg for semantic questions: lsp workspace-symbols for where X is defined, lsp references for all uses of X, lsp incoming-calls for who calls X, lsp implementation for implementations of X.",
+      "For lsp position actions, pass file plus query (the identifier name) instead of a guessed line/column.",
+      "Use lsp rename to rename a symbol; it writes all edits to disk.",
+      "Use rg for plain text, comments, strings, and non-code files.",
     ],
     parameters: LspParams,
 
@@ -548,15 +532,9 @@ Use bash to find files: find src -name "*.ts" -type f`,
         severity,
       } = params;
       const sevFilter: SeverityFilter = severity ?? "all";
-      const needsFile = action !== "workspace-diagnostics";
-      const needsPos = [
-        "definition",
-        "references",
-        "hover",
-        "signature",
-        "rename",
-        "codeAction",
-      ].includes(action);
+      const needsFile =
+        action !== "workspace-diagnostics" && action !== "workspace-symbols";
+      const needsPos = POSITION_ACTIONS.has(action);
 
       if (needsFile && !file) {
         throw new Error(`Action "${action}" requires a file path.`);
@@ -572,7 +550,7 @@ Use bash to find files: find src -name "*.ts" -type f`,
         query &&
         file
       ) {
-        const resolved = await resolvePosition(manager, file, query);
+        const resolved = await resolvePosition(manager, file, query, action === "rename");
         if (resolved) {
           rLine = resolved.line;
           rCol = resolved.column;
@@ -594,36 +572,68 @@ Use bash to find files: find src -name "*.ts" -type f`,
           : "";
 
       switch (action) {
-        case "definition": {
-          const results = await manager.getDefinition(file!, rLine!, rCol!);
-          const locs = results.map((l) => formatLocation(l, ctx.cwd));
-          const payload = locs.length
-            ? locs.join("\n")
-            : fromQuery
-              ? `${file}:${rLine}:${rCol}`
-              : "No definitions found.";
+        case "definition":
+        case "references":
+        case "implementation":
+        case "type-definition": {
+          const result = await runLocationAction(
+            manager,
+            action,
+            file!,
+            rLine!,
+            rCol!,
+            ctx.cwd,
+          );
           return {
             content: [
               {
                 type: "text" as const,
-                text: `action: definition\n${qLine}${posLine}${payload}`,
+                text: `action: ${action}\n${qLine}${posLine}${result.text}`,
               },
             ],
-            details: results,
+            details: result.details,
           };
         }
 
-        case "references": {
-          const results = await manager.getReferences(file!, rLine!, rCol!);
-          const locs = results.map((l) => formatLocation(l, ctx.cwd));
+        case "incoming-calls":
+        case "outgoing-calls": {
+          const result = await runCallsAction(
+            manager,
+            action,
+            file!,
+            rLine!,
+            rCol!,
+            ctx.cwd,
+          );
           return {
             content: [
               {
                 type: "text" as const,
-                text: `action: references\n${qLine}${posLine}${locs.length ? locs.join("\n") : "No references found."}`,
+                text: `action: ${action}\n${qLine}${posLine}${result.text}`,
               },
             ],
-            details: results,
+            details: result.details,
+          };
+        }
+
+        case "workspace-symbols": {
+          if (!query) {
+            throw new Error('Action "workspace-symbols" requires a "query".');
+          }
+          const result = await runWorkspaceSymbolsAction(
+            manager,
+            query,
+            file,
+            ctx.cwd,
+          );
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `action: workspace-symbols\n${qLine}${result.text}`,
+              },
+            ],
+            details: result.details,
           };
         }
 
@@ -754,27 +764,22 @@ Use bash to find files: find src -name "*.ts" -type f`,
         case "rename": {
           if (!newName)
             throw new Error('Action "rename" requires a "newName" parameter.');
-          const result = await manager.rename(file!, rLine!, rCol!, newName);
-          if (!result) {
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: `action: rename\n${qLine}${posLine}No rename available at this position.`,
-                },
-              ],
-              details: null,
-            };
-          }
-          const edits = formatWorkspaceEdit(result, ctx.cwd);
+          const result = await runRenameAction(
+            manager,
+            file!,
+            rLine!,
+            rCol!,
+            newName,
+            ctx.cwd,
+          );
           return {
             content: [
               {
                 type: "text" as const,
-                text: `action: rename\n${qLine}${posLine}newName: ${newName}\n\n${edits}`,
+                text: `action: rename\n${qLine}${posLine}${result.text}`,
               },
             ],
-            details: result,
+            details: result.details,
           };
         }
 
@@ -817,6 +822,7 @@ Use bash to find files: find src -name "*.ts" -type f`,
           : args.line !== undefined && args.column !== undefined
             ? theme.fg("warning", `:${args.line}:${args.column}`)
             : "") +
+        (args.newName ? " " + theme.fg("accent", `→ ${args.newName}`) : "") +
         (args.severity && args.severity !== "all"
           ? " " + theme.fg("dim", `[${args.severity}]`)
           : "");
@@ -836,7 +842,11 @@ Use bash to find files: find src -name "*.ts" -type f`,
 
       let headerEnd = 0;
       for (let i = 0; i < lines.length; i++) {
-        if (/^(action|query|severity|resolvedPosition):/.test(lines[i])) {
+        if (
+          /^(action|query|severity|resolvedPosition|project|target|newName):/.test(
+            lines[i],
+          )
+        ) {
           headerEnd = i + 1;
         } else {
           break;
@@ -1009,16 +1019,22 @@ Use bash to find files: find src -name "*.ts" -type f`,
     }
 
     clearIdleShutdownTimer();
-    const filePath = typeof input.path === "string" ? input.path : undefined;
-    if (!filePath) return;
+    // read and write have input.path. The unified edit tool has input.text
+    // with `[path]` file headers.
+    const filePaths =
+      event.toolName === "edit" && typeof input.text === "string"
+        ? editHeaderPaths(input.text)
+        : typeof input.path === "string"
+          ? [input.path]
+          : [];
 
-    const absPath = ensureActiveClientForFile(filePath, ctx.cwd);
-    if (!absPath) return;
-
-    // Pre-warm the client
-    getOrCreateManager(ctx.cwd, LSP_SERVERS)
-      .getClientsForFile(absPath)
-      .catch(() => {});
+    const manager = getOrCreateManager(ctx.cwd, LSP_SERVERS);
+    for (const filePath of filePaths) {
+      const absPath = ensureActiveClientForFile(filePath, ctx.cwd);
+      if (!absPath) continue;
+      // Pre-warm the client
+      manager.getClientsForFile(absPath).catch(() => {});
+    }
   });
 
   pi.on("agent_start", async () => {
@@ -1099,37 +1115,48 @@ Use bash to find files: find src -name "*.ts" -type f`,
   });
 
   pi.on("tool_result", async (event, ctx) => {
-    if (event.toolName !== "write" && event.toolName !== "edit") return;
+    if (event.isError || (event.toolName !== "write" && event.toolName !== "edit")) return;
 
-    const filePath = (event.input as Record<string, unknown>)?.path as string;
-    if (!filePath) return;
-
-    const absPath = ensureActiveClientForFile(filePath, ctx.cwd);
-    if (!absPath) return;
+    // write has input.path. The unified edit tool lists changed files in details.
+    const filePaths =
+      event.toolName === "edit"
+        ? editedPathsFromDetails(event.details)
+        : typeof event.input.path === "string"
+          ? [event.input.path]
+          : [];
+    const absPaths = filePaths
+      .map((filePath) => ensureActiveClientForFile(filePath, ctx.cwd))
+      .filter((absPath): absPath is string => absPath !== undefined);
+    if (!absPaths.length) return;
 
     if (hookMode === "disabled") return;
 
+    const includeWarnings = event.toolName === "write";
     if (hookMode === "agent_end") {
-      const includeWarnings = event.toolName === "write";
-      const existing = touchedFiles.get(absPath) ?? false;
-      touchedFiles.set(absPath, existing || includeWarnings);
+      for (const absPath of absPaths) {
+        const existing = touchedFiles.get(absPath) ?? false;
+        touchedFiles.set(absPath, existing || includeWarnings);
+      }
       return;
     }
 
     // edit_write mode: inline diagnostics
-    const includeWarnings = event.toolName === "write";
-    const output = await collectDiagnostics(
-      absPath,
-      ctx,
-      includeWarnings,
-      false,
-    );
-    if (!output) return;
+    const outputs: string[] = [];
+    for (const absPath of absPaths) {
+      const output = await collectDiagnostics(
+        absPath,
+        ctx,
+        includeWarnings,
+        absPaths.length > 1,
+      );
+      if (output) outputs.push(output);
+    }
+    if (!outputs.length) return;
 
     return {
       content: [
         ...(event.content as Array<{ type: "text"; text: string }>),
-        { type: "text" as const, text: output },
+        { type: "text" as const, text: outputs.join("\n") },
       ],
     };
   });

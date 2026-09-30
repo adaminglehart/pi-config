@@ -26,9 +26,13 @@ import {
   DEFAULT_NUM_RESULTS,
   DEFAULT_CONTEXT_MAX_CHARS,
   type Provider,
+  type SearchResult,
   type WebSearchDetails,
 } from "./types.js";
-import { searchParallel } from "./providers/parallel.js";
+import {
+  ParallelUnavailableError,
+  searchParallel,
+} from "./providers/parallel.js";
 import { searchExa } from "./providers/exa.js";
 
 const DESCRIPTION = `- Search the web using multiple providers (Parallel Web or Exa AI)
@@ -38,7 +42,7 @@ const DESCRIPTION = `- Search the web using multiple providers (Parallel Web or 
 - Use this tool for accessing information beyond knowledge cutoff
 
 Provider notes:
-  - **Parallel** (default): AI-native search with natural language objectives, optimized excerpts
+  - **Parallel** (default): AI-native search with natural language objectives, optimized excerpts. If Parallel is unavailable (no credit, rate limit, server error, timeout), the search falls back to Exa automatically
   - **Exa AI**: Uses MCP endpoint with EXA_API_KEY, supports live crawling and search modes (auto/fast/deep)
 
 Usage notes:
@@ -98,32 +102,53 @@ export default function (pi: ExtensionAPI) {
       const provider: Provider = params.provider || "parallel";
       const numResults = params.numResults || DEFAULT_NUM_RESULTS;
 
-      const result =
-        provider === "parallel"
-          ? await searchParallel(params.query, numResults, signal)
-          : await searchExa(
-              params.query,
-              numResults,
-              params.type || "auto",
-              params.livecrawl || "fallback",
-              params.contextMaxCharacters || DEFAULT_CONTEXT_MAX_CHARS,
-              signal,
-            );
+      const runExa = () =>
+        searchExa(
+          params.query,
+          numResults,
+          params.type || "auto",
+          params.livecrawl || "fallback",
+          params.contextMaxCharacters || DEFAULT_CONTEXT_MAX_CHARS,
+          signal,
+        );
 
-      const contentSize = new TextEncoder().encode(result.content).byteLength;
+      let usedProvider: Provider = provider;
+      let fallbackReason: string | undefined;
+      let result: SearchResult;
+      if (provider === "exa") {
+        result = await runExa();
+      } else {
+        try {
+          result = await searchParallel(params.query, numResults, signal);
+        } catch (error) {
+          if (!(error instanceof ParallelUnavailableError) || !process.env.EXA_API_KEY) {
+            throw error;
+          }
+          fallbackReason = error.message;
+          usedProvider = "exa";
+          result = await runExa();
+        }
+      }
+
+      const text = fallbackReason
+        ? `[${fallbackReason}. Results are from Exa.]\n\n${result.content}`
+        : result.content;
+      const contentSize = new TextEncoder().encode(text).byteLength;
 
       return {
         content: [
           {
             type: "text",
             text:
-              result.content ||
-              "No search results found. Please try a different query.",
+              result.content
+                ? text
+                : "No search results found. Please try a different query.",
           },
         ],
         details: {
           query: params.query,
-          provider,
+          provider: usedProvider,
+          fallbackReason,
           numResults,
           resultCount: result.resultCount,
           contentSize,
@@ -173,6 +198,9 @@ export default function (pi: ExtensionAPI) {
           `✓ ${count} result${count !== 1 ? "s" : ""}`,
         );
         text += theme.fg("dim", ` (${size}) [${provider}]`);
+        if (details?.fallbackReason) {
+          text += theme.fg("warning", " (fallback)");
+        }
         if (details?.latencyMs) {
           text += theme.fg("dim", ` ${details.latencyMs}ms`);
         }
@@ -181,6 +209,9 @@ export default function (pi: ExtensionAPI) {
       if (expanded && details) {
         text += `\n${theme.fg("dim", `Query: ${details.query}`)}`;
         text += `\n${theme.fg("dim", `Provider: ${details.provider}`)}`;
+        if (details.fallbackReason) {
+          text += `\n${theme.fg("warning", `Fallback: ${details.fallbackReason}`)}`;
+        }
         text += `\n${theme.fg("dim", `Requested: ${details.numResults} results`)}`;
         if (details.latencyMs) {
           text += `\n${theme.fg("dim", `Latency: ${details.latencyMs}ms`)}`;

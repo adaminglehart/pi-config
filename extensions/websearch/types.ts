@@ -13,6 +13,8 @@ export const PARALLEL_TIMEOUT_MS = 30000;
 export interface WebSearchDetails {
   query: string;
   provider: Provider;
+  /** Set when Parallel failed and Exa served the search. */
+  fallbackReason?: string;
   numResults: number;
   resultCount: number;
   contentSize: number;

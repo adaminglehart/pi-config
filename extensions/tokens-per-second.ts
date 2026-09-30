@@ -1,120 +1,133 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-interface TpsMetrics {
-  elapsedSec: number;
-  ttftSec: number;
-  avgTps: number;
-  instantTps: number;
-  hasTokens: boolean;
+const STATUS_ID = "token-rate";
+const WINDOW_MS = 1500;
+const UPDATE_INTERVAL_MS = 120;
+// Live rate is estimated from streamed characters; final rate uses provider usage.
+const CHARS_PER_TOKEN = 4;
+const IDLE_STATUS = "- t/s ░░░░░ · idle";
+
+interface Sample {
+  time: number;
+  chars: number;
+}
+
+/** Timing for the assistant message that is streaming now. */
+interface MessageTiming {
+  requestStart: number;
+  firstDelta: number;
+  chars: number;
+  thinkingChars: number;
+}
+
+/** Totals for all assistant messages in one agent run. */
+interface RunTotals {
+  outputTokens: number;
+  generationMs: number;
+  lastTtftMs: number;
+  estimated: boolean;
+}
+
+function bar(tps: number, max = 150): string {
+  const width = 5;
+  const n = Math.min(Math.round((tps / max) * width), width);
+  return "▓".repeat(n) + "░".repeat(width - n);
+}
+
+function rate(tokens: number, ms: number): number {
+  return ms > 100 ? Math.round(tokens / (ms / 1000)) : 0;
 }
 
 export default function (pi: ExtensionAPI) {
-  let tokenCount = 0;
-  let startTime = 0;
-  let firstTokenTime = 0;
+  let requestStart = 0;
+  let message: MessageTiming | null = null;
+  let samples: Sample[] = [];
   let lastUpdate = 0;
-  let streaming = false;
-  let recentDeltas: number[] = []; // timestamps for sliding window
+  let run: RunTotals = { outputTokens: 0, generationMs: 0, lastTtftMs: 0, estimated: false };
 
-  const WINDOW_MS = 1500;
-
-  function bar(tps: number, max = 150): string {
-    const width = 5;
-    const n = Math.min(Math.round((tps / max) * width), width);
-    return "▓".repeat(n) + "░".repeat(width - n);
+  function setStatus(ctx: ExtensionContext, text: string): void {
+    ctx.ui.setStatus(STATUS_ID, text);
   }
 
-  function calculateMetrics(now: number): TpsMetrics {
-    // Prune old deltas and calculate instant TPS
-    recentDeltas = recentDeltas.filter((t) => now - t < WINDOW_MS);
-    const instantTps = Math.round(recentDeltas.length / (WINDOW_MS / 1000));
-
-    // Calculate timing metrics
-    const elapsedMs = now - startTime;
-    const elapsedSec = elapsedMs / 1000;
-    const ttftMs = firstTokenTime > startTime ? firstTokenTime - startTime : 0;
-    const ttftSec = ttftMs / 1000;
-
-    // Calculate average TPS
-    const avgTps = elapsedSec > 0.1 ? Math.round(tokenCount / elapsedSec) : 0;
-
-    return {
-      elapsedSec,
-      ttftSec,
-      avgTps,
-      instantTps,
-      hasTokens: firstTokenTime > startTime,
-    };
+  function liveStatus(now: number): string {
+    samples = samples.filter((s) => now - s.time < WINDOW_MS);
+    const windowChars = samples.reduce((sum, s) => sum + s.chars, 0);
+    if (!message || message.firstDelta === 0) return `0 t/s ${bar(0)} · warming...`;
+    // Early in a message the window holds less than WINDOW_MS of samples.
+    const spanMs = Math.max(250, Math.min(WINDOW_MS, now - message.firstDelta));
+    const instant = rate(windowChars / CHARS_PER_TOKEN, spanMs);
+    const ttft = (message.firstDelta - message.requestStart) / 1000;
+    const avg = rate(message.chars / CHARS_PER_TOKEN, now - message.firstDelta);
+    return `${instant} t/s ${bar(instant)} · TTFT ${ttft.toFixed(1)}s · avg ${avg}`;
   }
 
-  function formatStreamingStatus(m: TpsMetrics): string {
-    const barStr = bar(m.instantTps);
-
-    if (m.hasTokens) {
-      return `${m.instantTps} t/s ${barStr} · TTFT ${m.ttftSec.toFixed(1)}s · avg ${m.avgTps}`;
-    }
-    return `${m.instantTps} t/s ${barStr} · warming...`;
+  function finalStatus(): string {
+    if (run.generationMs === 0) return IDLE_STATUS;
+    const approx = run.estimated ? "~" : "";
+    const tps = rate(run.outputTokens, run.generationMs);
+    return `${approx}${tps} t/s · TTFT ${(run.lastTtftMs / 1000).toFixed(2)}s`;
   }
 
-  function formatFinalStatus(m: TpsMetrics): string {
-    return `${m.avgTps} t/s · TTFT ${m.ttftSec.toFixed(2)}s`;
-  }
-
-  function updateStatus(ctx: {
-    ui: { setStatus: (id: string, status: string) => void };
-  }) {
-    const m = calculateMetrics(Date.now());
-    ctx.ui.setStatus("token-rate", formatStreamingStatus(m));
-  }
-
-  // Set idle on session start and re-set it before each turn until streaming begins
   pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.setStatus("token-rate", "- t/s ░░░░░ · idle");
-  });
-
-  pi.on("turn_start", async (_event, ctx) => {
-    // Re-assert idle status if we're not yet streaming (ensures consistent footer width)
-    if (!streaming) {
-      ctx.ui.setStatus("token-rate", "- t/s ░░░░░ · idle");
-    }
+    setStatus(ctx, IDLE_STATUS);
   });
 
   pi.on("agent_start", async (_event, ctx) => {
-    tokenCount = 0;
-    startTime = Date.now();
-    firstTokenTime = 0;
+    run = { outputTokens: 0, generationMs: 0, lastTtftMs: 0, estimated: false };
+    message = null;
+    setStatus(ctx, "0 t/s ░░░░░ · warming");
+  });
+
+  // Time to first token starts when the request goes to the provider,
+  // so context building and tool execution are not counted.
+  pi.on("before_provider_request", async () => {
+    requestStart = Date.now();
+  });
+
+  pi.on("message_start", async (event) => {
+    if (event.message.role !== "assistant") return;
+    message = { requestStart: requestStart || Date.now(), firstDelta: 0, chars: 0, thinkingChars: 0 };
+    samples = [];
     lastUpdate = 0;
-    recentDeltas = [];
-    streaming = true;
-    ctx.ui.setStatus("token-rate", "0 t/s ░░░░░ · warming");
   });
 
   pi.on("message_update", async (event, ctx) => {
-    if (!streaming) return;
-
+    if (!message) return;
     const ev = event.assistantMessageEvent;
-    if (ev.type === "text_delta" || ev.type === "thinking_delta") {
-      const now = Date.now();
+    if (ev.type !== "text_delta" && ev.type !== "thinking_delta" && ev.type !== "toolcall_delta") return;
 
-      // Record first token time
-      if (firstTokenTime === 0) {
-        firstTokenTime = now;
-      }
+    const now = Date.now();
+    if (message.firstDelta === 0) message.firstDelta = now;
+    message.chars += ev.delta.length;
+    if (ev.type === "thinking_delta") message.thinkingChars += ev.delta.length;
+    samples.push({ time: now, chars: ev.delta.length });
 
-      tokenCount++;
-      recentDeltas.push(now);
-
-      // Update every 120ms max to avoid flicker
-      if (now - lastUpdate > 120) {
-        lastUpdate = now;
-        updateStatus(ctx);
-      }
+    if (now - lastUpdate > UPDATE_INTERVAL_MS) {
+      lastUpdate = now;
+      setStatus(ctx, liveStatus(now));
     }
   });
 
+  pi.on("message_end", async (event) => {
+    if (event.message.role !== "assistant" || !message) return;
+    const current = message;
+    message = null;
+    requestStart = 0;
+    if (current.firstDelta === 0) return;
+
+    // Hidden reasoning tokens are generated before the first visible delta,
+    // so they are not part of the measured generation time.
+    const { output, reasoning } = event.message.usage;
+    const hiddenReasoning = current.thinkingChars === 0 ? (reasoning ?? 0) : 0;
+    const reported = output - hiddenReasoning;
+    run.outputTokens += reported > 0 ? reported : Math.round(current.chars / CHARS_PER_TOKEN);
+    run.estimated ||= reported <= 0;
+    run.generationMs += Date.now() - current.firstDelta;
+    run.lastTtftMs = current.firstDelta - current.requestStart;
+  });
+
   pi.on("agent_end", async (_event, ctx) => {
-    streaming = false;
-    const m = calculateMetrics(Date.now());
-    ctx.ui.setStatus("token-rate", formatFinalStatus(m));
+    message = null;
+    setStatus(ctx, finalStatus());
   });
 }
