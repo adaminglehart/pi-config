@@ -10,7 +10,7 @@
     "@earendil-works/pi-ai": "^0.99.1",
     "@earendil-works/pi-coding-agent": "^0.99.1",
     "@earendil-works/pi-server": "0.99.1",
-    "@earendil-works/pi-tui": "^0.99.1",
+    "@earendil-works/pi-tui": "^1.0.0",
     "defuddle": "^0.19.4",
     "linkedom": "^0.18.13",
     "parallel-web": "^1.3.3",
