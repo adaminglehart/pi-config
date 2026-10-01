@@ -7,9 +7,11 @@ const unused = () => { throw new Error("Agent API must not run in overlay tests"
 mock.module("@earendil-works/pi-coding-agent", () => ({
 	buildSessionContext: unused,
 	createAgentSession: unused,
-	createExtensionRuntime: unused,
+	DefaultResourceLoader: unused,
+	getAgentDir: unused,
 	getMarkdownTheme: unused,
 	SessionManager: unused,
+	SettingsManager: unused,
 }));
 const { BtwOverlay } = await import("../btw");
 

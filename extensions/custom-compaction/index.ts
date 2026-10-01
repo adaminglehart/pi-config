@@ -67,6 +67,9 @@ export default function (pi: ExtensionAPI) {
         compactionHeaders,
         customInstructions,
         signal,
+        undefined,
+        (requestModel, context, options) =>
+          ctx.modelRegistry.streamSimple(requestModel, context, options),
       );
 
       // Return the compaction result

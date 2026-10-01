@@ -6,9 +6,11 @@
 import {
 	buildSessionContext,
 	createAgentSession,
-	createExtensionRuntime,
+	DefaultResourceLoader,
+	getAgentDir,
 	getMarkdownTheme,
 	SessionManager,
+	SettingsManager,
 	type AgentSession,
 	type AgentSessionEvent,
 	type ExtensionAPI,
@@ -31,6 +33,7 @@ import {
 } from "@earendil-works/pi-tui";
 import { messageText } from "./_lib/message-text.js";
 import { getModelAuth } from "./_lib/model-auth.js";
+import codexSpeedModels from "./codex-speed-models.js";
 
 const BTW_ENTRY_TYPE = "btw-thread-entry";
 const BTW_RESET_TYPE = "btw-thread-reset";
@@ -90,8 +93,20 @@ function stripDynamicSystemPromptFooter(systemPrompt: string): string {
 		.trim();
 }
 
-function createBtwResourceLoader(ctx: ExtensionContext, appendSystemPrompt: string[] = [BTW_SYSTEM_PROMPT]): ResourceLoader {
-	const extensionsResult = { extensions: [], errors: [], runtime: createExtensionRuntime() };
+export async function createBtwResourceLoader(ctx: ExtensionContext, appendSystemPrompt: string[] = [BTW_SYSTEM_PROMPT]): Promise<ResourceLoader> {
+	const extensionLoader = new DefaultResourceLoader({
+		cwd: ctx.cwd,
+		agentDir: getAgentDir(),
+		settingsManager: SettingsManager.inMemory({}),
+		noExtensions: true,
+		noSkills: true,
+		noPromptTemplates: true,
+		noThemes: true,
+		noContextFiles: true,
+		extensionFactories: [codexSpeedModels],
+	});
+	await extensionLoader.reload();
+	const extensionsResult = extensionLoader.getExtensions();
 	const systemPrompt = stripDynamicSystemPromptFooter(ctx.getSystemPrompt());
 
 	return {
@@ -590,7 +605,7 @@ export default function (pi: ExtensionAPI) {
 			model: ctx.model,
 			thinkingLevel: pi.getThinkingLevel() as SessionThinkingLevel,
 			tools: ["read", "bash", "edit", "write"],
-			resourceLoader: createBtwResourceLoader(ctx),
+			resourceLoader: await createBtwResourceLoader(ctx),
 		});
 
 		const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
@@ -769,7 +784,7 @@ export default function (pi: ExtensionAPI) {
 			model,
 			thinkingLevel: "off",
 			tools: [],
-			resourceLoader: createBtwResourceLoader(ctx, [BTW_SUMMARY_PROMPT]),
+			resourceLoader: await createBtwResourceLoader(ctx, [BTW_SUMMARY_PROMPT]),
 		});
 
 		try {

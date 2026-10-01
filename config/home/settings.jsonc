@@ -2,7 +2,7 @@
   "honcho": {
     "baseUrl": "https://honcho.inglehart.io",
   },
-  "defaultModel": "{{model.standard}}",
+  "defaultModel": "openai-codex/gpt-6.1-sol-fast",
   "defaultThinkingLevel": "{{model.standard.thinking}}",
   "modelAliases": {
     "fast": { "model": "openai-codex/gpt-6-luna", "thinking": "max" },
@@ -13,6 +13,10 @@
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
     "openai-codex/gpt-6-luna",
+    "openai-codex/gpt-6-astra-fast",
+    "openai-codex/gpt-6.1-sol-fast",
+    "openai-codex/gpt-6-luna-fast",
+    "openai-codex/gpt-6-astra-ultrafast",
     "litellm/qwen3.8-27b-q4",
     "opencode-go/deepseek-v4.1-flash",
     "google/gemini-3.8-flash",
