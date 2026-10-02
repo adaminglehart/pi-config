@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.99.2",
+  "lastChangelogVersion": "1.0.0",
   "defaultTools": ["+codemode"],
   "packages": [
-    "npm:pi-subagents@0.73.1",
+    "npm:pi-subagents@0.74.0",
     "npm:pi-prompt-template-model@0.12.3",
     "git:github.com/earendil-works/pi-review"
   ],

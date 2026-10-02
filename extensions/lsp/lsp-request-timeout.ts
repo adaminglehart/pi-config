@@ -4,6 +4,7 @@
 import {
   CancellationTokenSource,
   type MessageConnection,
+  type RequestParam,
   type RequestType,
 } from "vscode-languageserver-protocol/node";
 
@@ -15,7 +16,7 @@ export class LspRequestTimeoutError extends Error {}
 export async function sendRequestWithTimeout<P, R, E>(
   connection: MessageConnection,
   type: RequestType<P, R, E>,
-  params: P,
+  params: RequestParam<P>,
 ): Promise<R> {
   const cancellation = new CancellationTokenSource();
   let timer: NodeJS.Timeout | undefined;

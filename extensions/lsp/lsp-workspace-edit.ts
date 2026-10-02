@@ -5,6 +5,7 @@ import * as fs from "node:fs";
 import type {
   AnnotatedTextEdit,
   Position,
+  SnippetTextEdit,
   TextEdit,
   WorkspaceEdit,
 } from "vscode-languageserver-protocol";
@@ -51,7 +52,7 @@ function collectTextEdits(edit: WorkspaceEdit): Map<string, TextEdit[]> {
   return byFile;
 }
 
-function toTextEdit(edit: TextEdit | AnnotatedTextEdit): TextEdit {
+function toTextEdit(edit: TextEdit | AnnotatedTextEdit | SnippetTextEdit): TextEdit {
   if ("snippet" in edit) {
     throw new Error(
       "The server returned snippet edits, which the lsp tool does not apply. No files were changed.",
