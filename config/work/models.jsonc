@@ -47,6 +47,25 @@
           },
         },
         {
+          "id": "claude-sonnet-5-5",
+          "name": "Claude Sonnet 5.5",
+          "api": "anthropic-messages",
+          "baseUrl": "http://${LITELLM_PROXY_HOST}:7891",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+          },
+          "input": ["text", "image"],
+          "contextWindow": 1000000,
+          "compat": {
+            "forceAdaptiveThinking": true,
+          },
+        },
+        {
           "id": "claude-sonnet-5",
           "name": "Claude Sonnet 5",
           "api": "anthropic-messages",
@@ -75,6 +94,17 @@
         {
           "id": "gpt-6-astra",
           "name": "GPT-6 Astra",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "xhigh": "xhigh",
+            "max": "max",
+          },
+          "input": ["text", "image"],
+          "contextWindow": 1050000,
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "name": "GPT-6.1 Sol",
           "reasoning": true,
           "thinkingLevelMap": {
             "xhigh": "xhigh",
