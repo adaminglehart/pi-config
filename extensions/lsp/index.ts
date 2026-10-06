@@ -484,7 +484,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "lsp",
     label: "LSP",
-    description: `Semantic code navigation through a language server (TypeScript/JavaScript, Go, Python, Rust, Vue, Svelte, Kotlin, Swift).
+    description: `Semantic code navigation through a language server (TypeScript/JavaScript, Go, Python, Rust, Terraform, Vue, Svelte, Kotlin, Swift).
 
 Actions:
 - workspace-symbols: find symbols by query across the project. file is optional and selects the project.

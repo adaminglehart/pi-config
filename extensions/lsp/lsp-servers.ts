@@ -137,6 +137,30 @@ const rustAnalyzer: LSPServerConfig = {
 };
 
 // -------------------------------------------------------------------
+// Terraform
+// -------------------------------------------------------------------
+
+const terraform: LSPServerConfig = {
+  id: "terraform",
+  extensions: [".tf", ".tfvars"],
+  findRoot: (file, cwd) =>
+    findRoot(file, cwd, [
+      ".terraform.lock.hcl",
+      "versions.tf",
+      "providers.tf",
+      "main.tf",
+    ]) ?? path.dirname(file),
+  spawn: async (root) => {
+    const handle = await simpleSpawn("terraform-ls", ["serve"])(root);
+    if (!handle) return undefined;
+    const tofu = which("tofu");
+    return tofu
+      ? { ...handle, initOptions: { terraform: { path: tofu } } }
+      : handle;
+  },
+};
+
+// -------------------------------------------------------------------
 // Vue
 // -------------------------------------------------------------------
 
@@ -273,6 +297,7 @@ export const LSP_SERVERS: LSPServerConfig[] = [
   gopls,
   pyright,
   rustAnalyzer,
+  terraform,
   vue,
   svelte,
   kotlin,
@@ -288,6 +313,7 @@ export const WARMUP_MAP: Record<string, string> = {
   "go.mod": ".go",
   "pyproject.toml": ".py",
   "Cargo.toml": ".rs",
+  "main.tf": ".tf",
   "settings.gradle.kts": ".kt",
   "Package.swift": ".swift",
 };
