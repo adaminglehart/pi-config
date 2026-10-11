@@ -9,7 +9,7 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "^1.0.4",
     "@earendil-works/pi-coding-agent": "^1.0.4",
-    "@earendil-works/pi-server": "1.0.4",
+    "@earendil-works/pi-server": "1.1.0",
     "@earendil-works/pi-tui": "^1.0.4",
     "defuddle": "^0.19.4",
     "linkedom": "^0.18.13",
