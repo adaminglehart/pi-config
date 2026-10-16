@@ -414,7 +414,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("before_agent_start", async (event, ctx) => {
     const runGeneration = generation;
-    if (!canInject() || closed || deleted) return;
+    if (event.messageType !== "user" || !canInject() || closed || deleted) return;
     turnCounter += 1;
     const shouldRefresh =
       turnCounter === 1 ||
