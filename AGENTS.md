@@ -78,8 +78,6 @@ just deploy             # Alias of `just apply`
 just diff               # Inspect build/agent/ against its destination
 just clean              # Remove generated output and managed deployed files
 just update-ui-skills   # Download current ui.sh skills and refresh their allowlist
-just hindsight-import   # Import historical session JSONL into Hindsight (dry run
-                        # by default; pass --write to ingest)
 just honcho-env         # Generate honcho/.env for the active environment
 ```
 

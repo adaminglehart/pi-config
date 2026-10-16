@@ -82,9 +82,6 @@ just diff
 # Remove primary generated output and managed deployed files
 just clean
 
-# Import historical session JSONL into Hindsight (dry run; pass --write to ingest)
-just hindsight-import
-
 # Generate honcho/.env for the detected environment
 just honcho-env
 ```

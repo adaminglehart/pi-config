@@ -1,4 +1,0 @@
-nodeLinker: hoisted
-dangerouslyAllowAllBuilds: true
-minimumReleaseAgeExclude:
-  - '@vectorize-io/hindsight-client@0.10.2'
