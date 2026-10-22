@@ -2,6 +2,10 @@
 
 - Implement the simplest solution for current requirements. Do not add fallback
   code or compatibility shims for requirements that no longer exist.
+- Enter plan mode only when the user explicitly asks for plan mode. Do not call
+  `enter_plan_mode` because a task is complex or needs planning. Keep ordinary
+  planning in the conversation. A request to implement work is not permission
+  to enter plan mode.
 - Try an available tool or dependency before you ask whether it is installed.
 - Before parallel calls use the same credential, executable, path, working
   directory, or service, test that shared requirement with one cheap, bounded

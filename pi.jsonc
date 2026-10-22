@@ -34,7 +34,8 @@
       "herdr",
       "pi-extension",
       "session-reader",
-      "agent-browser"
+      "agent-browser",
+      "zero-tech-debt"
     ],
     "uiShSkills": [
       "add-dark-mode",

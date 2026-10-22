@@ -1,6 +1,9 @@
 {
   "providers": {
     "openai-codex": {
+      "modelOverrides": {
+        "gpt-6.1-sol": { "contextWindow": 500000 },
+      },
       "models": [
         {
           "id": "gpt-6-astra-fast",
@@ -20,7 +23,7 @@
           "headers": { "x-codex-routing-hint": "model=gpt-6.1-sol;tier=priority" },
           "reasoning": true,
           "input": ["text", "image"],
-          "contextWindow": 272000,
+          "contextWindow": 500000,
           "maxTokens": 128000,
           "thinkingLevelMap": { "off": null, "minimal": "low", "low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh", "max": "max" },
           "compat": { "supportsOpenAIGrammarTools": true, "supportsAdditionalTools": true, "supportsToolSearch": true, "supportsMidConvoSystemMessages": true },

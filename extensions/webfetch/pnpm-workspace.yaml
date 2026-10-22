@@ -1,2 +1,4 @@
 nodeLinker: hoisted
 dangerouslyAllowAllBuilds: true
+minimumReleaseAgeExclude:
+  - 'linkedom@0.18.14'

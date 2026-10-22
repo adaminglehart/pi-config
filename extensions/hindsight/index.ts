@@ -1181,7 +1181,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
-    if (!enabled || !config.injectContext) return;
+    if (event.messageType !== "user" || !enabled || !config.injectContext) return;
 
     turnCounter++;
     if (isSubagent() && !config.autoRecallInSubagents) return;

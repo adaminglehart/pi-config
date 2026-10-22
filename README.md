@@ -36,6 +36,12 @@ available to `UIDOTSH_TOKEN` into `skills/` and updates the checked-in
 `pi.uiShSkills` list in `pi.jsonc`. Updating is explicit so normal builds stay
 offline and do not change reviewed skill content.
 
+## Zero Tech Debt skill
+
+Use `/skill:zero-tech-debt` to simplify a change around its intended behavior.
+The local skill is in `skills/zero-tech-debt/SKILL.md`. It checks current callers
+before removing compatibility code and keeps cleanup within the requested scope.
+
 ## Configuration merge order
 
 Generated `settings.json`, `models.json`, and `mcp.json` merge later

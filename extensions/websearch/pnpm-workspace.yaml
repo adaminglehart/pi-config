@@ -1,2 +1,4 @@
 nodeLinker: hoisted
 dangerouslyAllowAllBuilds: true
+minimumReleaseAgeExclude:
+  - 'parallel-web@1.3.6'

@@ -18,7 +18,7 @@
     "openai-codex/gpt-6-luna-fast",
     "openai-codex/gpt-6-astra-ultrafast",
     "litellm/qwen3.8-27b-q4",
-    "opencode-go/deepseek-v4.1-flash",
+    // "opencode-go/deepseek-v4.1-flash",
     "google/gemini-3.8-flash",
     "gb10/deepseek-v4-flash-vision-exp",
     "gb10/GLM-5.3-Flash-EXL3"
@@ -39,7 +39,6 @@
         "thinking": "{{model.reviewer.thinking}}",
       },
       "worker": {
-        "model": "opencode-go/deepseek-v4.1-flash",
         "thinking": "high",
       },
       "scout": {

@@ -132,6 +132,7 @@ export default function sessionTitleExtension(pi: ExtensionAPI): void {
 
   pi.on("before_agent_start", async (event, ctx) => {
     if (
+      event.messageType !== "user" ||
       !shouldGenerateTitle ||
       generationTask ||
       pi.getSessionName() ||
