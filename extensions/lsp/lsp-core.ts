@@ -119,6 +119,8 @@ export const LANGUAGE_IDS: Record<string, string> = {
   ".pyi": "python",
   ".go": "go",
   ".rs": "rust",
+  ".tf": "terraform",
+  ".tfvars": "terraform-vars",
   ".kt": "kotlin",
   ".kts": "kotlin",
   ".swift": "swift",

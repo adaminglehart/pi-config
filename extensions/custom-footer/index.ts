@@ -120,17 +120,8 @@ interface FooterContext {
   contextWindow: number;
   cwd: string;
   gitBranch: string | null;
-  acmEnabled: boolean;
   extensionStatuses: ReadonlyMap<string, string>;
   sessionId: string | null;
-}
-
-function renderAcmSegment(ctx: FooterContext): string {
-  if (ctx.acmEnabled) {
-    return `${ansi.fg(colors.pi)}ACM${ansi.reset}`;
-  } else {
-    return `${ansi.fg(colors.sep)}ACM:${ansi.reset}${ansi.fg(colors.text)}off${ansi.reset}`;
-  }
 }
 
 function renderModelSegment(ctx: FooterContext): string {
@@ -344,7 +335,6 @@ export default function customFooter(pi: ExtensionAPI) {
   let enabled = true;
   let tuiRef: TUI | null = null;
   let ctxRef: ExtensionContext | null = null;
-  let acmEnabled = false;
 
   /**
    * Footer render cache.
@@ -373,12 +363,6 @@ export default function customFooter(pi: ExtensionAPI) {
     dataVersion++;
   }
 
-  pi.events.on("context-pilot:enabled", () => {
-    acmEnabled = true;
-    bumpDataVersion();
-    tuiRef?.requestRender();
-  });
-
   pi.on("agent_end", async () => {
     setAgentState("paused");
     bumpDataVersion();
@@ -405,9 +389,6 @@ export default function customFooter(pi: ExtensionAPI) {
     bumpDataVersion();
     tuiRef?.requestRender();
   });
-
-  // Note: session_switch event doesn't exist in pi's event system
-  // Keeping ACM status request in session_start instead
 
   pi.registerCommand("footer-scene", {
     description: "Cycle footer scenes, or select one by name",
@@ -499,7 +480,6 @@ export default function customFooter(pi: ExtensionAPI) {
               contextWindow: contextUsage?.contextWindow ?? 0,
               cwd: ctxRef?.cwd ?? "",
               gitBranch: footerData?.getGitBranch?.() ?? null,
-              acmEnabled: acmEnabled,
               extensionStatuses:
                 footerData?.getExtensionStatuses?.() ?? new Map(),
               sessionId: ctxRef?.sessionManager?.getSessionId?.() ?? null,
@@ -522,7 +502,6 @@ export default function customFooter(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!isSubagent()) selectRandomScene();
-    pi.events.emit("context-pilot:status_request", {});
     if (enabled && ctx.hasUI) setupFooter(ctx);
   });
 }
