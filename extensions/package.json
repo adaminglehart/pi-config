@@ -19,6 +19,6 @@
     "vscode-languageserver-protocol": "3.18.4"
   },
   "dependencies": {
-    "vscode-jsonrpc": "^9.0.3"
+    "vscode-jsonrpc": "^10.0.0"
   }
 }
