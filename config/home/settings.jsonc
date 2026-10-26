@@ -10,6 +10,9 @@
     "reviewer": { "model": "openai-codex/gpt-6-astra", "thinking": "high" },
   },
   "enabledModels": [
+    "claude-code/claude-opus-5-5",
+    "claude-code/claude-fable-5-1",
+    "claude-code/claude-sonnet-5-5",
     "openai-codex/gpt-6-astra",
     "openai-codex/gpt-6.1-sol",
     "openai-codex/gpt-6-luna",
@@ -20,7 +23,7 @@
     "litellm/qwen3.8-27b-q4",
     // "opencode-go/deepseek-v4.1-flash",
     "google/gemini-3.8-flash",
-    "gb10/deepseek-v4-flash-vision-exp",
+    "gb10/DeepSeek-V4.1-Flash-1017-EXL3",
     "gb10/GLM-5.3-Flash-EXL3"
   ],
   "compaction": {
