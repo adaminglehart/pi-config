@@ -40,9 +40,9 @@ _deploy:
     echo "Deploying primary agent → $DEST"
     mkdir -p "$DEST"
     bun scripts/managed-destination.ts reconcile "$BUILD" "$DEST"
-    rsync -a --exclude 'node_modules' "$BUILD/" "$DEST/"
-    # Remove stale files inside enabled extensions while preserving dependency trees.
-    rsync -a --delete --exclude 'node_modules' "$BUILD/extensions/" "$DEST/extensions/"
+    rsync -a --exclude 'node_modules' --exclude '/extensions/herdr-agent-state.ts' "$BUILD/" "$DEST/"
+    # Keep the Herdr-owned extension and dependency trees during synchronization.
+    rsync -a --delete --exclude 'node_modules' --exclude '/herdr-agent-state.ts' "$BUILD/extensions/" "$DEST/extensions/"
     # Copy each complete production dependency tree without running it in DEST.
     for modules in "$BUILD"/extensions/*/node_modules; do
       [ -d "$modules" ] || continue
@@ -75,6 +75,7 @@ diff:
     fi
     diff -rq "$BUILD" "$DEST" \
       --exclude node_modules \
+      --exclude herdr-agent-state.ts \
       --exclude sessions \
       --exclude auth.json \
       --exclude git \

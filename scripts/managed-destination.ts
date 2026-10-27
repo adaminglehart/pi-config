@@ -7,6 +7,7 @@ interface ManagedDestinationPath {
   path: string;
   entryLabel?: string;
   preserveEntries?: readonly string[];
+  externallyManagedEntries?: readonly string[];
 }
 
 /**
@@ -19,6 +20,7 @@ export const MANAGED_DESTINATION_PATHS: readonly ManagedDestinationPath[] = [
   {
     path: "extensions",
     entryLabel: "extension",
+    externallyManagedEntries: ["herdr-agent-state.ts"],
     preserveEntries: [
       "pnpm-lock.yaml",
       "node_modules",
@@ -64,7 +66,10 @@ export function reconcileDestination(buildDir: string, destDir: string): void {
       const builtEntries = existsSync(builtPath)
         ? new Set(readdirSync(builtPath))
         : new Set<string>();
-      const preserveEntries = new Set(managed.preserveEntries ?? []);
+      const preserveEntries = new Set([
+        ...(managed.preserveEntries ?? []),
+        ...(managed.externallyManagedEntries ?? []),
+      ]);
 
       for (const entry of readdirSync(deployedPath)) {
         if (!builtEntries.has(entry) && !preserveEntries.has(entry)) {
@@ -85,7 +90,18 @@ export function reconcileDestination(buildDir: string, destDir: string): void {
 /** Remove all repository-managed paths from a deployment destination. */
 export function cleanDestination(destDir: string): void {
   for (const managed of MANAGED_DESTINATION_PATHS) {
-    remove(join(destDir, managed.path));
+    const deployedPath = join(destDir, managed.path);
+    if (!managed.externallyManagedEntries) {
+      remove(deployedPath);
+      continue;
+    }
+    if (!existsSync(deployedPath)) continue;
+
+    const externalEntries = new Set(managed.externallyManagedEntries);
+    for (const entry of readdirSync(deployedPath)) {
+      if (!externalEntries.has(entry)) remove(join(deployedPath, entry));
+    }
+    if (readdirSync(deployedPath).length === 0) remove(deployedPath);
   }
 }
 

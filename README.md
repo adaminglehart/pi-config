@@ -36,6 +36,13 @@ available to `UIDOTSH_TOKEN` into `skills/` and updates the checked-in
 `pi.uiShSkills` list in `pi.jsonc`. Updating is explicit so normal builds stay
 offline and do not change reviewed skill content.
 
+## Herdr extension ownership
+
+Herdr alone manages `~/.pi/agent/extensions/herdr-agent-state.ts`. This
+repository does not build or deploy a copy. Deployment and cleanup preserve
+that file. Use `herdr integration install pi` to install or update it, and
+`herdr integration status` to check its version.
+
 ## Zero Tech Debt skill
 
 Use `/skill:zero-tech-debt` to simplify a change around its intended behavior.
