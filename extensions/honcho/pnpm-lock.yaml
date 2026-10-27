@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@honcho-ai/sdk':
-        specifier: 2.6.0
-        version: 2.6.0
+        specifier: 2.7.0
+        version: 2.7.0
     devDependencies:
       '@types/node':
         specifier: ^26.6.5
@@ -177,8 +177,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@honcho-ai/sdk@2.6.0':
-    resolution: {integrity: sha512-v91ng2zBD/DybWralKyJc2+5X7DUMdQbi/fHd2yAN06ipIp5KHb1O1u3A4E6JWxXZbQWoXPV+MO7sxCIYmVh7g==}
+  '@honcho-ai/sdk@2.7.0':
+    resolution: {integrity: sha512-v+4oEQ0PEYr4VMDsUGA41ZTJlr3IuATz27TbLHs5TOkp53sX9fGwUToM5hnyM2TBKkZ9xNmuPxMCHk+AMbzqdA==}
 
   '@types/node@26.6.5':
     resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
@@ -284,7 +284,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@honcho-ai/sdk@2.6.0':
+  '@honcho-ai/sdk@2.7.0':
     dependencies:
       zod: 4.0.0
 
