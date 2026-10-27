@@ -1,0 +1,3 @@
+nodeLinker: hoisted
+dangerouslyAllowAllBuilds: true
+autoInstallPeers: false

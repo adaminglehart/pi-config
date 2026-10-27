@@ -4,8 +4,7 @@
   "packages": [
     "npm:pi-subagents@0.80.0",
     "npm:pi-prompt-template-model@0.12.3",
-    "git:github.com/earendil-works/pi-review",
-    "git:github.com/earendil-works/pi-claude-code"
+    "git:github.com/earendil-works/pi-review"
   ],
   "extensions": ["~/dev/plannotator/apps/pi-extension/index.ts"],
   "skills": ["~/.agents/skills"],
