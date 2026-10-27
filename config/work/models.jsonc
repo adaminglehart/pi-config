@@ -84,6 +84,25 @@
             "forceAdaptiveThinking": true,
           },
         },
+        {
+          "id": "claude-fable-5-1",
+          "name": "Claude Fable 5.1",
+          "api": "anthropic-messages",
+          "baseUrl": "http://${LITELLM_PROXY_HOST}:7891",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+          },
+          "input": ["text", "image"],
+          "contextWindow": 1000000,
+          "compat": {
+            "forceAdaptiveThinking": true,
+          },
+        },
       ],
     },
     "litellm-openai": {

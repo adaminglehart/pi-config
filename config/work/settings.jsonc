@@ -3,7 +3,7 @@
     "baseUrl": "http://localhost:8100",
   },
   "defaultModel": "litellm-anthropic/claude-opus-5-5",
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "modelAliases": {
     "fast": { "model": "litellm-openai/gpt-6-luna", "thinking": "high" },
     "standard": { "model": "litellm-openai/gpt-6-sol", "thinking": "high" },
@@ -12,7 +12,6 @@
   "enabledModels": [
     "litellm-openai/gpt-6-astra",
     "litellm-openai/gpt-6.1-sol",
-    // "litellm-openai/gpt-6-sol",
     "litellm-openai/gpt-6-luna",
     "litellm-anthropic/claude-opus-5-5",
     "litellm-anthropic/claude-sonnet-5-5",
