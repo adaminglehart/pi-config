@@ -63,7 +63,7 @@ const QuestionParamsSchema = Type.Object({
 type QuestionParams = Static<typeof QuestionParamsSchema>;
 
 const EXTRACTION_PROVIDER = "openrouter";
-const EXTRACTION_MODEL = "google/gemini-3-flash-preview";
+const EXTRACTION_MODEL = "google/gemini-3.8-flash";
 
 const EXTRACTION_SYSTEM_PROMPT = `Extract all questions that need user input from the assistant message.
 

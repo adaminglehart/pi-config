@@ -11,7 +11,7 @@ interface CompactionModelConfig {
 function readCompactionSettings(): CompactionModelConfig {
   return getNamespacedConfig("compaction", {
     provider: "openrouter",
-    model: "google/gemini-3-flash-preview",
+    model: "google/gemini-3.8-flash",
   });
 }
 

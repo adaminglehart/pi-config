@@ -1,4 +1,0 @@
-nodeLinker: hoisted
-dangerouslyAllowAllBuilds: true
-minimumReleaseAgeExclude:
-  - 'drizzle-orm@1.0.0-rc.5'

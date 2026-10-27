@@ -3,7 +3,7 @@
     "baseUrl": "https://honcho.inglehart.io",
   },
   "defaultModel": "openai-codex/gpt-6.1-sol-fast",
-  "defaultThinkingLevel": "{{model.standard.thinking}}",
+  "defaultThinkingLevel": "high",
   "modelAliases": {
     "fast": { "model": "openai-codex/gpt-6-luna", "thinking": "max" },
     "standard": { "model": "openai-codex/gpt-6.1-sol", "thinking": "medium" },
