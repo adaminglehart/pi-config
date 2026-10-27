@@ -26,6 +26,7 @@ export interface HonchoConfig {
   maxMessageChars: number;
   searchResults: number;
   sdkTimeoutMs: number;
+  chatTimeoutMs: number;
   sdkMaxRetries: number;
   contextDeadlineMs: number;
   shutdownDeadlineMs: number;
@@ -74,6 +75,7 @@ const DEFAULTS: HonchoConfig = {
   maxMessageChars: 12000,
   searchResults: 10,
   sdkTimeoutMs: 10000,
+  chatTimeoutMs: 30000,
   sdkMaxRetries: 1,
   contextDeadlineMs: 1000,
   shutdownDeadlineMs: 2000,
@@ -168,6 +170,12 @@ export function loadHonchoConfig(settingsPath?: string): HonchoConfig {
     sdkTimeoutMs: integerValue(
       raw.sdkTimeoutMs,
       DEFAULTS.sdkTimeoutMs,
+      100,
+      120000,
+    ),
+    chatTimeoutMs: integerValue(
+      raw.chatTimeoutMs,
+      DEFAULTS.chatTimeoutMs,
       100,
       120000,
     ),

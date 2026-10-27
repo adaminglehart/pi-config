@@ -90,6 +90,7 @@ Use this tool when you need to retrieve and analyze web content.`,
       "Use webfetch when you need to retrieve and analyze web content.",
       "URL must start with http:// or https://",
       "Output is automatically truncated if too large.",
+      "For a GitHub repository file, find the exact path with `gh api repos/<owner>/<repo>/contents/<dir>` first. Do not guess raw.githubusercontent.com paths or tags.",
     ],
     parameters: WebFetchParams,
 

@@ -32,6 +32,7 @@
     "maxMessageChars": 12000,
     "searchResults": 10,
     "sdkTimeoutMs": 10000,
+    "chatTimeoutMs": 30000,
     "sdkMaxRetries": 1,
     "contextDeadlineMs": 1000,
     "shutdownDeadlineMs": 2000,

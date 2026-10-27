@@ -29,3 +29,5 @@
   seconds or eight tool calls without a result. State the known facts, open
   points, and next check. Do not send routine progress reports during
   implementation work.
+- Read the `agent-browser` skill before you run `agent-browser`. Close each
+  browser session that you open before your final response.

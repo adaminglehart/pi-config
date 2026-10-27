@@ -52,7 +52,27 @@ const typescript: LSPServerConfig = {
     );
   },
   spawn: async (root) => {
-    // Prefer local installation
+    // TypeScript 7 is native and serves LSP itself. It has no tsserver.js, so
+    // typescript-language-server cannot drive it.
+    const typescriptPackage = findNearestFile(
+      root,
+      [path.join("node_modules", "typescript", "package.json")],
+      path.parse(root).root,
+    );
+    if (typescriptPackage) {
+      const { version } = JSON.parse(fs.readFileSync(typescriptPackage, "utf8")) as {
+        version: string;
+      };
+      if (Number.parseInt(version, 10) >= 7) {
+        const tsc = path.join(path.dirname(typescriptPackage), "bin", "tsc");
+        return {
+          process: spawn(process.execPath, [tsc, "--lsp", "--stdio"], {
+            cwd: root,
+            stdio: ["pipe", "pipe", "pipe"],
+          }),
+        };
+      }
+    }
     const local = path.join(
       root,
       "node_modules",

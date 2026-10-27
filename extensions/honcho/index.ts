@@ -44,6 +44,7 @@ interface RuntimeHandles {
   client: Honcho;
   userPeer: Peer;
   aiPeer: Peer;
+  chatPeer: Peer;
   session: Session;
 }
 
@@ -188,13 +189,23 @@ export default function (pi: ExtensionAPI) {
       timeout: config.sdkTimeoutMs,
       maxRetries: config.sdkMaxRetries,
     });
-    const [userPeer, aiPeer] = await Promise.all([
+    // Dialectic chat runs a model on the server and often takes longer than
+    // the other API calls, so it uses a client with its own timeout.
+    const chatClient = new Honcho({
+      baseURL: config.baseUrl,
+      apiKey: config.apiKey || undefined,
+      workspaceId: config.workspace,
+      timeout: config.chatTimeoutMs,
+      maxRetries: config.sdkMaxRetries,
+    });
+    const [userPeer, aiPeer, chatPeer] = await Promise.all([
       client.peer(config.userPeer, {
         metadata: { display_name: config.userPeer, source: "pi" },
       }),
       client.peer(config.aiPeer, {
         metadata: { display_name: config.aiPeer, source: "pi" },
       }),
+      chatClient.peer(config.aiPeer),
     ]);
     if (!isCurrent(runGeneration)) {
       throw new Error("Honcho session changed during initialization");
@@ -218,7 +229,7 @@ export default function (pi: ExtensionAPI) {
       [aiPeer, { observeMe: false, observeOthers: true }],
     ]);
 
-    const result = { client, userPeer, aiPeer, session };
+    const result = { client, userPeer, aiPeer, chatPeer, session };
     if (isCurrent(runGeneration)) {
       handles = result;
       piSessionId = localPiSessionId;
@@ -493,7 +504,7 @@ export default function (pi: ExtensionAPI) {
     parameters: ChatParams,
     async execute(_id, params: ChatParamsType, _signal, _update, ctx) {
       const runtime = await ensureInitialized(generation, ctx);
-      const response = await runtime.aiPeer.chat(params.question, {
+      const response = await runtime.chatPeer.chat(params.question, {
         target: runtime.userPeer,
         reasoningLevel: "minimal",
       });
