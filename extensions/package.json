@@ -16,7 +16,7 @@
     "tsx": "4.23.15",
     "typebox": "^1.4.2",
     "typescript": "7.0.2",
-    "vscode-languageserver-protocol": "3.18.4"
+    "vscode-languageserver-protocol": "3.18.5"
   },
   "dependencies": {
     "vscode-jsonrpc": "^9.0.3"
