@@ -11,7 +11,6 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { Type, type Static } from "typebox";
-import { StringEnum } from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -106,7 +105,7 @@ const POSITION_ACTIONS: ReadonlySet<LspAction> = new Set([
 const SEVERITY_FILTERS = ["all", "error", "warning", "info", "hint"] as const;
 
 const LspParams = Type.Object({
-  action: StringEnum(ACTIONS),
+  action: Type.Enum(ACTIONS, { type: "string" }),
   file: Type.Optional(
     Type.String({
       description:
@@ -150,7 +149,8 @@ const LspParams = Type.Object({
     Type.String({ description: "New name for rename action" }),
   ),
   severity: Type.Optional(
-    StringEnum(SEVERITY_FILTERS, {
+    Type.Enum(SEVERITY_FILTERS, {
+      type: "string",
       description: 'Filter diagnostics: "all"|"error"|"warning"|"info"|"hint"',
     }),
   ),

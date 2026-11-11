@@ -16,7 +16,6 @@
  */
 
 import { Type } from "typebox";
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatSize } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
@@ -69,7 +68,8 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       query: Type.String({ description: "Web search query" }),
       provider: Type.Optional(
-        StringEnum(PROVIDERS, {
+        Type.Enum(PROVIDERS, {
+          type: "string",
           description: "Search provider - 'parallel' (default) or 'exa'",
         }),
       ),
@@ -80,13 +80,15 @@ export default function (pi: ExtensionAPI) {
       ),
       // Exa-specific options
       livecrawl: Type.Optional(
-        StringEnum(["fallback", "preferred"] as const, {
+        Type.Enum(["fallback", "preferred"], {
+          type: "string",
           description:
             "[Exa only] Live crawl mode - 'fallback': backup if cached unavailable, 'preferred': prioritize live crawling",
         }),
       ),
       type: Type.Optional(
-        StringEnum(["auto", "fast", "deep"] as const, {
+        Type.Enum(["auto", "fast", "deep"], {
+          type: "string",
           description:
             "[Exa only] Search type - 'auto': balanced, 'fast': quick results, 'deep': comprehensive",
         }),

@@ -105,11 +105,15 @@ test("preview budget includes omission row", () => {
 });
 test("restored results need no live record; call and result do not duplicate headers", () => {
   const hooks = toolRenderers("read");
-  const context = { args: { path: "file" }, state: {}, cwd: "/work", expanded: false, isPartial: false, isError: false, executionStarted: false };
+  const context = { args: { path: "file" }, state: {}, cwd: "/work", expanded: false, isPartial: false, isError: false, executionStarted: false, keyText: () => "ctrl+x" };
   const call = hooks.renderCall(context.args, theme, context);
   const result = hooks.renderResult({ content: [{ type: "text", text: "hello" }] }, { expanded: false, isPartial: false }, theme, context);
   assert.equal(call.render(100).length, 0);
-  assert.match(result.render(100).map(stripTerminalSequences).join("\n"), /Read file/);
+  const rendered = result.render(100).map(stripTerminalSequences).join("\n");
+  assert.match(rendered, /Read file/);
+  assert.match(rendered, /ctrl\+x to expand/);
+  context.keyText = () => "";
+  assert.doesNotMatch(result.render(100).map(stripTerminalSequences).join("\n"), /to expand/);
 });
 
 test("Bash failure truncation paths remain visible outside the preview budget", () => {

@@ -1,4 +1,4 @@
-import { keyText, type Theme, type ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type { KeybindingHints, Theme, ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { ToolRow, type DisplayArgs, type DisplayResult, type RowInput, type ToolKind } from "./row.js";
 
 interface RowState { hasResult?: boolean }
@@ -10,10 +10,11 @@ interface Context {
   isPartial: boolean;
   isError: boolean;
   executionStarted: boolean;
+  keyText: KeybindingHints["keyText"];
 }
 
 function rowInput(kind: ToolKind, context: Context, result?: DisplayResult): RowInput {
-  const key = keyText("app.tools.expand");
+  const key = context.keyText("app.tools.expand");
   return {
     kind, args: context.args, cwd: context.cwd, result,
     expanded: context.expanded, partial: context.isPartial, error: context.isError,

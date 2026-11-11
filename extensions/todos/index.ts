@@ -33,12 +33,10 @@ import {
   DynamicBorder,
   copyToClipboard,
   getMarkdownTheme,
-  keyHint,
   type ExtensionAPI,
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -106,7 +104,7 @@ interface TodoSettings {
 }
 
 const TodoParams = Type.Object({
-  action: StringEnum([
+  action: Type.Enum([
     "list",
     "list-all",
     "get",
@@ -116,7 +114,7 @@ const TodoParams = Type.Object({
     "delete",
     "claim",
     "release",
-  ] as const),
+  ], { type: "string" }),
   id: Type.Optional(
     Type.String({ description: "Todo id (TODO-<hex> or raw hex filename)" }),
   ),
@@ -1431,8 +1429,8 @@ function renderTodoDetail(
   return lines.join("\n");
 }
 
-function appendExpandHint(theme: Theme, text: string): string {
-  return `${text}\n${theme.fg("dim", `(${keyHint("app.tools.expand", "to expand")})`)}`;
+function appendExpandHint(theme: Theme, text: string, hint: string): string {
+  return `${text}\n${theme.fg("dim", `(${hint})`)}`;
 }
 
 async function ensureTodoExists(
@@ -1949,7 +1947,7 @@ export default function todosExtension(pi: ExtensionAPI) {
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, { expanded, isPartial }, theme) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       const details = result.details as TodoToolDetails | undefined;
       if (isPartial) {
         return new Text(theme.fg("warning", "Processing..."), 0, 0);
@@ -1973,7 +1971,7 @@ export default function todosExtension(pi: ExtensionAPI) {
         if (!expanded) {
           const { closedTodos } = splitTodosByAssignment(details.todos);
           if (closedTodos.length) {
-            text = appendExpandHint(theme, text);
+            text = appendExpandHint(theme, text, context.keyHint("app.tools.expand", "to expand"));
           }
         }
         return new Text(text, 0, 0);
@@ -2008,7 +2006,7 @@ export default function todosExtension(pi: ExtensionAPI) {
         text = lines.join("\n");
       }
       if (!expanded) {
-        text = appendExpandHint(theme, text);
+        text = appendExpandHint(theme, text, context.keyHint("app.tools.expand", "to expand"));
       }
       return new Text(text, 0, 0);
     },

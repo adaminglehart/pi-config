@@ -1,4 +1,4 @@
-import { type Api, type Model, StringEnum, type UserMessage } from "@earendil-works/pi-ai";
+import { type Api, type Model, type UserMessage } from "@earendil-works/pi-ai";
 import { complete } from "@earendil-works/pi-ai/compat";
 import {
   BorderedLoader,
@@ -23,7 +23,7 @@ import { requestDesktopNotification } from "./_lib/desktop-notification.js";
 import { messageText } from "./_lib/message-text.js";
 import { findModelAuth, getModelAuth, type ModelAuth } from "./_lib/model-auth.js";
 
-const QuestionKindSchema = StringEnum(["single", "multiple", "text"] as const);
+const QuestionKindSchema = Type.Enum(["single", "multiple", "text"], { type: "string" });
 
 const OptionSchema = Type.Object({
   value: Type.String({ description: "Stable value returned for this option" }),

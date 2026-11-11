@@ -54,9 +54,10 @@ test("streamed input keeps one stable header without background redraws", async 
 			row.updateArgs({ text: script.slice(0, i) });
 			assert.deepEqual(row.render(80), initial);
 		}
-		// Drain file I/O from the old asynchronous preview implementation.
+		const streamedRedraws = redraws();
+		// Pi requests a render for each argument update. No extra preview work must follow.
 		await new Promise((resolve) => setTimeout(resolve, 50));
-		assert.equal(redraws(), 0);
+		assert.equal(redraws(), streamedRedraws);
 		assert.deepEqual(row.render(80), initial);
 		row.setArgsComplete();
 		row.markExecutionStarted();

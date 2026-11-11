@@ -9,12 +9,12 @@ importers:
   .:
     dependencies:
       '@honcho-ai/sdk':
-        specifier: 2.6.0
-        version: 2.6.0
+        specifier: 2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
-        specifier: ^26.6.5
-        version: 26.6.5
+        specifier: ^26.6.6
+        version: 26.6.6
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -177,11 +177,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@honcho-ai/sdk@2.6.0':
-    resolution: {integrity: sha512-v91ng2zBD/DybWralKyJc2+5X7DUMdQbi/fHd2yAN06ipIp5KHb1O1u3A4E6JWxXZbQWoXPV+MO7sxCIYmVh7g==}
+  '@honcho-ai/sdk@2.9.0':
+    resolution: {integrity: sha512-fGuph0r+AxDzzecIysot00a2UNAA/63fBMqAeokmnrSD+rVPpsj6zjUDwjh4myfEm55ICZ1pUrZcda/bmX7+qQ==}
 
-  '@types/node@26.6.5':
-    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
@@ -284,11 +284,11 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@honcho-ai/sdk@2.6.0':
+  '@honcho-ai/sdk@2.9.0':
     dependencies:
       zod: 4.0.0
 
-  '@types/node@26.6.5':
+  '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
 

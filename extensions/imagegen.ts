@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
-import { StringEnum } from "@earendil-works/pi-ai";
 import {
   formatSize,
   type ExtensionAPI,
@@ -12,7 +11,7 @@ import { type Static, Type } from "typebox";
 const IMAGE_MODEL = "gpt-image-2";
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
-const QualitySchema = StringEnum(["auto", "low", "medium", "high"] as const);
+const QualitySchema = Type.Enum(["auto", "low", "medium", "high"], { type: "string" });
 
 const ImagegenParamsSchema = Type.Object({
   prompt: Type.String({ description: "Detailed description of the image to generate" }),
